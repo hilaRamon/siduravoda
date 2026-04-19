@@ -5,7 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
-import { Plus, Search, Pencil, Trash2, Building2, Phone, Mail } from 'lucide-react';
+import { Plus, Search, Pencil, Trash2, Building2, Phone, Mail, Upload } from 'lucide-react';
+import ImportWorkplacesModal from '@/components/workplaces/ImportWorkplacesModal';
 
 function WorkplaceFormModal({ open, onClose, onSave, workplace }) {
   const [form, setForm] = useState(workplace || {
@@ -65,6 +66,7 @@ function WorkplaceFormModal({ open, onClose, onSave, workplace }) {
 export default function Workplaces() {
   const [search, setSearch] = useState('');
   const [showForm, setShowForm] = useState(false);
+  const [showImport, setShowImport] = useState(false);
   const [editWp, setEditWp] = useState(null);
   const queryClient = useQueryClient();
 
@@ -101,9 +103,14 @@ export default function Workplaces() {
           <h2 className="text-2xl font-bold">מקומות עבודה</h2>
           <p className="text-muted-foreground mt-1">{workplaces.length} מקומות במערכת</p>
         </div>
-        <Button onClick={() => { setEditWp(null); setShowForm(true); }}>
-          <Plus size={16} className="ml-2" /> מקום חדש
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setShowImport(true)}>
+            <Upload size={16} className="ml-2" /> ייבוא מאקסל
+          </Button>
+          <Button onClick={() => { setEditWp(null); setShowForm(true); }}>
+            <Plus size={16} className="ml-2" /> מקום חדש
+          </Button>
+        </div>
       </div>
 
       <div className="relative mb-6">
@@ -175,6 +182,11 @@ export default function Workplaces() {
         onClose={() => { setShowForm(false); setEditWp(null); }}
         onSave={handleSave}
         workplace={editWp}
+      />
+      <ImportWorkplacesModal
+        open={showImport}
+        onClose={() => setShowImport(false)}
+        onImported={() => { queryClient.invalidateQueries({ queryKey: ['workplaces'] }); setShowImport(false); }}
       />
     </div>
   );
