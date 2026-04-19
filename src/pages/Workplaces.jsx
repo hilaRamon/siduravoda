@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
-import { Plus, Search, Pencil, Trash2, Building2, Phone, Mail, Upload } from 'lucide-react';
+import { Plus, Search, Pencil, Trash2, Building2, Upload } from 'lucide-react';
 import ImportWorkplacesModal from '@/components/workplaces/ImportWorkplacesModal';
 
 function WorkplaceFormModal({ open, onClose, onSave, workplace }) {
@@ -119,8 +119,8 @@ export default function Workplaces() {
       </div>
 
       {isLoading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {[1,2,3].map(i => <div key={i} className="h-40 bg-secondary rounded-2xl animate-pulse" />)}
+        <div className="space-y-3">
+          {[1,2,3].map(i => <div key={i} className="h-12 bg-secondary rounded-xl animate-pulse" />)}
         </div>
       ) : filtered.length === 0 ? (
         <div className="text-center py-16 text-muted-foreground">
@@ -128,52 +128,44 @@ export default function Workplaces() {
           <p>{search ? 'לא נמצאו תוצאות' : 'אין מקומות עבודה עדיין'}</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filtered.map(w => (
-            <div key={w.id} className="bg-card rounded-2xl border border-border shadow-sm p-5 hover:shadow-md transition-shadow">
-              <div className="flex items-start justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <div className="w-9 h-9 bg-primary/10 rounded-xl flex items-center justify-center">
-                    <Building2 size={18} className="text-primary" />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-sm">{w.name}</h3>
-                    {w.farm_name && <p className="text-xs text-muted-foreground">{w.farm_name}</p>}
-                  </div>
-                </div>
-                <div className="flex gap-1">
-                  <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-primary"
-                    onClick={() => { setEditWp(w); setShowForm(true); }}>
-                    <Pencil size={13} />
-                  </Button>
-                  <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                    onClick={() => handleDelete(w.id)}>
-                    <Trash2 size={13} />
-                  </Button>
-                </div>
-              </div>
-              <div className="space-y-1.5">
-                {w.company_id && (
-                  <div className="text-xs text-muted-foreground">ח.פ: {w.company_id}</div>
-                )}
-                {w.contact_phone && (
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <Phone size={12} /> איש קשר: {w.contact_phone}
-                  </div>
-                )}
-                {w.accounting_phone && (
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <Phone size={12} /> הנה"ח: {w.accounting_phone}
-                  </div>
-                )}
-                {w.accounting_email && (
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <Mail size={12} /> {w.accounting_email}
-                  </div>
-                )}
-              </div>
-            </div>
-          ))}
+        <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden">
+          <table className="w-full">
+            <thead className="bg-secondary/60 border-b border-border">
+              <tr>
+                <th className="text-right px-5 py-3 text-sm font-semibold text-muted-foreground">שם מקום עבודה</th>
+                <th className="text-right px-5 py-3 text-sm font-semibold text-muted-foreground">שם משק</th>
+                <th className="text-right px-5 py-3 text-sm font-semibold text-muted-foreground">ח.פ</th>
+                <th className="text-right px-5 py-3 text-sm font-semibold text-muted-foreground">טלפון איש קשר</th>
+                <th className="text-right px-5 py-3 text-sm font-semibold text-muted-foreground">טלפון הנה"ח</th>
+                <th className="text-right px-5 py-3 text-sm font-semibold text-muted-foreground">מייל הנה"ח</th>
+                <th className="px-5 py-3"></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {filtered.map(w => (
+                <tr key={w.id} className="hover:bg-secondary/30 transition-colors">
+                  <td className="px-5 py-3 font-medium">{w.name}</td>
+                  <td className="px-5 py-3 text-sm text-muted-foreground">{w.farm_name || '—'}</td>
+                  <td className="px-5 py-3 text-sm text-muted-foreground">{w.company_id || '—'}</td>
+                  <td className="px-5 py-3 text-sm text-muted-foreground">{w.contact_phone || '—'}</td>
+                  <td className="px-5 py-3 text-sm text-muted-foreground">{w.accounting_phone || '—'}</td>
+                  <td className="px-5 py-3 text-sm text-muted-foreground">{w.accounting_email || '—'}</td>
+                  <td className="px-5 py-3">
+                    <div className="flex gap-1 justify-end">
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-primary"
+                        onClick={() => { setEditWp(w); setShowForm(true); }}>
+                        <Pencil size={14} />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                        onClick={() => handleDelete(w.id)}>
+                        <Trash2 size={14} />
+                      </Button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
 

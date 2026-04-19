@@ -5,33 +5,54 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { ChevronRight, ChevronLeft, Copy, CalendarDays, X } from 'lucide-react';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { ChevronRight, ChevronLeft, Copy, CalendarDays, X, ChevronsUpDown } from 'lucide-react';
 import { format, addDays, subDays } from 'date-fns';
 
 function WorkplaceCell({ student, assignment, workplaces, onAssign, onRemove }) {
+  const [open, setOpen] = useState(false);
+
   const handleSelect = async (workplaceId) => {
+    setOpen(false);
     if (!workplaceId) return;
     const workplace = workplaces.find(w => w.id === workplaceId);
     await onAssign(student, workplace, assignment);
   };
 
+  const selectedName = assignment ? workplaces.find(w => w.id === assignment.workplace_id)?.name || assignment.workplace_name : null;
+
   return (
     <td className="px-3 py-2 border-b border-border">
       <div className="flex items-center gap-1">
-        <Select value={assignment?.workplace_id || ''} onValueChange={handleSelect}>
-          <SelectTrigger className={`h-8 text-xs w-full border transition-colors ${
-            assignment
-              ? 'bg-primary/10 border-primary/30 text-primary font-medium hover:bg-primary/20'
-              : 'bg-secondary/50 border-dashed text-muted-foreground hover:bg-secondary hover:border-border'
-          }`}>
-            <SelectValue placeholder="+ שבץ" />
-          </SelectTrigger>
-          <SelectContent align="start">
-            {workplaces.map(w => (
-              <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <Popover open={open} onOpenChange={setOpen}>
+          <PopoverTrigger asChild>
+            <button className={`h-8 text-xs w-full border rounded-md px-2 flex items-center justify-between transition-colors ${
+              assignment
+                ? 'bg-primary/10 border-primary/30 text-primary font-medium hover:bg-primary/20'
+                : 'bg-secondary/50 border-dashed text-muted-foreground hover:bg-secondary hover:border-border'
+            }`}>
+              <span className="truncate">{selectedName || '+ שבץ'}</span>
+              <ChevronsUpDown size={12} className="shrink-0 opacity-50 mr-1" />
+            </button>
+          </PopoverTrigger>
+          <PopoverContent className="w-64 p-0" align="start">
+            <Command>
+              <CommandInput placeholder="חיפוש מקום עבודה..." className="h-8 text-xs" />
+              <CommandList>
+                <CommandEmpty>לא נמצא</CommandEmpty>
+                <CommandGroup>
+                  {workplaces.map(w => (
+                    <CommandItem key={w.id} value={w.name} onSelect={() => handleSelect(w.id)}
+                      className="text-xs cursor-pointer">
+                      {w.name}
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              </CommandList>
+            </Command>
+          </PopoverContent>
+        </Popover>
         {assignment && (
           <button onClick={() => onRemove(assignment.id)}
             className="shrink-0 p-1 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors">
