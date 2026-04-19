@@ -3,7 +3,8 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ChevronRight, ChevronLeft, Copy, CalendarDays, X, ChevronDown } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { ChevronRight, ChevronLeft, Copy, CalendarDays, X } from 'lucide-react';
 import { format, addDays, subDays } from 'date-fns';
 
 function WorkplaceCell({ student, assignment, workplaces, onAssign, onRemove }) {
@@ -66,6 +67,8 @@ function RoleCell({ assignment, roles, onUpdateRole }) {
 export default function Assignments() {
   const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [cloning, setCloning] = useState(false);
+  const [showCloneDialog, setShowCloneDialog] = useState(false);
+  const [cloneTargetDate, setCloneTargetDate] = useState('');
   const [filterCohort, setFilterCohort] = useState('');
   const [filterWorkplace, setFilterWorkplace] = useState('');
   const [filterAssigned, setFilterAssigned] = useState('');
@@ -133,20 +136,22 @@ export default function Assignments() {
   };
 
   const handleCloneDay = async () => {
-    const targetDate = format(addDays(new Date(date + 'T12:00:00'), 7), 'yyyy-MM-dd');
-    if (!confirm(`שכפל שיבוצים לתאריך ${targetDate}?`)) return;
+    if (!cloneTargetDate) return;
     setCloning(true);
     const toCreate = assignments.map(a => ({
-      date: targetDate,
+      date: cloneTargetDate,
       student_id: a.student_id,
       student_name: a.student_name,
       workplace_id: a.workplace_id,
       workplace_name: a.workplace_name,
+      role: a.role,
     }));
     await base44.entities.Assignment.bulkCreate(toCreate);
     queryClient.invalidateQueries({ queryKey: ['assignments'] });
     setCloning(false);
-    alert(`שוכפלו ${toCreate.length} שיבוצים ל-${targetDate}`);
+    setShowCloneDialog(false);
+    setCloneTargetDate('');
+    alert(`שוכפלו ${toCreate.length} שיבוצים לתאריך ${cloneTargetDate}`);
   };
 
   const prevDay = () => setDate(format(subDays(new Date(date + 'T12:00:00'), 1), 'yyyy-MM-dd'));
@@ -163,8 +168,8 @@ export default function Assignments() {
           </p>
         </div>
         {assignments.length > 0 && (
-          <Button variant="outline" onClick={handleCloneDay} disabled={cloning}>
-            <Copy size={16} className="ml-2" /> {cloning ? 'משכפל...' : 'שכפל לשבוע הבא'}
+          <Button variant="outline" onClick={() => { setCloneTargetDate(''); setShowCloneDialog(true); }}>
+            <Copy size={16} className="ml-2" /> שכפל שיבוצים
           </Button>
         )}
       </div>
@@ -227,6 +232,33 @@ export default function Assignments() {
           </Button>
         )}
       </div>
+
+      {/* Clone Dialog */}
+      <Dialog open={showCloneDialog} onOpenChange={setShowCloneDialog}>
+        <DialogContent className="max-w-sm" dir="rtl">
+          <DialogHeader>
+            <DialogTitle>שכפול שיבוצים</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 mt-2">
+            <p className="text-sm text-muted-foreground">
+              שכפל את {assignments.length} השיבוצים מתאריך <strong>{date}</strong> לתאריך:
+            </p>
+            <input
+              type="date"
+              value={cloneTargetDate}
+              onChange={e => setCloneTargetDate(e.target.value)}
+              min={format(addDays(new Date(), 1), 'yyyy-MM-dd')}
+              className="w-full border border-border rounded-lg px-3 py-2 text-sm bg-card focus:outline-none focus:ring-2 focus:ring-primary/30"
+            />
+            <div className="flex gap-2 justify-end pt-1">
+              <Button variant="outline" onClick={() => setShowCloneDialog(false)}>ביטול</Button>
+              <Button onClick={handleCloneDay} disabled={!cloneTargetDate || cloning}>
+                <Copy size={14} className="ml-2" /> {cloning ? 'משכפל...' : 'שכפל'}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Main Table */}
       <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden">
