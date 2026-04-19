@@ -123,6 +123,7 @@ export default function Assignments() {
   const { data: workplaces = [] } = useQuery({
     queryKey: ['workplaces'],
     queryFn: () => base44.entities.Workplace.list(),
+    select: (data) => [...data].sort((a, b) => (a.name || '').localeCompare(b.name || '', 'he')),
   });
 
   const { data: roles = [] } = useQuery({
