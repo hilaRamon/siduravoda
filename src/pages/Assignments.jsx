@@ -132,6 +132,16 @@ export default function Assignments() {
     if (filterAssigned === 'assigned' && !a) return false;
     if (filterAssigned === 'unassigned' && a) return false;
     return true;
+  }).sort((a, b) => {
+    const aAssign = assignmentByStudent[a.id];
+    const bAssign = assignmentByStudent[b.id];
+    const aWp = aAssign?.workplace_name || '';
+    const bWp = bAssign?.workplace_name || '';
+    if (aWp !== bWp) return aWp.localeCompare(bWp, 'he');
+    const aCohort = a.cohort || '';
+    const bCohort = b.cohort || '';
+    if (aCohort !== bCohort) return aCohort.localeCompare(bCohort, 'he');
+    return (a.full_name || '').localeCompare(b.full_name || '', 'he');
   }), [students, assignmentByStudent, filterName, filterCohort, filterWorkplace, filterRole, filterAssigned]);
 
   const handleAssign = async (student, workplace, existingAssignment) => {
