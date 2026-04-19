@@ -1,17 +1,13 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ChevronRight, ChevronLeft, Copy, CalendarDays, Trash2, X } from 'lucide-react';
+import { ChevronRight, ChevronLeft, Copy, CalendarDays, X, ChevronDown } from 'lucide-react';
 import { format, addDays, subDays } from 'date-fns';
 
-// Cell: shows assigned workplace or empty — click opens dropdown inline
-function AssignmentCell({ student, assignment, workplaces, date, onAssign, onRemove }) {
-  const [open, setOpen] = useState(false);
-
+function WorkplaceCell({ student, assignment, workplaces, onAssign, onRemove }) {
   const handleSelect = async (workplaceId) => {
-    setOpen(false);
     if (!workplaceId) return;
     const workplace = workplaces.find(w => w.id === workplaceId);
     await onAssign(student, workplace, assignment);
@@ -19,20 +15,13 @@ function AssignmentCell({ student, assignment, workplaces, date, onAssign, onRem
 
   return (
     <td className="px-4 py-2 border-b border-border">
-      <div className="relative flex items-center gap-1">
-        <Select
-          open={open}
-          onOpenChange={setOpen}
-          value={assignment?.workplace_id || ''}
-          onValueChange={handleSelect}
-        >
-          <SelectTrigger
-            className={`h-8 text-xs w-full border transition-colors ${
-              assignment
-                ? 'bg-primary/10 border-primary/30 text-primary font-medium hover:bg-primary/20'
-                : 'bg-secondary/50 border-dashed text-muted-foreground hover:bg-secondary hover:border-border'
-            }`}
-          >
+      <div className="flex items-center gap-1">
+        <Select value={assignment?.workplace_id || ''} onValueChange={handleSelect}>
+          <SelectTrigger className={`h-8 text-xs w-full border transition-colors ${
+            assignment
+              ? 'bg-primary/10 border-primary/30 text-primary font-medium hover:bg-primary/20'
+              : 'bg-secondary/50 border-dashed text-muted-foreground hover:bg-secondary hover:border-border'
+          }`}>
             <SelectValue placeholder="+ שבץ" />
           </SelectTrigger>
           <SelectContent align="start">
@@ -42,10 +31,8 @@ function AssignmentCell({ student, assignment, workplaces, date, onAssign, onRem
           </SelectContent>
         </Select>
         {assignment && (
-          <button
-            onClick={() => onRemove(assignment.id)}
-            className="shrink-0 p-1 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
-          >
+          <button onClick={() => onRemove(assignment.id)}
+            className="shrink-0 p-1 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors">
             <X size={12} />
           </button>
         )}
@@ -54,9 +41,34 @@ function AssignmentCell({ student, assignment, workplaces, date, onAssign, onRem
   );
 }
 
+function RoleCell({ assignment, roles, onUpdateRole }) {
+  if (!assignment) {
+    return <td className="px-4 py-2 border-b border-border text-muted-foreground text-xs">—</td>;
+  }
+
+  return (
+    <td className="px-4 py-2 border-b border-border">
+      <Select value={assignment.role || ''} onValueChange={(v) => onUpdateRole(assignment, v)}>
+        <SelectTrigger className="h-8 text-xs w-full border bg-secondary/50 border-border">
+          <SelectValue placeholder="— בחר —" />
+        </SelectTrigger>
+        <SelectContent align="start">
+          <SelectItem value="none">— ללא תפקיד —</SelectItem>
+          {roles.map(r => (
+            <SelectItem key={r.id} value={r.name}>{r.name}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </td>
+  );
+}
+
 export default function Assignments() {
   const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [cloning, setCloning] = useState(false);
+  const [filterCohort, setFilterCohort] = useState('');
+  const [filterWorkplace, setFilterWorkplace] = useState('');
+  const [filterAssigned, setFilterAssigned] = useState('');
   const queryClient = useQueryClient();
 
   const { data: assignments = [] } = useQuery({
@@ -74,13 +86,30 @@ export default function Assignments() {
     queryFn: () => base44.entities.Workplace.list(),
   });
 
-  // map studentId -> assignment for this date
+  const { data: roles = [] } = useQuery({
+    queryKey: ['roles'],
+    queryFn: () => base44.entities.Role.list(),
+  });
+
   const assignmentByStudent = {};
   assignments.forEach(a => { assignmentByStudent[a.student_id] = a; });
 
+  const cohorts = useMemo(() => [...new Set(students.map(s => s.cohort).filter(Boolean))], [students]);
+
+  const filteredStudents = useMemo(() => students.filter(s => {
+    const assignment = assignmentByStudent[s.student_id || s.id];
+    if (filterCohort && s.cohort !== filterCohort) return false;
+    if (filterWorkplace) {
+      const a = assignmentByStudent[s.id];
+      if (!a || a.workplace_id !== filterWorkplace) return false;
+    }
+    if (filterAssigned === 'assigned' && !assignmentByStudent[s.id]) return false;
+    if (filterAssigned === 'unassigned' && assignmentByStudent[s.id]) return false;
+    return true;
+  }), [students, assignmentByStudent, filterCohort, filterWorkplace, filterAssigned]);
+
   const handleAssign = async (student, workplace, existingAssignment) => {
     if (existingAssignment) {
-      // update: delete old, create new
       await base44.entities.Assignment.delete(existingAssignment.id);
     }
     await base44.entities.Assignment.create({
@@ -98,8 +127,13 @@ export default function Assignments() {
     queryClient.invalidateQueries({ queryKey: ['assignments', date] });
   };
 
+  const handleUpdateRole = async (assignment, roleName) => {
+    await base44.entities.Assignment.update(assignment.id, { role: roleName === 'none' ? '' : roleName });
+    queryClient.invalidateQueries({ queryKey: ['assignments', date] });
+  };
+
   const handleCloneDay = async () => {
-    const targetDate = format(addDays(new Date(date), 7), 'yyyy-MM-dd');
+    const targetDate = format(addDays(new Date(date + 'T12:00:00'), 7), 'yyyy-MM-dd');
     if (!confirm(`שכפל שיבוצים לתאריך ${targetDate}?`)) return;
     setCloning(true);
     const toCreate = assignments.map(a => ({
@@ -118,8 +152,6 @@ export default function Assignments() {
   const prevDay = () => setDate(format(subDays(new Date(date + 'T12:00:00'), 1), 'yyyy-MM-dd'));
   const nextDay = () => setDate(format(addDays(new Date(date + 'T12:00:00'), 1), 'yyyy-MM-dd'));
 
-  const assignedCount = assignments.length;
-
   return (
     <div className="p-8">
       {/* Header */}
@@ -127,7 +159,7 @@ export default function Assignments() {
         <div>
           <h2 className="text-2xl font-bold">שיבוצים יומיים</h2>
           <p className="text-muted-foreground mt-1">
-            {assignedCount} משובצים מתוך {students.length} סטודנטים
+            {assignments.length} משובצים מתוך {students.length} תלמידים
           </p>
         </div>
         {assignments.length > 0 && (
@@ -138,7 +170,7 @@ export default function Assignments() {
       </div>
 
       {/* Date Picker */}
-      <div className="flex items-center gap-3 mb-6">
+      <div className="flex items-center gap-3 mb-5">
         <Button variant="outline" size="icon" onClick={prevDay}><ChevronRight size={18} /></Button>
         <div className="flex items-center gap-2">
           <CalendarDays size={18} className="text-primary" />
@@ -155,48 +187,87 @@ export default function Assignments() {
         </span>
       </div>
 
+      {/* Filters */}
+      <div className="flex flex-wrap gap-3 mb-5">
+        <Select value={filterCohort} onValueChange={setFilterCohort}>
+          <SelectTrigger className="w-40 h-8 text-xs">
+            <SelectValue placeholder="סינון מחזור" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">כל המחזורים</SelectItem>
+            {cohorts.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+          </SelectContent>
+        </Select>
+
+        <Select value={filterWorkplace} onValueChange={setFilterWorkplace}>
+          <SelectTrigger className="w-44 h-8 text-xs">
+            <SelectValue placeholder="סינון מקום עבודה" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">כל מקומות העבודה</SelectItem>
+            {workplaces.map(w => <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>)}
+          </SelectContent>
+        </Select>
+
+        <Select value={filterAssigned} onValueChange={setFilterAssigned}>
+          <SelectTrigger className="w-36 h-8 text-xs">
+            <SelectValue placeholder="סטטוס שיבוץ" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">הכל</SelectItem>
+            <SelectItem value="assigned">משובצים</SelectItem>
+            <SelectItem value="unassigned">לא משובצים</SelectItem>
+          </SelectContent>
+        </Select>
+
+        {(filterCohort || filterWorkplace || filterAssigned) && (
+          <Button variant="ghost" size="sm" className="h-8 text-xs text-muted-foreground"
+            onClick={() => { setFilterCohort(''); setFilterWorkplace(''); setFilterAssigned(''); }}>
+            <X size={12} className="ml-1" /> נקה סינון
+          </Button>
+        )}
+      </div>
+
       {/* Main Table */}
       <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden">
         <table className="w-full text-sm">
           <thead className="bg-secondary/60 border-b border-border">
             <tr>
               <th className="text-right px-4 py-3 font-semibold text-muted-foreground w-8">#</th>
-              <th className="text-right px-4 py-3 font-semibold text-muted-foreground">שם סטודנט</th>
+              <th className="text-right px-4 py-3 font-semibold text-muted-foreground">שם תלמיד</th>
               <th className="text-right px-4 py-3 font-semibold text-muted-foreground">מחזור</th>
               <th className="text-right px-4 py-3 font-semibold text-muted-foreground w-56">מקום עבודה</th>
-              <th className="text-right px-4 py-3 font-semibold text-muted-foreground">תפקיד</th>
+              <th className="text-right px-4 py-3 font-semibold text-muted-foreground w-40">תפקיד</th>
               <th className="text-right px-4 py-3 font-semibold text-muted-foreground">הערות</th>
             </tr>
           </thead>
           <tbody>
-            {students.length === 0 ? (
+            {filteredStudents.length === 0 ? (
               <tr>
                 <td colSpan={6} className="text-center py-12 text-muted-foreground">
-                  אין סטודנטים במערכת
+                  {students.length === 0 ? 'אין תלמידים במערכת' : 'לא נמצאו תוצאות לסינון'}
                 </td>
               </tr>
             ) : (
-              students.map((student, idx) => {
+              filteredStudents.map((student, idx) => {
                 const assignment = assignmentByStudent[student.id];
                 return (
-                  <tr
-                    key={student.id}
-                    className={`transition-colors ${assignment ? 'bg-primary/5' : 'hover:bg-secondary/20'}`}
-                  >
+                  <tr key={student.id} className={`transition-colors ${assignment ? 'bg-primary/5' : 'hover:bg-secondary/20'}`}>
                     <td className="px-4 py-2 border-b border-border text-muted-foreground text-xs">{idx + 1}</td>
                     <td className="px-4 py-2 border-b border-border font-medium">{student.full_name}</td>
                     <td className="px-4 py-2 border-b border-border text-muted-foreground text-xs">{student.cohort || '—'}</td>
-                    <AssignmentCell
+                    <WorkplaceCell
                       student={student}
                       assignment={assignment}
                       workplaces={workplaces}
-                      date={date}
                       onAssign={handleAssign}
                       onRemove={handleRemove}
                     />
-                    <td className="px-4 py-2 border-b border-border text-muted-foreground text-xs">
-                      {assignment?.role || '—'}
-                    </td>
+                    <RoleCell
+                      assignment={assignment}
+                      roles={roles}
+                      onUpdateRole={handleUpdateRole}
+                    />
                     <td className="px-4 py-2 border-b border-border text-muted-foreground text-xs">
                       {assignment?.notes || '—'}
                     </td>
