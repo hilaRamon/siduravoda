@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Upload, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
+import * as XLSX from 'xlsx';
 
 const FREE_DAY_MAP = {
   'ראשון': 'א', 'א׳': 'א', "א'": 'א', 'א': 'א',
@@ -21,17 +22,13 @@ const SYSTEM_FIELDS = [
   { key: 'notes', label: 'הערות', required: false },
 ];
 
-function parseCSV(text) {
-  const lines = text.split('\n').filter(l => l.trim());
-  if (lines.length < 2) return { headers: [], rows: [] };
-  const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
-  const rows = lines.slice(1).map(line => {
-    const cells = line.split(',').map(c => c.trim().replace(/^"|"$/g, ''));
-    const obj = {};
-    headers.forEach((h, i) => { obj[h] = cells[i] || ''; });
-    return obj;
-  });
-  return { headers, rows };
+function parseExcel(buffer) {
+  const workbook = XLSX.read(buffer, { type: 'array' });
+  const sheet = workbook.Sheets[workbook.SheetNames[0]];
+  const data = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+  if (!data.length) return { headers: [], rows: [] };
+  const headers = Object.keys(data[0]);
+  return { headers, rows: data.map(r => { const obj = {}; headers.forEach(h => { obj[h] = String(r[h] ?? ''); }); return obj; }) };
 }
 
 export default function ImportModal({ open, onClose, onImported }) {
@@ -49,10 +46,9 @@ export default function ImportModal({ open, onClose, onImported }) {
     if (!file) return;
     const reader = new FileReader();
     reader.onload = (ev) => {
-      const { headers, rows } = parseCSV(ev.target.result);
+      const { headers, rows } = parseExcel(new Uint8Array(ev.target.result));
       setHeaders(headers);
       setRows(rows);
-      // Auto-map obvious fields
       const autoMap = {};
       SYSTEM_FIELDS.forEach(sf => {
         const match = headers.find(h =>
@@ -67,7 +63,7 @@ export default function ImportModal({ open, onClose, onImported }) {
       setMapping(autoMap);
       setStep('map');
     };
-    reader.readAsText(file, 'UTF-8');
+    reader.readAsArrayBuffer(file);
   };
 
   const buildPreviewRows = () => {
@@ -142,20 +138,20 @@ export default function ImportModal({ open, onClose, onImported }) {
     <Dialog open={open} onOpenChange={() => { reset(); onClose(); }}>
       <DialogContent className="max-w-2xl" dir="rtl">
         <DialogHeader>
-          <DialogTitle>ייבוא סטודנטים מקובץ CSV</DialogTitle>
+          <DialogTitle>ייבוא סטודנטים מקובץ Excel</DialogTitle>
         </DialogHeader>
 
         {step === 'upload' && (
           <div className="py-8 text-center">
             <div className="border-2 border-dashed border-border rounded-2xl p-10 hover:border-primary transition-colors">
               <Upload className="mx-auto mb-3 text-muted-foreground" size={36} />
-              <p className="text-sm text-muted-foreground mb-4">גרור קובץ CSV או לחץ לבחירה</p>
-              <input ref={fileRef} type="file" accept=".csv" onChange={handleFile} className="hidden" id="csv-upload" />
+              <p className="text-sm text-muted-foreground mb-4">גרור קובץ Excel או לחץ לבחירה</p>
+              <input ref={fileRef} type="file" accept=".xlsx,.xls" onChange={handleFile} className="hidden" id="excel-upload" />
               <Button asChild variant="outline">
-                <label htmlFor="csv-upload" className="cursor-pointer">בחר קובץ CSV</label>
+                <label htmlFor="excel-upload" className="cursor-pointer">בחר קובץ Excel</label>
               </Button>
             </div>
-            <p className="text-xs text-muted-foreground mt-4">הקובץ צריך להכיל שורת כותרות בשורה הראשונה</p>
+            <p className="text-xs text-muted-foreground mt-4">הקובץ צריך להכיל שורת כותרות בשורה הראשונה (.xlsx / .xls)</p>
           </div>
         )}
 
