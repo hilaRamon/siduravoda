@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ChevronRight, ChevronLeft, Copy, CalendarDays, X } from 'lucide-react';
@@ -15,7 +16,7 @@ function WorkplaceCell({ student, assignment, workplaces, onAssign, onRemove }) 
   };
 
   return (
-    <td className="px-4 py-2 border-b border-border">
+    <td className="px-3 py-2 border-b border-border">
       <div className="flex items-center gap-1">
         <Select value={assignment?.workplace_id || ''} onValueChange={handleSelect}>
           <SelectTrigger className={`h-8 text-xs w-full border transition-colors ${
@@ -44,11 +45,10 @@ function WorkplaceCell({ student, assignment, workplaces, onAssign, onRemove }) 
 
 function RoleCell({ assignment, roles, onUpdateRole }) {
   if (!assignment) {
-    return <td className="px-4 py-2 border-b border-border text-muted-foreground text-xs">—</td>;
+    return <td className="px-3 py-2 border-b border-border text-muted-foreground text-xs">—</td>;
   }
-
   return (
-    <td className="px-4 py-2 border-b border-border">
+    <td className="px-3 py-2 border-b border-border">
       <Select value={assignment.role || ''} onValueChange={(v) => onUpdateRole(assignment, v)}>
         <SelectTrigger className="h-8 text-xs w-full border bg-secondary/50 border-border">
           <SelectValue placeholder="— בחר —" />
@@ -64,13 +64,27 @@ function RoleCell({ assignment, roles, onUpdateRole }) {
   );
 }
 
+// Mini filter input inside table header
+function HeaderFilter({ children, filter, onFilter }) {
+  return (
+    <th className="px-3 py-2 text-right font-semibold text-muted-foreground">
+      <div className="flex flex-col gap-1">
+        <span className="text-xs">{children}</span>
+        {filter}
+      </div>
+    </th>
+  );
+}
+
 export default function Assignments() {
   const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [cloning, setCloning] = useState(false);
   const [showCloneDialog, setShowCloneDialog] = useState(false);
   const [cloneTargetDate, setCloneTargetDate] = useState('');
+  const [filterName, setFilterName] = useState('');
   const [filterCohort, setFilterCohort] = useState('');
   const [filterWorkplace, setFilterWorkplace] = useState('');
+  const [filterRole, setFilterRole] = useState('');
   const [filterAssigned, setFilterAssigned] = useState('');
   const queryClient = useQueryClient();
 
@@ -94,22 +108,28 @@ export default function Assignments() {
     queryFn: () => base44.entities.Role.list(),
   });
 
-  const assignmentByStudent = {};
-  assignments.forEach(a => { assignmentByStudent[a.student_id] = a; });
+  const assignmentByStudent = useMemo(() => {
+    const map = {};
+    assignments.forEach(a => { map[a.student_id] = a; });
+    return map;
+  }, [assignments]);
 
   const cohorts = useMemo(() => [...new Set(students.map(s => s.cohort).filter(Boolean))], [students]);
 
   const filteredStudents = useMemo(() => students.filter(s => {
-    const assignment = assignmentByStudent[s.student_id || s.id];
-    if (filterCohort && s.cohort !== filterCohort) return false;
-    if (filterWorkplace) {
-      const a = assignmentByStudent[s.id];
+    const a = assignmentByStudent[s.id];
+    if (filterName && !s.full_name?.includes(filterName)) return false;
+    if (filterCohort && filterCohort !== 'all' && s.cohort !== filterCohort) return false;
+    if (filterWorkplace && filterWorkplace !== 'all') {
       if (!a || a.workplace_id !== filterWorkplace) return false;
     }
-    if (filterAssigned === 'assigned' && !assignmentByStudent[s.id]) return false;
-    if (filterAssigned === 'unassigned' && assignmentByStudent[s.id]) return false;
+    if (filterRole && filterRole !== 'all') {
+      if (!a || a.role !== filterRole) return false;
+    }
+    if (filterAssigned === 'assigned' && !a) return false;
+    if (filterAssigned === 'unassigned' && a) return false;
     return true;
-  }), [students, assignmentByStudent, filterCohort, filterWorkplace, filterAssigned]);
+  }), [students, assignmentByStudent, filterName, filterCohort, filterWorkplace, filterRole, filterAssigned]);
 
   const handleAssign = async (student, workplace, existingAssignment) => {
     if (existingAssignment) {
@@ -167,11 +187,9 @@ export default function Assignments() {
             {assignments.length} משובצים מתוך {students.length} תלמידים
           </p>
         </div>
-        {assignments.length > 0 && (
-          <Button variant="outline" onClick={() => { setCloneTargetDate(''); setShowCloneDialog(true); }}>
-            <Copy size={16} className="ml-2" /> שכפל שיבוצים
-          </Button>
-        )}
+        <Button variant="outline" onClick={() => { setCloneTargetDate(''); setShowCloneDialog(true); }}>
+          <Copy size={16} className="ml-2" /> שכפל שיבוצים
+        </Button>
       </div>
 
       {/* Date Picker */}
@@ -192,47 +210,6 @@ export default function Assignments() {
         </span>
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-wrap gap-3 mb-5">
-        <Select value={filterCohort} onValueChange={setFilterCohort}>
-          <SelectTrigger className="w-40 h-8 text-xs">
-            <SelectValue placeholder="סינון מחזור" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">כל המחזורים</SelectItem>
-            {cohorts.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-          </SelectContent>
-        </Select>
-
-        <Select value={filterWorkplace} onValueChange={setFilterWorkplace}>
-          <SelectTrigger className="w-44 h-8 text-xs">
-            <SelectValue placeholder="סינון מקום עבודה" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">כל מקומות העבודה</SelectItem>
-            {workplaces.map(w => <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>)}
-          </SelectContent>
-        </Select>
-
-        <Select value={filterAssigned} onValueChange={setFilterAssigned}>
-          <SelectTrigger className="w-36 h-8 text-xs">
-            <SelectValue placeholder="סטטוס שיבוץ" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">הכל</SelectItem>
-            <SelectItem value="assigned">משובצים</SelectItem>
-            <SelectItem value="unassigned">לא משובצים</SelectItem>
-          </SelectContent>
-        </Select>
-
-        {(filterCohort || filterWorkplace || filterAssigned) && (
-          <Button variant="ghost" size="sm" className="h-8 text-xs text-muted-foreground"
-            onClick={() => { setFilterCohort(''); setFilterWorkplace(''); setFilterAssigned(''); }}>
-            <X size={12} className="ml-1" /> נקה סינון
-          </Button>
-        )}
-      </div>
-
       {/* Clone Dialog */}
       <Dialog open={showCloneDialog} onOpenChange={setShowCloneDialog}>
         <DialogContent className="max-w-sm" dir="rtl">
@@ -247,7 +224,6 @@ export default function Assignments() {
               type="date"
               value={cloneTargetDate}
               onChange={e => setCloneTargetDate(e.target.value)}
-              min={format(addDays(new Date(), 1), 'yyyy-MM-dd')}
               className="w-full border border-border rounded-lg px-3 py-2 text-sm bg-card focus:outline-none focus:ring-2 focus:ring-primary/30"
             />
             <div className="flex gap-2 justify-end pt-1">
@@ -265,12 +241,85 @@ export default function Assignments() {
         <table className="w-full text-sm">
           <thead className="bg-secondary/60 border-b border-border">
             <tr>
-              <th className="text-right px-4 py-3 font-semibold text-muted-foreground w-8">#</th>
-              <th className="text-right px-4 py-3 font-semibold text-muted-foreground">שם תלמיד</th>
-              <th className="text-right px-4 py-3 font-semibold text-muted-foreground">מחזור</th>
-              <th className="text-right px-4 py-3 font-semibold text-muted-foreground w-56">מקום עבודה</th>
-              <th className="text-right px-4 py-3 font-semibold text-muted-foreground w-40">תפקיד</th>
-              <th className="text-right px-4 py-3 font-semibold text-muted-foreground">הערות</th>
+              <th className="px-3 py-2 text-right font-semibold text-muted-foreground w-8 text-xs">#</th>
+
+              {/* שם תלמיד */}
+              <th className="px-3 py-2 text-right font-semibold text-muted-foreground">
+                <div className="flex flex-col gap-1">
+                  <span className="text-xs">שם תלמיד</span>
+                  <Input
+                    value={filterName}
+                    onChange={e => setFilterName(e.target.value)}
+                    placeholder="חיפוש..."
+                    className="h-7 text-xs"
+                  />
+                </div>
+              </th>
+
+              {/* מחזור */}
+              <th className="px-3 py-2 text-right font-semibold text-muted-foreground">
+                <div className="flex flex-col gap-1">
+                  <span className="text-xs">מחזור</span>
+                  <Select value={filterCohort} onValueChange={setFilterCohort}>
+                    <SelectTrigger className="h-7 text-xs w-full">
+                      <SelectValue placeholder="הכל" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">הכל</SelectItem>
+                      {cohorts.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </th>
+
+              {/* מקום עבודה */}
+              <th className="px-3 py-2 text-right font-semibold text-muted-foreground w-56">
+                <div className="flex flex-col gap-1">
+                  <span className="text-xs">מקום עבודה</span>
+                  <Select value={filterWorkplace} onValueChange={setFilterWorkplace}>
+                    <SelectTrigger className="h-7 text-xs w-full">
+                      <SelectValue placeholder="הכל" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">הכל</SelectItem>
+                      {workplaces.map(w => <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </th>
+
+              {/* תפקיד */}
+              <th className="px-3 py-2 text-right font-semibold text-muted-foreground w-40">
+                <div className="flex flex-col gap-1">
+                  <span className="text-xs">תפקיד</span>
+                  <Select value={filterRole} onValueChange={setFilterRole}>
+                    <SelectTrigger className="h-7 text-xs w-full">
+                      <SelectValue placeholder="הכל" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">הכל</SelectItem>
+                      {roles.map(r => <SelectItem key={r.id} value={r.name}>{r.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </th>
+
+              {/* הערות / סטטוס שיבוץ */}
+              <th className="px-3 py-2 text-right font-semibold text-muted-foreground">
+                <div className="flex flex-col gap-1">
+                  <span className="text-xs">שיבוץ</span>
+                  <Select value={filterAssigned} onValueChange={setFilterAssigned}>
+                    <SelectTrigger className="h-7 text-xs w-full">
+                      <SelectValue placeholder="הכל" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">הכל</SelectItem>
+                      <SelectItem value="assigned">משובצים</SelectItem>
+                      <SelectItem value="unassigned">לא משובצים</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -285,9 +334,9 @@ export default function Assignments() {
                 const assignment = assignmentByStudent[student.id];
                 return (
                   <tr key={student.id} className={`transition-colors ${assignment ? 'bg-primary/5' : 'hover:bg-secondary/20'}`}>
-                    <td className="px-4 py-2 border-b border-border text-muted-foreground text-xs">{idx + 1}</td>
-                    <td className="px-4 py-2 border-b border-border font-medium">{student.full_name}</td>
-                    <td className="px-4 py-2 border-b border-border text-muted-foreground text-xs">{student.cohort || '—'}</td>
+                    <td className="px-3 py-2 border-b border-border text-muted-foreground text-xs">{idx + 1}</td>
+                    <td className="px-3 py-2 border-b border-border font-medium">{student.full_name}</td>
+                    <td className="px-3 py-2 border-b border-border text-muted-foreground text-xs">{student.cohort || '—'}</td>
                     <WorkplaceCell
                       student={student}
                       assignment={assignment}
@@ -300,7 +349,7 @@ export default function Assignments() {
                       roles={roles}
                       onUpdateRole={handleUpdateRole}
                     />
-                    <td className="px-4 py-2 border-b border-border text-muted-foreground text-xs">
+                    <td className="px-3 py-2 border-b border-border text-muted-foreground text-xs">
                       {assignment?.notes || '—'}
                     </td>
                   </tr>

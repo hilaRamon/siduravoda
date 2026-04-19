@@ -6,7 +6,6 @@ const navItems = [
   { to: '/dashboard', label: 'לוח בקרה', icon: LayoutDashboard },
   { to: '/students', label: 'תלמידים וצוות', icon: GraduationCap },
   { to: '/workplaces', label: 'מקומות עבודה', icon: Building2 },
-  { to: '/assignments', label: 'שיבוצים', icon: CalendarDays },
   { to: '/roles', label: 'תפקידים', icon: ShieldCheck },
 ];
 
