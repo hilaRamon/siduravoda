@@ -5,17 +5,18 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Plus, Search, Pencil, Trash2, Building2, Phone, MapPin, Users } from 'lucide-react';
+import { Plus, Search, Pencil, Trash2, Building2, Phone, Mail } from 'lucide-react';
 
 function WorkplaceFormModal({ open, onClose, onSave, workplace }) {
   const [form, setForm] = useState(workplace || {
-    name: '', capacity: '', address: '', contact_name: '', contact_phone: '', notes: '', is_active: true,
+    name: '', farm_name: '', company_id: '', contact_phone: '', accounting_phone: '', accounting_email: '',
   });
+
+  const set = (field) => (e) => setForm(p => ({ ...p, [field]: e.target.value }));
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    onSave({ ...form, capacity: form.capacity ? Number(form.capacity) : undefined });
+    onSave(form);
   };
 
   return (
@@ -26,30 +27,30 @@ function WorkplaceFormModal({ open, onClose, onSave, workplace }) {
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4 mt-2">
           <div>
-            <Label>שם מקום עבודה *</Label>
-            <Input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} required className="mt-1" />
+            <Label>שם מקום העבודה *</Label>
+            <Input value={form.name} onChange={set('name')} required className="mt-1" placeholder="שם מקום העבודה" />
+          </div>
+          <div>
+            <Label>שם משק</Label>
+            <Input value={form.farm_name} onChange={set('farm_name')} className="mt-1" placeholder="שם המשק" />
+          </div>
+          <div>
+            <Label>ח.פ</Label>
+            <Input value={form.company_id} onChange={set('company_id')} className="mt-1" placeholder="מספר ח.פ" />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <Label>קיבולת (סטודנטים ליום)</Label>
-              <Input type="number" value={form.capacity} onChange={e => setForm(p => ({ ...p, capacity: e.target.value }))} className="mt-1" min="1" />
+              <Label>טלפון איש קשר</Label>
+              <Input value={form.contact_phone} onChange={set('contact_phone')} className="mt-1" placeholder="05X-XXXXXXX" />
             </div>
             <div>
-              <Label>איש קשר</Label>
-              <Input value={form.contact_name} onChange={e => setForm(p => ({ ...p, contact_name: e.target.value }))} className="mt-1" />
+              <Label>טלפון הנה"ח</Label>
+              <Input value={form.accounting_phone} onChange={set('accounting_phone')} className="mt-1" placeholder="05X-XXXXXXX" />
             </div>
           </div>
           <div>
-            <Label>טלפון</Label>
-            <Input value={form.contact_phone} onChange={e => setForm(p => ({ ...p, contact_phone: e.target.value }))} className="mt-1" />
-          </div>
-          <div>
-            <Label>כתובת</Label>
-            <Input value={form.address} onChange={e => setForm(p => ({ ...p, address: e.target.value }))} className="mt-1" />
-          </div>
-          <div>
-            <Label>הערות</Label>
-            <Textarea value={form.notes} onChange={e => setForm(p => ({ ...p, notes: e.target.value }))} className="mt-1" rows={2} />
+            <Label>מייל הנה"ח</Label>
+            <Input type="email" value={form.accounting_email} onChange={set('accounting_email')} className="mt-1" placeholder="accounting@example.com" />
           </div>
           <div className="flex gap-2 justify-end pt-2">
             <Button type="button" variant="outline" onClick={onClose}>ביטול</Button>
@@ -72,7 +73,9 @@ export default function Workplaces() {
     queryFn: () => base44.entities.Workplace.list('-created_date'),
   });
 
-  const filtered = workplaces.filter(w => w.name?.includes(search) || w.address?.includes(search));
+  const filtered = workplaces.filter(w =>
+    w.name?.includes(search) || w.farm_name?.includes(search)
+  );
 
   const handleSave = async (form) => {
     if (editWp) {
@@ -105,7 +108,7 @@ export default function Workplaces() {
 
       <div className="relative mb-6">
         <Search size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-        <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="חיפוש לפי שם או כתובת..." className="pr-9" />
+        <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="חיפוש לפי שם מקום או משק..." className="pr-9" />
       </div>
 
       {isLoading ? (
@@ -126,7 +129,10 @@ export default function Workplaces() {
                   <div className="w-9 h-9 bg-primary/10 rounded-xl flex items-center justify-center">
                     <Building2 size={18} className="text-primary" />
                   </div>
-                  <h3 className="font-semibold text-sm">{w.name}</h3>
+                  <div>
+                    <h3 className="font-semibold text-sm">{w.name}</h3>
+                    {w.farm_name && <p className="text-xs text-muted-foreground">{w.farm_name}</p>}
+                  </div>
                 </div>
                 <div className="flex gap-1">
                   <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-primary"
@@ -140,25 +146,25 @@ export default function Workplaces() {
                 </div>
               </div>
               <div className="space-y-1.5">
-                {w.capacity && (
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <Users size={13} /> קיבולת: {w.capacity} סטודנטים
-                  </div>
-                )}
-                {w.address && (
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <MapPin size={13} /> {w.address}
-                  </div>
+                {w.company_id && (
+                  <div className="text-xs text-muted-foreground">ח.פ: {w.company_id}</div>
                 )}
                 {w.contact_phone && (
                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <Phone size={13} /> {w.contact_phone}
+                    <Phone size={12} /> איש קשר: {w.contact_phone}
+                  </div>
+                )}
+                {w.accounting_phone && (
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Phone size={12} /> הנה"ח: {w.accounting_phone}
+                  </div>
+                )}
+                {w.accounting_email && (
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Mail size={12} /> {w.accounting_email}
                   </div>
                 )}
               </div>
-              {w.is_active === false && (
-                <span className="mt-3 inline-block text-xs bg-destructive/10 text-destructive px-2 py-0.5 rounded-full">לא פעיל</span>
-              )}
             </div>
           ))}
         </div>
