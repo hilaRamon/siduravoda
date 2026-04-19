@@ -119,6 +119,8 @@ export default function Assignments() {
 
   const filteredStudents = useMemo(() => students.filter(s => {
     const a = assignmentByStudent[s.id];
+    // Show only active students, OR students that already have an assignment for this date
+    if (s.is_active === false && !a) return false;
     if (filterName && !s.full_name?.includes(filterName)) return false;
     if (filterCohort && filterCohort !== 'all' && s.cohort !== filterCohort) return false;
     if (filterWorkplace && filterWorkplace !== 'all') {

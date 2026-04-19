@@ -107,6 +107,7 @@ export default function ImportModal({ open, onClose, onImported }) {
         free_day: free_day || undefined,
         distance_status: mapping.distance_status ? row[mapping.distance_status]?.trim() : undefined,
         notes: mapping.notes ? row[mapping.notes]?.trim() : undefined,
+        is_active: true,
       };
       // Remove undefined keys
       Object.keys(data).forEach(k => data[k] === undefined && delete data[k]);
