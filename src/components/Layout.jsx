@@ -1,11 +1,12 @@
 import { Link, Outlet, useLocation } from 'react-router-dom';
-import { Users, Building2, CalendarDays, LayoutDashboard } from 'lucide-react';
+import { Users, Building2, CalendarDays, LayoutDashboard, ShieldCheck } from 'lucide-react';
 
 const navItems = [
   { to: '/', label: 'לוח בקרה', icon: LayoutDashboard },
   { to: '/students', label: 'סטודנטים', icon: Users },
   { to: '/workplaces', label: 'מקומות עבודה', icon: Building2 },
   { to: '/assignments', label: 'שיבוצים', icon: CalendarDays },
+  { to: '/roles', label: 'תפקידים', icon: ShieldCheck },
 ];
 
 export default function Layout() {

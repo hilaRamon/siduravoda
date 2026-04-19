@@ -10,6 +10,7 @@ import Dashboard from './pages/Dashboard';
 import Students from './pages/Students';
 import Workplaces from './pages/Workplaces';
 import Assignments from './pages/Assignments';
+import Roles from './pages/Roles';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -38,6 +39,7 @@ const AuthenticatedApp = () => {
         <Route path="/students" element={<Students />} />
         <Route path="/workplaces" element={<Workplaces />} />
         <Route path="/assignments" element={<Assignments />} />
+        <Route path="/roles" element={<Roles />} />
       </Route>
       <Route path="*" element={<PageNotFound />} />
     </Routes>
