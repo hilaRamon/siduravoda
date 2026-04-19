@@ -44,14 +44,15 @@ function WorkplaceCell({ student, assignment, workplaces, onAssign, onRemove }) 
 }
 
 function RoleCell({ assignment, roles, onUpdateRole }) {
-  if (!assignment) {
-    return <td className="px-3 py-2 border-b border-border text-muted-foreground text-xs">—</td>;
-  }
   return (
     <td className="px-3 py-2 border-b border-border">
-      <Select value={assignment.role || ''} onValueChange={(v) => onUpdateRole(assignment, v)}>
-        <SelectTrigger className="h-8 text-xs w-full border bg-secondary/50 border-border">
-          <SelectValue placeholder="— בחר —" />
+      <Select
+        value={assignment?.role || ''}
+        onValueChange={(v) => assignment && onUpdateRole(assignment, v)}
+        disabled={!assignment}
+      >
+        <SelectTrigger className={`h-8 text-xs w-full border ${assignment ? 'bg-secondary/50 border-border' : 'bg-transparent border-dashed text-muted-foreground opacity-50'}`}>
+          <SelectValue placeholder="— בחר תפקיד —" />
         </SelectTrigger>
         <SelectContent align="start">
           <SelectItem value="none">— ללא תפקיד —</SelectItem>
