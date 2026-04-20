@@ -9,7 +9,7 @@ import Layout from './components/Layout';
 import Dashboard from './pages/Dashboard';
 import Students from './pages/Students';
 import Workplaces from './pages/Workplaces';
-import Assignments from './pages/Assignments.jsx';
+import Assignments from './pages/Assignments';
 import Roles from './pages/Roles';
 import Reports from './pages/Reports';
 
