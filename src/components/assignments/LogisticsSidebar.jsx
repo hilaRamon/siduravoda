@@ -107,7 +107,7 @@ function WorkplaceLogisticsCard({ date, workplaceId, workplaceName, studentCount
                 return (
                   <span key={vehicleId} className="text-xs bg-primary/10 text-primary px-2 py-1 rounded-full flex items-center gap-1">
                     {name}
-                    <button onClick={() => { removeVehicle(vehicleId); setVehicleOpen(false); }} className="hover:opacity-70">
+                    <button type="button" onClick={(e) => { e.preventDefault(); removeVehicle(vehicleId); }} className="hover:opacity-70">
                       <X size={10} />
                     </button>
                   </span>
