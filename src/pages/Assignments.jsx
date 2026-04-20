@@ -8,10 +8,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Checkbox } from '@/components/ui/checkbox';
-import { ChevronRight, ChevronLeft, Copy, CalendarDays, X, ChevronsUpDown, Pencil } from 'lucide-react';
+import { ChevronRight, ChevronLeft, Copy, CalendarDays, X, ChevronsUpDown, Pencil, AlertCircle } from 'lucide-react';
 import DailyReportPDFButton from '@/components/reports/DailyReportPDFButton';
 import LogisticsSidebar from '@/components/assignments/LogisticsSidebar';
 import { format, addDays, subDays } from 'date-fns';
+import { useState, useMemo } from 'react';
 
 function WorkplaceCell({ student, assignment, workplaces, onAssign, onRemove }) {
   const [open, setOpen] = useState(false);
@@ -20,7 +21,8 @@ function WorkplaceCell({ student, assignment, workplaces, onAssign, onRemove }) 
     setOpen(false);
     if (!workplaceId) return;
     const workplace = workplaces.find(w => w.id === workplaceId);
-    await onAssign(student, workplace, assignment);
+    const canAssign = await onAssign(student, workplace, assignment);
+    if (!canAssign) setOpen(true);
   };
 
   const selectedName = assignment ? workplaces.find(w => w.id === assignment.workplace_id)?.name || assignment.workplace_name : null;
@@ -252,6 +254,10 @@ export default function Assignments() {
   };
 
   const handleAssign = async (student, workplace, existingAssignment) => {
+    if (student.forbidden_workplaces?.includes(workplace.id)) {
+      alert(`⛔ לא ניתן לשבץ את ${student.full_name} ל-${workplace.name} — זה מקום עבודה אסור`);
+      return false;
+    }
     if (existingAssignment) {
       await base44.entities.Assignment.delete(existingAssignment.id);
     }
@@ -265,6 +271,7 @@ export default function Assignments() {
       hours: 4.5,
     });
     queryClient.invalidateQueries({ queryKey: ['assignments', date] });
+    return true;
   };
 
   const handleRemove = async (id) => {
