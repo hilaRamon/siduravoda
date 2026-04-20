@@ -549,7 +549,13 @@ export default function Assignments() {
                   <tr key={student.id} className={`transition-colors ${isSelected ? 'bg-primary/10' : assignment ? 'bg-primary/5' : 'hover:bg-secondary/20'}`}>
                     <td className="px-3 py-2 border-b border-border">
                       {assignment && (
-                        <Checkbox checked={!!isSelected} onCheckedChange={(_, e) => toggleSelect(assignment.id, idx, e?.nativeEvent?.shiftKey)} onClick={(e) => toggleSelect(assignment.id, idx, e.shiftKey)} />
+                        <Checkbox
+                          checked={!!isSelected}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            toggleSelect(assignment.id, idx, e.shiftKey);
+                          }}
+                        />
                       )}
                     </td>
                     <td className="px-3 py-2 border-b border-border text-muted-foreground text-xs">{idx + 1}</td>
