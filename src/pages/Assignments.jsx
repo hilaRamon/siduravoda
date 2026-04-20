@@ -193,14 +193,18 @@ export default function Assignments() {
   const handleCloneDay = async () => {
     if (!cloneTargetDate) return;
     setCloning(true);
-    const toCreate = assignments.map(a => ({
-      date: cloneTargetDate,
-      student_id: a.student_id,
-      student_name: a.student_name,
-      workplace_id: a.workplace_id,
-      workplace_name: a.workplace_name,
-      role: a.role,
-    }));
+    // Filter out inactive students when cloning
+    const activeStudentIds = new Set(students.filter(s => s.is_active !== false).map(s => s.id));
+    const toCreate = assignments
+      .filter(a => activeStudentIds.has(a.student_id))
+      .map(a => ({
+        date: cloneTargetDate,
+        student_id: a.student_id,
+        student_name: a.student_name,
+        workplace_id: a.workplace_id,
+        workplace_name: a.workplace_name,
+        role: a.role,
+      }));
     await base44.entities.Assignment.bulkCreate(toCreate);
     queryClient.invalidateQueries({ queryKey: ['assignments'] });
     setCloning(false);

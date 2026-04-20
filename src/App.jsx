@@ -11,6 +11,7 @@ import Students from './pages/Students';
 import Workplaces from './pages/Workplaces';
 import Assignments from './pages/Assignments';
 import Roles from './pages/Roles';
+import Reports from './pages/Reports';
 
 
 const AuthenticatedApp = () => {
@@ -41,6 +42,7 @@ const AuthenticatedApp = () => {
         <Route path="/students" element={<Students />} />
         <Route path="/workplaces" element={<Workplaces />} />
         <Route path="/roles" element={<Roles />} />
+        <Route path="/reports" element={<Reports />} />
       </Route>
       <Route path="*" element={<PageNotFound />} />
     </Routes>
