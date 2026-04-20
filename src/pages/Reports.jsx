@@ -105,9 +105,10 @@ export default function Reports() {
     // Delete all existing assignments from 01/04/2026 in small batches with delay
     const existingAssignments = await base44.entities.Assignment.list();
     const toDelete = existingAssignments.filter(a => a.date >= '2026-04-01');
-    for (let i = 0; i < toDelete.length; i += 5) {
-      await Promise.all(toDelete.slice(i, i + 5).map(a => base44.entities.Assignment.delete(a.id)));
-      await new Promise(r => setTimeout(r, 300));
+    for (let i = 0; i < toDelete.length; i++) {
+      setRandomStatus(`מוחק שיבוצים... ${i + 1} / ${toDelete.length}`);
+      await base44.entities.Assignment.delete(toDelete[i].id);
+      await new Promise(r => setTimeout(r, 200));
     }
 
     setRandomStatus('יוצר שיבוצים חדשים...');
