@@ -344,7 +344,7 @@ export default function Assignments() {
               <Pencil size={16} className="ml-2" /> עריכת {selectedIds.size} שורות
             </Button>
           )}
-          <Button variant="outline" onClick={() => { setCloneTargetDate(''); setShowCloneDialog(true); }}>
+          <Button variant="outline" onClick={() => { setCloneTargetDate(format(addDays(new Date(date + 'T12:00:00'), 1), 'yyyy-MM-dd')); setShowCloneDialog(true); }}>
             <Copy size={16} className="ml-2" /> שכפל שיבוצים
           </Button>
         </div>
