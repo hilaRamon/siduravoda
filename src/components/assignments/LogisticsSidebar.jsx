@@ -60,7 +60,10 @@ function WorkplaceLogisticsCard({ date, workplaceId, workplaceName, studentCount
         {currentData.vehicle_id ? (
           <div className="flex items-center gap-1">
             <button
-              onClick={() => handleVehicleSelect('', '', 1)}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleVehicleSelect('', '', 1);
+              }}
               className="flex-1 h-8 text-xs border border-primary rounded-md px-2 flex items-center justify-between bg-primary/5 hover:bg-primary/10 transition-colors font-medium text-primary"
             >
               <span>{currentData.vehicle_name}</span>
@@ -102,7 +105,10 @@ function WorkplaceLogisticsCard({ date, workplaceId, workplaceName, studentCount
         {currentData.vehicle_id_2 ? (
           <div className="flex items-center gap-1">
             <button
-              onClick={() => handleVehicleSelect('', '', 2)}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleVehicleSelect('', '', 2);
+              }}
               className="flex-1 h-8 text-xs border border-primary rounded-md px-2 flex items-center justify-between bg-primary/5 hover:bg-primary/10 transition-colors font-medium text-primary"
             >
               <span>{currentData.vehicle_name_2}</span>
