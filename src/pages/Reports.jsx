@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
-import { Download, FileSpreadsheet, Shuffle, Loader2 } from 'lucide-react';
+import { Download, FileSpreadsheet, Shuffle, Loader2, UserCheck } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { format, eachDayOfInterval, parseISO } from 'date-fns';
 
@@ -157,6 +157,71 @@ export default function Reports() {
     alert(`נוצרו ${allNew.length} שיבוצים רנדומליים בהצלחה!`);
   };
 
+  const [assigningRoles, setAssigningRoles] = useState(false);
+  const [rolesStatus, setRolesStatus] = useState('');
+
+  // --- Assign Roles ---
+  const handleAssignRoles = async () => {
+    if (!confirm('פעולה זו תשבץ תפקידים (נהג, אחראי פק"ל, ראש צוות) לכל יום מ-01/04/2026 עד היום. להמשיך?')) return;
+
+    setAssigningRoles(true);
+    setRolesStatus('טוען שיבוצים...');
+
+    const allAssignments = await base44.entities.Assignment.list();
+    const relevant = allAssignments.filter(a => a.date >= '2026-04-01');
+
+    // Group by date
+    const byDate = {};
+    relevant.forEach(a => {
+      if (!byDate[a.date]) byDate[a.date] = [];
+      byDate[a.date].push(a);
+    });
+
+    const dates = Object.keys(byDate).sort();
+    const ROLES = ['נהג', 'אחראי פק"ל', 'ראש צוות'];
+
+    // For rotation: track which students had each role previously
+    // Use simple index-based rotation across days so each day 3 different students get the roles
+    // We pick 3 students per day using a rotating offset based on day index
+    const allStudentIds = [...new Set(relevant.map(a => a.student_id))];
+
+    const updates = []; // { id, role }
+
+    dates.forEach((date, dayIdx) => {
+      const dayAssignments = byDate[date];
+      // Pick 3 different students using rotating offset
+      const offset = (dayIdx * 3) % allStudentIds.length;
+      const roleStudents = [
+        allStudentIds[offset % allStudentIds.length],
+        allStudentIds[(offset + 1) % allStudentIds.length],
+        allStudentIds[(offset + 2) % allStudentIds.length],
+      ];
+
+      dayAssignments.forEach(a => {
+        const roleIdx = roleStudents.indexOf(a.student_id);
+        if (roleIdx !== -1) {
+          updates.push({ id: a.id, role: ROLES[roleIdx] });
+        } else if (a.role) {
+          // Clear old roles from students not assigned today
+          updates.push({ id: a.id, role: '' });
+        }
+      });
+    });
+
+    setRolesStatus(`מעדכן תפקידים... 0 / ${updates.length}`);
+    for (let i = 0; i < updates.length; i++) {
+      await base44.entities.Assignment.update(updates[i].id, { role: updates[i].role });
+      if (i % 5 === 0) {
+        setRolesStatus(`מעדכן תפקידים... ${i + 1} / ${updates.length}`);
+        await new Promise(r => setTimeout(r, 150));
+      }
+    }
+
+    setAssigningRoles(false);
+    setRolesStatus('');
+    alert(`עודכנו תפקידים ל-${dates.length} ימים בהצלחה!`);
+  };
+
   return (
     <div className="p-8 max-w-2xl">
       <div className="mb-8">
@@ -204,6 +269,28 @@ export default function Reports() {
           <Button variant="outline" onClick={handleRandomAssignment} disabled={randomizing} className="shrink-0 border-warning text-warning hover:bg-warning/10">
             {randomizing ? <Loader2 size={16} className="animate-spin ml-2" /> : <Shuffle size={16} className="ml-2" />}
             {randomizing ? 'מעבד...' : 'הרץ שיבוץ'}
+          </Button>
+        </div>
+
+        {/* Role Assignment */}
+        <div className="bg-card border border-border rounded-2xl p-6 flex items-start justify-between gap-4">
+          <div className="flex items-start gap-4">
+            <div className="bg-success/10 rounded-xl p-3">
+              <UserCheck size={24} className="text-success" />
+            </div>
+            <div>
+              <h3 className="font-semibold text-base">שיבוץ תפקידים אוטומטי</h3>
+              <p className="text-sm text-muted-foreground mt-1">
+                משבץ בכל יום 3 תלמידים שונים לתפקידים: נהג, אחראי פק"ל, ראש צוות (01/04/2026 עד היום).
+              </p>
+              {rolesStatus && (
+                <p className="text-xs text-primary mt-2 font-medium">{rolesStatus}</p>
+              )}
+            </div>
+          </div>
+          <Button variant="outline" onClick={handleAssignRoles} disabled={assigningRoles} className="shrink-0 border-success text-success hover:bg-success/10">
+            {assigningRoles ? <Loader2 size={16} className="animate-spin ml-2" /> : <UserCheck size={16} className="ml-2" />}
+            {assigningRoles ? 'מעבד...' : 'שבץ תפקידים'}
           </Button>
         </div>
 
