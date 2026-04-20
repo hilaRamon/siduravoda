@@ -1,13 +1,12 @@
 import { useState, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
-import { Truck, Clock, ChevronDown, User } from 'lucide-react';
+import { Truck, Clock, ChevronDown } from 'lucide-react';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
-function WorkplaceLogisticsCard({ date, workplaceId, workplaceName, studentCount, students, logistics, allLogistics, onSave }) {
+function WorkplaceLogisticsCard({ date, workplaceId, workplaceName, studentCount, logistics, allLogistics, onSave }) {
   const [vehicleOpen, setVehicleOpen] = useState(false);
-  const [driverOpen, setDriverOpen] = useState(false);
 
   const { data: vehicles = [] } = useQuery({
     queryKey: ['vehicles'],
@@ -36,47 +35,6 @@ function WorkplaceLogisticsCard({ date, workplaceId, workplaceName, studentCount
         <span className="text-xs bg-primary/10 text-primary font-medium px-2 py-0.5 rounded-full shrink-0">
           {studentCount} תלמידים
         </span>
-      </div>
-
-      {/* Driver */}
-      <div className="space-y-1">
-        <label className="text-xs text-muted-foreground flex items-center gap-1">
-          <User size={11} /> נהג
-        </label>
-        <Popover open={driverOpen} onOpenChange={setDriverOpen}>
-          <PopoverTrigger asChild>
-            <button className="w-full h-8 text-xs border border-border rounded-md px-2 flex items-center justify-between bg-background hover:bg-secondary/40 transition-colors">
-              <span className={currentData.driver_student_name ? '' : 'text-muted-foreground'}>
-                {currentData.driver_student_name || '— בחר נהג —'}
-              </span>
-              <ChevronDown size={12} className="opacity-50 shrink-0" />
-            </button>
-          </PopoverTrigger>
-          <PopoverContent className="w-56 p-0" align="end">
-            <Command>
-              <CommandInput placeholder="חיפוש נהג..." className="h-8 text-xs" />
-              <CommandList>
-                <CommandEmpty>לא נמצא</CommandEmpty>
-                <CommandGroup>
-                  <CommandItem value="__clear__" onSelect={() => {
-                    onSave(workplaceId, workplaceName, { ...currentData, driver_student_id: '', driver_student_name: '' });
-                    setDriverOpen(false);
-                  }} className="text-xs text-muted-foreground">
-                    — ללא נהג —
-                  </CommandItem>
-                  {students.map(s => (
-                    <CommandItem key={s.student_id} value={s.student_name || ''} onSelect={() => {
-                      onSave(workplaceId, workplaceName, { ...currentData, driver_student_id: s.student_id, driver_student_name: s.student_name });
-                      setDriverOpen(false);
-                    }} className="text-xs">
-                      {s.student_name}
-                    </CommandItem>
-                  ))}
-                </CommandGroup>
-              </CommandList>
-            </Command>
-          </PopoverContent>
-        </Popover>
       </div>
 
       {/* Vehicle */}
@@ -154,13 +112,12 @@ export default function LogisticsSidebar({ date, assignments }) {
   const activeWorkplaces = useMemo(() => {
     const map = {};
     assignments.filter(a => !SKIP.includes(a.workplace_name)).forEach(a => {
-      if (!map[a.workplace_id]) map[a.workplace_id] = { name: a.workplace_name, count: 0, students: [] };
+      if (!map[a.workplace_id]) map[a.workplace_id] = { name: a.workplace_name, count: 0 };
       map[a.workplace_id].count++;
-      map[a.workplace_id].students.push(a);
     });
     return Object.entries(map)
       .sort(([, a], [, b]) => a.name.localeCompare(b.name, 'he'))
-      .map(([id, v]) => ({ id, name: v.name, count: v.count, students: v.students }));
+      .map(([id, v]) => ({ id, name: v.name, count: v.count }));
   }, [assignments]);
 
   const handleSave = async (workplaceId, workplaceName, data) => {
@@ -199,7 +156,6 @@ export default function LogisticsSidebar({ date, assignments }) {
             workplaceId={wp.id}
             workplaceName={wp.name}
             studentCount={wp.count}
-            students={wp.students}
             logistics={logisticsMap[wp.id]}
             allLogistics={logisticsList}
             onSave={handleSave}
