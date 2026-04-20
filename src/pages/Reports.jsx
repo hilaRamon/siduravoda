@@ -72,21 +72,28 @@ export default function Reports() {
     setRandomizing(true);
     setRandomStatus('טוען נתונים...');
 
-    // Active students only
-    const activeStudents = students.filter(s => s.is_active !== false);
+    const allStudents = await base44.entities.Student.list();
+    const activeStudents = allStudents.filter(s => s.is_active !== false);
     if (!activeStudents.length) {
       alert('אין תלמידים פעילים');
       setRandomizing(false);
       return;
     }
 
-    // Take first 10 workplaces (by created_date desc = as returned)
-    const top10 = workplaces.slice(0, 10);
-    if (!top10.length) {
-      alert('אין מקומות עבודה במערכת');
-      setRandomizing(false);
-      return;
-    }
+    // Fixed special workplaces
+    const SPECIAL_WP = [
+      { id: '69e5bf0070786e7ad489a574', name: 'לא עובד' },
+      { id: '69e5bf05a5a0b60e073731ae', name: 'לימודים' },
+    ];
+
+    // 8 first workplaces from sorted list (by created_date asc) + 2 special = 10 total
+    const allWorkplaces = await base44.entities.Workplace.list('created_date', 100);
+    const regularWp = allWorkplaces
+      .filter(w => !['69e5bf0070786e7ad489a574', '69e5bf05a5a0b60e073731ae'].includes(w.id))
+      .slice(0, 8)
+      .map(w => ({ id: w.id, name: w.name }));
+
+    const pool = [...regularWp, ...SPECIAL_WP]; // 10 workplaces
 
     // Date range: 01/04/2026 to today
     const startDate = parseISO('2026-04-01');
@@ -95,18 +102,15 @@ export default function Reports() {
 
     setRandomStatus('מוחק שיבוצים קיימים...');
 
-    // Delete all existing assignments from 01/04/2026
+    // Delete all existing assignments from 01/04/2026 in batches
     const existingAssignments = await base44.entities.Assignment.list();
     const toDelete = existingAssignments.filter(a => a.date >= '2026-04-01');
-    for (const a of toDelete) {
-      await base44.entities.Assignment.delete(a.id);
+    for (let i = 0; i < toDelete.length; i += 50) {
+      await Promise.all(toDelete.slice(i, i + 50).map(a => base44.entities.Assignment.delete(a.id)));
     }
 
     setRandomStatus('יוצר שיבוצים חדשים...');
 
-    const ROLES = ['ראש צוות', 'נהג', 'אחראי פק"ל'];
-
-    // Helper: shuffle array
     const shuffle = (arr) => {
       const a = [...arr];
       for (let i = a.length - 1; i > 0; i--) {
@@ -116,20 +120,28 @@ export default function Reports() {
       return a;
     };
 
-    // Create random assignments for each date
+    // Build all assignments: each student gets a random workplace from pool
+    // Ensure at least 1 student in "לא עובד" and 1 in "לימודים" each day
     const allNew = [];
     for (const date of allDates) {
-      // Assign workplace to each active student
-      for (const student of activeStudents) {
-        const wp = top10[Math.floor(Math.random() * top10.length)];
-        allNew.push({
+      const shuffledStudents = shuffle([...activeStudents]);
+      // First 2 students guaranteed to "לא עובד" and "לימודים"
+      const assignments = shuffledStudents.map((student, idx) => {
+        let wp;
+        if (idx === 0) wp = SPECIAL_WP[0]; // לא עובד
+        else if (idx === 1) wp = SPECIAL_WP[1]; // לימודים
+        else wp = pool[Math.floor(Math.random() * pool.length)];
+        return {
           date,
           student_id: student.id,
           student_name: student.full_name,
           workplace_id: wp.id,
           workplace_name: wp.name,
-        });
-      }
+          rate: 40,
+          hours: 4.5,
+        };
+      });
+      allNew.push(...assignments);
     }
 
     // Bulk create in batches of 100
@@ -138,29 +150,9 @@ export default function Reports() {
       await base44.entities.Assignment.bulkCreate(allNew.slice(i, i + 100));
     }
 
-    // Now assign roles: fetch newly created assignments per date, pick 3 different students
-    setRandomStatus('משבץ תפקידים...');
-    const freshAssignments = await base44.entities.Assignment.list();
-    const byDate = {};
-    freshAssignments.forEach(a => {
-      if (a.date >= '2026-04-01') {
-        if (!byDate[a.date]) byDate[a.date] = [];
-        byDate[a.date].push(a);
-      }
-    });
-
-    for (const date of allDates) {
-      const dayAssignments = byDate[date] || [];
-      if (dayAssignments.length < 3) continue;
-      const picked = shuffle(dayAssignments).slice(0, 3);
-      for (let i = 0; i < ROLES.length; i++) {
-        await base44.entities.Assignment.update(picked[i].id, { role: ROLES[i] });
-      }
-    }
-
     setRandomizing(false);
     setRandomStatus('');
-    alert(`נוצרו ${allNew.length} שיבוצים רנדומליים עם תפקידים בהצלחה!`);
+    alert(`נוצרו ${allNew.length} שיבוצים רנדומליים בהצלחה!`);
   };
 
   return (
