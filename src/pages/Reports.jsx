@@ -102,11 +102,12 @@ export default function Reports() {
 
     setRandomStatus('מוחק שיבוצים קיימים...');
 
-    // Delete all existing assignments from 01/04/2026 in batches
+    // Delete all existing assignments from 01/04/2026 in small batches with delay
     const existingAssignments = await base44.entities.Assignment.list();
     const toDelete = existingAssignments.filter(a => a.date >= '2026-04-01');
-    for (let i = 0; i < toDelete.length; i += 50) {
-      await Promise.all(toDelete.slice(i, i + 50).map(a => base44.entities.Assignment.delete(a.id)));
+    for (let i = 0; i < toDelete.length; i += 5) {
+      await Promise.all(toDelete.slice(i, i + 5).map(a => base44.entities.Assignment.delete(a.id)));
+      await new Promise(r => setTimeout(r, 300));
     }
 
     setRandomStatus('יוצר שיבוצים חדשים...');
