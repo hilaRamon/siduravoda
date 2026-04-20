@@ -149,6 +149,7 @@ export default function Assignments() {
   const [filterAssigned, setFilterAssigned] = useState('');
 
   const [selectedIds, setSelectedIds] = useState(new Set());
+  const [lastSelectedIdx, setLastSelectedIdx] = useState(null);
   const [showBulkDialog, setShowBulkDialog] = useState(false);
   const [bulkWorkplace, setBulkWorkplace] = useState('');
   const [bulkHours, setBulkHours] = useState('');
@@ -228,13 +229,24 @@ export default function Assignments() {
     }
   };
 
-  const toggleSelect = (assignmentId) => {
+  const toggleSelect = (assignmentId, rowIdx, shiftKey) => {
     setSelectedIds(prev => {
       const next = new Set(prev);
-      if (next.has(assignmentId)) next.delete(assignmentId);
-      else next.add(assignmentId);
+      if (shiftKey && lastSelectedIdx !== null) {
+        const from = Math.min(lastSelectedIdx, rowIdx);
+        const to = Math.max(lastSelectedIdx, rowIdx);
+        for (let i = from; i <= to; i++) {
+          const s = filteredStudents[i];
+          const a = assignmentByStudent[s?.id];
+          if (a) next.add(a.id);
+        }
+      } else {
+        if (next.has(assignmentId)) next.delete(assignmentId);
+        else next.add(assignmentId);
+      }
       return next;
     });
+    setLastSelectedIdx(rowIdx);
   };
 
   const handleAssign = async (student, workplace, existingAssignment) => {
@@ -537,7 +549,7 @@ export default function Assignments() {
                   <tr key={student.id} className={`transition-colors ${isSelected ? 'bg-primary/10' : assignment ? 'bg-primary/5' : 'hover:bg-secondary/20'}`}>
                     <td className="px-3 py-2 border-b border-border">
                       {assignment && (
-                        <Checkbox checked={!!isSelected} onCheckedChange={() => toggleSelect(assignment.id)} />
+                        <Checkbox checked={!!isSelected} onCheckedChange={(_, e) => toggleSelect(assignment.id, idx, e?.nativeEvent?.shiftKey)} onClick={(e) => toggleSelect(assignment.id, idx, e.shiftKey)} />
                       )}
                     </td>
                     <td className="px-3 py-2 border-b border-border text-muted-foreground text-xs">{idx + 1}</td>
