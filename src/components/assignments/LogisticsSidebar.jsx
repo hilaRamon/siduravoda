@@ -102,8 +102,8 @@ function WorkplaceLogisticsCard({ date, workplaceId, workplaceName, studentCount
         ) : (
           <div className="space-y-1.5">
             <div className="flex flex-wrap gap-1">
-              {selectedNames.map((name, idx) => {
-                const vehicleId = selectedVehicleIds[idx];
+              {selectedVehicleIds.map((vehicleId) => {
+                const name = vehicles.find(v => v.id === vehicleId)?.name;
                 return (
                   <span key={vehicleId} className="text-xs bg-primary/10 text-primary px-2 py-1 rounded-full flex items-center gap-1">
                     {name}
