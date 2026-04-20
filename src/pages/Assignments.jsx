@@ -9,6 +9,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ChevronRight, ChevronLeft, Copy, CalendarDays, X, ChevronsUpDown, Pencil } from 'lucide-react';
+import DailyReportPDFButton from '@/components/reports/DailyReportPDFButton';
 import { format, addDays, subDays } from 'date-fns';
 
 function WorkplaceCell({ student, assignment, workplaces, onAssign, onRemove }) {
@@ -344,6 +345,7 @@ export default function Assignments() {
               <Pencil size={16} className="ml-2" /> עריכת {selectedIds.size} שורות
             </Button>
           )}
+          <DailyReportPDFButton date={date} assignments={assignments} />
           <Button variant="outline" onClick={() => { setCloneTargetDate(format(addDays(new Date(date + 'T12:00:00'), 1), 'yyyy-MM-dd')); setShowCloneDialog(true); }}>
             <Copy size={16} className="ml-2" /> שכפל שיבוצים
           </Button>
