@@ -139,6 +139,7 @@ function WorkplaceLogisticsCard({ date, workplaceId, workplaceName, studentCount
             </Popover>
           </div>
         )}
+      </div>
 
       {/* Exit Time */}
       <div className="space-y-1">
