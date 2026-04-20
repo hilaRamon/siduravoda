@@ -25,15 +25,14 @@ function buildReportGroups(assignments, logisticsMap) {
   const byWorkplace = {};
   filtered.forEach(a => {
     const key = a.workplace_id;
-    if (!byWorkplace[key]) byWorkplace[key] = { name: a.workplace_name, students: [] };
+    if (!byWorkplace[key]) byWorkplace[key] = { id: a.workplace_id, name: a.workplace_name, students: [] };
     byWorkplace[key].students.push(a);
   });
 
   return Object.values(byWorkplace)
     .sort((a, b) => a.name.localeCompare(b.name, 'he'))
     .map(g => {
-      const wpId = filtered.find(a => a.workplace_name === g.name)?.workplace_id;
-      const log = logisticsMap[wpId] || {};
+      const log = logisticsMap[g.id] || {};
       return {
         workplaceName: g.name,
         students: g.students.sort((a, b) => (a.student_name || '').localeCompare(b.student_name || '', 'he')),

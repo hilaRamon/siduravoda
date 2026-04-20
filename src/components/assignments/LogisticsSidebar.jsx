@@ -5,7 +5,7 @@ import { Truck, Clock, ChevronDown } from 'lucide-react';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
-function WorkplaceLogisticsCard({ date, workplaceId, workplaceName, studentCount, logistics, onSave }) {
+function WorkplaceLogisticsCard({ date, workplaceId, workplaceName, studentCount, logistics, allLogistics, onSave }) {
   const [vehicleOpen, setVehicleOpen] = useState(false);
 
   const { data: vehicles = [] } = useQuery({
@@ -14,6 +14,14 @@ function WorkplaceLogisticsCard({ date, workplaceId, workplaceName, studentCount
   });
 
   const currentData = logistics || {};
+
+  // Vehicles already assigned to OTHER workplaces today
+  const takenVehicleIds = new Set(
+    allLogistics
+      .filter(l => l.workplace_id !== workplaceId && l.vehicle_id)
+      .map(l => l.vehicle_id)
+  );
+  const availableVehicles = vehicles.filter(v => !takenVehicleIds.has(v.id));
 
   const update = (field, value) => {
     onSave(workplaceId, workplaceName, { ...currentData, [field]: value });
@@ -52,7 +60,7 @@ function WorkplaceLogisticsCard({ date, workplaceId, workplaceName, studentCount
                   <CommandItem value="__clear__" onSelect={() => { update('vehicle_id', ''); update('vehicle_name', ''); setVehicleOpen(false); }} className="text-xs text-muted-foreground">
                     — ללא רכב —
                   </CommandItem>
-                  {vehicles.map(v => (
+                  {availableVehicles.map(v => (
                     <CommandItem key={v.id} value={v.name} onSelect={() => {
                       onSave(workplaceId, workplaceName, { ...currentData, vehicle_id: v.id, vehicle_name: v.name });
                       setVehicleOpen(false);
@@ -149,6 +157,7 @@ export default function LogisticsSidebar({ date, assignments }) {
             workplaceName={wp.name}
             studentCount={wp.count}
             logistics={logisticsMap[wp.id]}
+            allLogistics={logisticsList}
             onSave={handleSave}
           />
         ))}
