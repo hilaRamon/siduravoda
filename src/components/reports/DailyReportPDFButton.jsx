@@ -114,8 +114,8 @@ export default function DailyReportPDFButton({ date, assignments }) {
                   <tr key={s.id} style={{ background: i % 2 === 0 ? '#fff' : '#f9fafb' }}>
                     <td style={{ border: '1px solid #d1d5db', padding: '3px 8px' }}>{s.student_name}</td>
                     <td style={{ border: '1px solid #d1d5db', padding: '3px 8px', textAlign: 'center' }}>{s.role === 'אחראי פק"ל' ? 'כן' : ''}</td>
-                    <td style={{ border: '1px solid #d1d5db', padding: '3px 8px' }}>{i === 0 ? group.driverName : ''}</td>
-                    <td style={{ border: '1px solid #d1d5db', padding: '3px 8px' }}>{i === 0 ? group.teamLeaderName : ''}</td>
+                    <td style={{ border: '1px solid #d1d5db', padding: '3px 8px' }}>{group.driverName}</td>
+                    <td style={{ border: '1px solid #d1d5db', padding: '3px 8px' }}>{group.teamLeaderName}</td>
                   </tr>
                 ))}
               </tbody>

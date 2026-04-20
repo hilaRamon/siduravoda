@@ -138,8 +138,8 @@ export default function DailyAssignmentReport() {
                           <td className="border border-gray-300 px-2 py-1 text-center">
                             {s.role === 'אחראי פק"ל' ? 'כן' : ''}
                           </td>
-                          <td className="border border-gray-300 px-2 py-1">{i === 0 ? group.driverName : ''}</td>
-                          <td className="border border-gray-300 px-2 py-1">{i === 0 ? group.teamLeaderName : ''}</td>
+                          <td className="border border-gray-300 px-2 py-1">{group.driverName}</td>
+                          <td className="border border-gray-300 px-2 py-1">{group.teamLeaderName}</td>
                         </tr>
                       ))}
                     </tbody>
