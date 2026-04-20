@@ -1,24 +1,17 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
-import { Truck, Clock, User, ChevronDown } from 'lucide-react';
+import { Truck, Clock, ChevronDown } from 'lucide-react';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
-function WorkplaceLogisticsCard({ date, workplaceId, workplaceName, studentCount, students, logistics, onSave }) {
-  const [driverOpen, setDriverOpen] = useState(false);
+function WorkplaceLogisticsCard({ date, workplaceId, workplaceName, studentCount, logistics, onSave }) {
   const [vehicleOpen, setVehicleOpen] = useState(false);
 
   const { data: vehicles = [] } = useQuery({
     queryKey: ['vehicles'],
     queryFn: () => base44.entities.Vehicle.list(),
   });
-
-  // Only cohort "צוות" students
-  const driverCandidates = useMemo(
-    () => students.filter(s => s.cohort === 'צוות' && s.is_active !== false),
-    [students]
-  );
 
   const currentData = logistics || {};
 
@@ -87,54 +80,12 @@ function WorkplaceLogisticsCard({ date, workplaceId, workplaceName, studentCount
         />
       </div>
 
-      {/* Driver */}
-      <div className="space-y-1">
-        <label className="text-xs text-muted-foreground flex items-center gap-1">
-          <User size={11} /> נהג (מחזור צוות בלבד)
-        </label>
-        <Popover open={driverOpen} onOpenChange={setDriverOpen}>
-          <PopoverTrigger asChild>
-            <button className="w-full h-8 text-xs border border-border rounded-md px-2 flex items-center justify-between bg-background hover:bg-secondary/40 transition-colors">
-              <span className={currentData.driver_student_name ? '' : 'text-muted-foreground'}>
-                {currentData.driver_student_name || '— בחר נהג —'}
-              </span>
-              <ChevronDown size={12} className="opacity-50 shrink-0" />
-            </button>
-          </PopoverTrigger>
-          <PopoverContent className="w-56 p-0" align="end">
-            <Command>
-              <CommandInput placeholder="חיפוש נהג..." className="h-8 text-xs" />
-              <CommandList>
-                <CommandEmpty>אין תלמידים ממחזור צוות</CommandEmpty>
-                <CommandGroup>
-                  <CommandItem value="__clear__" onSelect={() => { onSave(workplaceId, workplaceName, { ...currentData, driver_student_id: '', driver_student_name: '' }); setDriverOpen(false); }} className="text-xs text-muted-foreground">
-                    — ללא נהג —
-                  </CommandItem>
-                  {driverCandidates.map(s => (
-                    <CommandItem key={s.id} value={s.full_name} onSelect={() => {
-                      onSave(workplaceId, workplaceName, { ...currentData, driver_student_id: s.id, driver_student_name: s.full_name });
-                      setDriverOpen(false);
-                    }} className="text-xs">
-                      {s.full_name}
-                    </CommandItem>
-                  ))}
-                </CommandGroup>
-              </CommandList>
-            </Command>
-          </PopoverContent>
-        </Popover>
-      </div>
     </div>
   );
 }
 
 export default function LogisticsSidebar({ date, assignments }) {
   const queryClient = useQueryClient();
-
-  const { data: allStudents = [] } = useQuery({
-    queryKey: ['students'],
-    queryFn: () => base44.entities.Student.list(),
-  });
 
   const { data: logisticsList = [] } = useQuery({
     queryKey: ['workplace-logistics', date],
@@ -197,7 +148,6 @@ export default function LogisticsSidebar({ date, assignments }) {
             workplaceId={wp.id}
             workplaceName={wp.name}
             studentCount={wp.count}
-            students={allStudents}
             logistics={logisticsMap[wp.id]}
             onSave={handleSave}
           />
