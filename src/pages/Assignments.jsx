@@ -91,7 +91,7 @@ function EditableNumberCell({ value, defaultValue, assignment, field, onUpdate }
   const [editing, setEditing] = useState(false);
   const [localVal, setLocalVal] = useState('');
 
-  const displayValue = value != null && value !== '' ? value : defaultValue;
+  const displayValue = (value != null && value !== '' && value !== undefined) ? value : defaultValue;
 
   const startEdit = () => {
     if (!assignment) return;
