@@ -12,6 +12,7 @@ import Workplaces from './pages/Workplaces';
 import Assignments from './pages/Assignments.jsx';
 import Roles from './pages/Roles';
 import Reports from './pages/Reports';
+import Vehicles from './pages/Vehicles';
 
 
 const AuthenticatedApp = () => {
@@ -42,6 +43,7 @@ const AuthenticatedApp = () => {
         <Route path="/students" element={<Students />} />
         <Route path="/workplaces" element={<Workplaces />} />
         <Route path="/roles" element={<Roles />} />
+        <Route path="/vehicles" element={<Vehicles />} />
         <Route path="/reports" element={<Reports />} />
       </Route>
       <Route path="*" element={<PageNotFound />} />
