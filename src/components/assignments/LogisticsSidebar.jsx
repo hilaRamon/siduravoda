@@ -45,6 +45,8 @@ function WorkplaceLogisticsCard({ date, workplaceId, workplaceName, studentCount
     .map(id => vehicles.find(v => v.id === id)?.name)
     .filter(Boolean);
 
+  const [openSlot, setOpenSlot] = useState(null);
+
   const renderVehicleSelector = (slotIndex) => {
     const vehicleId = slotIndex === 1 ? currentData.vehicle_id : slotIndex === 2 ? currentData.vehicle_id_2 : currentData.vehicle_id_3;
     const vehicleName = slotIndex === 1 ? currentData.vehicle_name : slotIndex === 2 ? currentData.vehicle_name_2 : currentData.vehicle_name_3;
@@ -59,42 +61,36 @@ function WorkplaceLogisticsCard({ date, workplaceId, workplaceName, studentCount
         <label className="text-xs text-muted-foreground flex items-center gap-1">
           <Truck size={11} /> רכב {slotIndex}
         </label>
-        {vehicleId ? (
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              handleVehicleSelect('', '', slotIndex);
-            }}
-            className="w-full h-8 text-xs border border-primary rounded-md px-2 flex items-center justify-between bg-primary/5 hover:bg-primary/10 transition-colors font-medium text-primary"
-          >
-            <span>{vehicleName}</span>
-            <XIcon size={12} className="ml-1" />
-          </button>
-        ) : (
-          <Popover>
-            <PopoverTrigger asChild>
-              <button className="w-full h-8 text-xs border border-border rounded-md px-2 flex items-center justify-between bg-background hover:bg-secondary/40 transition-colors">
-                <span className="text-muted-foreground">— בחר רכב —</span>
-                <ChevronDown size={12} className="opacity-50 shrink-0" />
-              </button>
-            </PopoverTrigger>
-            <PopoverContent className="w-56 p-0" align="end">
-              <Command>
-                <CommandInput placeholder="חיפוש רכב..." className="h-8 text-xs" />
-                <CommandList>
-                  <CommandEmpty>לא נמצא</CommandEmpty>
-                  <CommandGroup>
-                    {availableVehicles.filter(v => !otherIds.includes(v.id)).map(v => (
-                      <CommandItem key={v.id} value={v.name} onSelect={() => handleVehicleSelect(v.id, v.name, slotIndex)} className="text-xs cursor-pointer">
-                        {v.name}{v.license_plate ? ` (${v.license_plate})` : ''}
-                      </CommandItem>
-                    ))}
-                  </CommandGroup>
-                </CommandList>
-              </Command>
-            </PopoverContent>
-          </Popover>
-        )}
+        <Popover open={openSlot === slotIndex} onOpenChange={(open) => setOpenSlot(open ? slotIndex : null)}>
+          <PopoverTrigger asChild>
+            <button className={`w-full h-8 text-xs border rounded-md px-2 flex items-center justify-between transition-colors ${
+              vehicleId
+                ? 'border-primary bg-primary/5 text-primary font-medium hover:bg-primary/10'
+                : 'border-border bg-background text-muted-foreground hover:bg-secondary/40'
+            }`}>
+              <span>{vehicleName || '— בחר רכב —'}</span>
+              {vehicleId ? <XIcon size={12} className="ml-1" /> : <ChevronDown size={12} className="opacity-50 shrink-0" />}
+            </button>
+          </PopoverTrigger>
+          <PopoverContent className="w-56 p-0" align="end">
+            <Command>
+              <CommandInput placeholder="חיפוש רכב..." className="h-8 text-xs" />
+              <CommandList>
+                <CommandEmpty>לא נמצא</CommandEmpty>
+                <CommandGroup>
+                  {availableVehicles.filter(v => !otherIds.includes(v.id)).map(v => (
+                    <CommandItem key={v.id} value={v.name} onSelect={() => {
+                      handleVehicleSelect(v.id, v.name, slotIndex);
+                      setOpenSlot(null);
+                    }} className="text-xs cursor-pointer">
+                      {v.name}{v.license_plate ? ` (${v.license_plate})` : ''}
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              </CommandList>
+            </Command>
+          </PopoverContent>
+        </Popover>
       </div>
     );
   };

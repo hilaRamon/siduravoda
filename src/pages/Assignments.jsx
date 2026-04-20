@@ -324,7 +324,6 @@ export default function Assignments() {
         role: a.role,
         rate: a.rate ?? 40,
         hours: a.hours ?? 4.5,
-        bonus: a.bonus,
       }));
     await base44.entities.Assignment.bulkCreate(toCreate);
     queryClient.invalidateQueries({ queryKey: ['assignments'] });
