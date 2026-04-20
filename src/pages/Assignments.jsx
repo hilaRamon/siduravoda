@@ -12,7 +12,6 @@ import { ChevronRight, ChevronLeft, Copy, CalendarDays, X, ChevronsUpDown, Penci
 import DailyReportPDFButton from '@/components/reports/DailyReportPDFButton';
 import LogisticsSidebar from '@/components/assignments/LogisticsSidebar';
 import { format, addDays, subDays } from 'date-fns';
-import { useState, useMemo } from 'react';
 
 function WorkplaceCell({ student, assignment, workplaces, onAssign, onRemove }) {
   const [open, setOpen] = useState(false);
