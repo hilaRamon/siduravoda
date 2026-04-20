@@ -1,9 +1,8 @@
 import { Link, Outlet, useLocation } from 'react-router-dom';
-import { Building2, CalendarDays, LayoutDashboard, ShieldCheck, GraduationCap, BarChart2, Truck } from 'lucide-react';
+import { Building2, CalendarDays, ShieldCheck, GraduationCap, BarChart2, Truck } from 'lucide-react';
 
 const navItems = [
   { to: '/', label: 'שיבוצים יומיים', icon: CalendarDays },
-  { to: '/dashboard', label: 'לוח בקרה', icon: LayoutDashboard },
   { to: '/students', label: 'תלמידים וצוות', icon: GraduationCap },
   { to: '/workplaces', label: 'מקומות עבודה', icon: Building2 },
   { to: '/roles', label: 'תפקידים', icon: ShieldCheck },
