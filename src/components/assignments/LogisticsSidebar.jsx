@@ -57,31 +57,41 @@ function WorkplaceLogisticsCard({ date, workplaceId, workplaceName, studentCount
         <label className="text-xs text-muted-foreground flex items-center gap-1">
           <Truck size={11} /> רכב 1
         </label>
-        <Popover>
-          <PopoverTrigger asChild>
-            <button className="w-full h-8 text-xs border border-border rounded-md px-2 flex items-center justify-between bg-background hover:bg-secondary/40 transition-colors">
-              <span className={currentData.vehicle_id ? 'font-medium' : 'text-muted-foreground'}>
-                {currentData.vehicle_name || '— בחר רכב —'}
-              </span>
-              <ChevronDown size={12} className="opacity-50 shrink-0" />
+        {currentData.vehicle_id ? (
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => handleVehicleSelect('', '', 1)}
+              className="flex-1 h-8 text-xs border border-primary rounded-md px-2 flex items-center justify-between bg-primary/5 hover:bg-primary/10 transition-colors font-medium text-primary"
+            >
+              <span>{currentData.vehicle_name}</span>
+              <XIcon size={12} className="ml-1" />
             </button>
-          </PopoverTrigger>
-          <PopoverContent className="w-56 p-0" align="end">
-            <Command>
-              <CommandInput placeholder="חיפוש רכב..." className="h-8 text-xs" />
-              <CommandList>
-                <CommandEmpty>לא נמצא</CommandEmpty>
-                <CommandGroup>
-                  {availableVehicles.filter(v => v.id !== currentData.vehicle_id_2).map(v => (
-                    <CommandItem key={v.id} value={v.name} onSelect={() => handleVehicleSelect(v.id, v.name, 1)} className="text-xs cursor-pointer">
-                      {v.name}{v.license_plate ? ` (${v.license_plate})` : ''}
-                    </CommandItem>
-                  ))}
-                </CommandGroup>
-              </CommandList>
-            </Command>
-          </PopoverContent>
-        </Popover>
+          </div>
+        ) : (
+          <Popover>
+            <PopoverTrigger asChild>
+              <button className="w-full h-8 text-xs border border-border rounded-md px-2 flex items-center justify-between bg-background hover:bg-secondary/40 transition-colors">
+                <span className="text-muted-foreground">— בחר רכב —</span>
+                <ChevronDown size={12} className="opacity-50 shrink-0" />
+              </button>
+            </PopoverTrigger>
+            <PopoverContent className="w-56 p-0" align="end">
+              <Command>
+                <CommandInput placeholder="חיפוש רכב..." className="h-8 text-xs" />
+                <CommandList>
+                  <CommandEmpty>לא נמצא</CommandEmpty>
+                  <CommandGroup>
+                    {availableVehicles.filter(v => v.id !== currentData.vehicle_id_2).map(v => (
+                      <CommandItem key={v.id} value={v.name} onSelect={() => handleVehicleSelect(v.id, v.name, 1)} className="text-xs cursor-pointer">
+                        {v.name}{v.license_plate ? ` (${v.license_plate})` : ''}
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                </CommandList>
+              </Command>
+            </PopoverContent>
+          </Popover>
+        )}
       </div>
 
       {/* Vehicle 2 */}
@@ -89,31 +99,41 @@ function WorkplaceLogisticsCard({ date, workplaceId, workplaceName, studentCount
         <label className="text-xs text-muted-foreground flex items-center gap-1">
           <Truck size={11} /> רכב 2
         </label>
-        <Popover>
-          <PopoverTrigger asChild>
-            <button className="w-full h-8 text-xs border border-border rounded-md px-2 flex items-center justify-between bg-background hover:bg-secondary/40 transition-colors">
-              <span className={currentData.vehicle_id_2 ? 'font-medium' : 'text-muted-foreground'}>
-                {currentData.vehicle_name_2 || '— בחר רכב —'}
-              </span>
-              <ChevronDown size={12} className="opacity-50 shrink-0" />
+        {currentData.vehicle_id_2 ? (
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => handleVehicleSelect('', '', 2)}
+              className="flex-1 h-8 text-xs border border-primary rounded-md px-2 flex items-center justify-between bg-primary/5 hover:bg-primary/10 transition-colors font-medium text-primary"
+            >
+              <span>{currentData.vehicle_name_2}</span>
+              <XIcon size={12} className="ml-1" />
             </button>
-          </PopoverTrigger>
-          <PopoverContent className="w-56 p-0" align="end">
-            <Command>
-              <CommandInput placeholder="חיפוש רכב..." className="h-8 text-xs" />
-              <CommandList>
-                <CommandEmpty>לא נמצא</CommandEmpty>
-                <CommandGroup>
-                  {availableVehicles.filter(v => v.id !== currentData.vehicle_id).map(v => (
-                    <CommandItem key={v.id} value={v.name} onSelect={() => handleVehicleSelect(v.id, v.name, 2)} className="text-xs cursor-pointer">
-                      {v.name}{v.license_plate ? ` (${v.license_plate})` : ''}
-                    </CommandItem>
-                  ))}
-                </CommandGroup>
-              </CommandList>
-            </Command>
-          </PopoverContent>
-        </Popover>
+          </div>
+        ) : (
+          <Popover>
+            <PopoverTrigger asChild>
+              <button className="w-full h-8 text-xs border border-border rounded-md px-2 flex items-center justify-between bg-background hover:bg-secondary/40 transition-colors">
+                <span className="text-muted-foreground">— בחר רכב —</span>
+                <ChevronDown size={12} className="opacity-50 shrink-0" />
+              </button>
+            </PopoverTrigger>
+            <PopoverContent className="w-56 p-0" align="end">
+              <Command>
+                <CommandInput placeholder="חיפוש רכב..." className="h-8 text-xs" />
+                <CommandList>
+                  <CommandEmpty>לא נמצא</CommandEmpty>
+                  <CommandGroup>
+                    {availableVehicles.filter(v => v.id !== currentData.vehicle_id).map(v => (
+                      <CommandItem key={v.id} value={v.name} onSelect={() => handleVehicleSelect(v.id, v.name, 2)} className="text-xs cursor-pointer">
+                        {v.name}{v.license_plate ? ` (${v.license_plate})` : ''}
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                </CommandList>
+              </Command>
+            </PopoverContent>
+          </Popover>
+        )}
       </div>
 
       {/* Exit Time */}
