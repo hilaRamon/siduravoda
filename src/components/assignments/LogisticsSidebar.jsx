@@ -31,9 +31,12 @@ function WorkplaceLogisticsCard({ date, workplaceId, workplaceName, studentCount
     if (slotIndex === 1) {
       newData.vehicle_id = vehicleId;
       newData.vehicle_name = vehicleName;
-    } else {
+    } else if (slotIndex === 2) {
       newData.vehicle_id_2 = vehicleId;
       newData.vehicle_name_2 = vehicleName;
+    } else if (slotIndex === 3) {
+      newData.vehicle_id_3 = vehicleId;
+      newData.vehicle_name_3 = vehicleName;
     }
     onSave(workplaceId, workplaceName, newData);
   }, [currentData, vehicles, workplaceId, workplaceName, onSave]);
@@ -41,6 +44,60 @@ function WorkplaceLogisticsCard({ date, workplaceId, workplaceName, studentCount
   const selectedNames = selectedVehicleIds
     .map(id => vehicles.find(v => v.id === id)?.name)
     .filter(Boolean);
+
+  const renderVehicleSelector = (slotIndex) => {
+    const vehicleId = slotIndex === 1 ? currentData.vehicle_id : slotIndex === 2 ? currentData.vehicle_id_2 : currentData.vehicle_id_3;
+    const vehicleName = slotIndex === 1 ? currentData.vehicle_name : slotIndex === 2 ? currentData.vehicle_name_2 : currentData.vehicle_name_3;
+    const otherIds = [
+      slotIndex !== 1 && currentData.vehicle_id,
+      slotIndex !== 2 && currentData.vehicle_id_2,
+      slotIndex !== 3 && currentData.vehicle_id_3
+    ].filter(Boolean);
+
+    return (
+      <div className="space-y-1">
+        <label className="text-xs text-muted-foreground flex items-center gap-1">
+          <Truck size={11} /> רכב {slotIndex}
+        </label>
+        {vehicleId ? (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handleVehicleSelect('', '', slotIndex);
+            }}
+            className="w-full h-8 text-xs border border-primary rounded-md px-2 flex items-center justify-between bg-primary/5 hover:bg-primary/10 transition-colors font-medium text-primary"
+          >
+            <span>{vehicleName}</span>
+            <XIcon size={12} className="ml-1" />
+          </button>
+        ) : (
+          <Popover>
+            <PopoverTrigger asChild>
+              <button className="w-full h-8 text-xs border border-border rounded-md px-2 flex items-center justify-between bg-background hover:bg-secondary/40 transition-colors">
+                <span className="text-muted-foreground">— בחר רכב —</span>
+                <ChevronDown size={12} className="opacity-50 shrink-0" />
+              </button>
+            </PopoverTrigger>
+            <PopoverContent className="w-56 p-0" align="end">
+              <Command>
+                <CommandInput placeholder="חיפוש רכב..." className="h-8 text-xs" />
+                <CommandList>
+                  <CommandEmpty>לא נמצא</CommandEmpty>
+                  <CommandGroup>
+                    {availableVehicles.filter(v => !otherIds.includes(v.id)).map(v => (
+                      <CommandItem key={v.id} value={v.name} onSelect={() => handleVehicleSelect(v.id, v.name, slotIndex)} className="text-xs cursor-pointer">
+                        {v.name}{v.license_plate ? ` (${v.license_plate})` : ''}
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                </CommandList>
+              </Command>
+            </PopoverContent>
+          </Popover>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div className="bg-card border border-border rounded-xl p-3 space-y-2">
@@ -50,96 +107,6 @@ function WorkplaceLogisticsCard({ date, workplaceId, workplaceName, studentCount
         <span className="text-xs bg-primary/10 text-primary font-medium px-2 py-0.5 rounded-full shrink-0">
           {studentCount} תלמידים
         </span>
-      </div>
-
-      {/* Vehicle 1 */}
-      <div className="space-y-1">
-        <label className="text-xs text-muted-foreground flex items-center gap-1">
-          <Truck size={11} /> רכב 1
-        </label>
-        {currentData.vehicle_id ? (
-          <div className="flex items-center gap-1">
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                handleVehicleSelect('', '', 1);
-              }}
-              className="flex-1 h-8 text-xs border border-primary rounded-md px-2 flex items-center justify-between bg-primary/5 hover:bg-primary/10 transition-colors font-medium text-primary"
-            >
-              <span>{currentData.vehicle_name}</span>
-              <XIcon size={12} className="ml-1" />
-            </button>
-          </div>
-        ) : (
-          <Popover>
-            <PopoverTrigger asChild>
-              <button className="w-full h-8 text-xs border border-border rounded-md px-2 flex items-center justify-between bg-background hover:bg-secondary/40 transition-colors">
-                <span className="text-muted-foreground">— בחר רכב —</span>
-                <ChevronDown size={12} className="opacity-50 shrink-0" />
-              </button>
-            </PopoverTrigger>
-            <PopoverContent className="w-56 p-0" align="end">
-              <Command>
-                <CommandInput placeholder="חיפוש רכב..." className="h-8 text-xs" />
-                <CommandList>
-                  <CommandEmpty>לא נמצא</CommandEmpty>
-                  <CommandGroup>
-                    {availableVehicles.filter(v => v.id !== currentData.vehicle_id_2).map(v => (
-                      <CommandItem key={v.id} value={v.name} onSelect={() => handleVehicleSelect(v.id, v.name, 1)} className="text-xs cursor-pointer">
-                        {v.name}{v.license_plate ? ` (${v.license_plate})` : ''}
-                      </CommandItem>
-                    ))}
-                  </CommandGroup>
-                </CommandList>
-              </Command>
-            </PopoverContent>
-          </Popover>
-        )}
-      </div>
-
-      {/* Vehicle 2 */}
-      <div className="space-y-1">
-        <label className="text-xs text-muted-foreground flex items-center gap-1">
-          <Truck size={11} /> רכב 2
-        </label>
-        {currentData.vehicle_id_2 ? (
-          <div className="flex items-center gap-1">
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                handleVehicleSelect('', '', 2);
-              }}
-              className="flex-1 h-8 text-xs border border-primary rounded-md px-2 flex items-center justify-between bg-primary/5 hover:bg-primary/10 transition-colors font-medium text-primary"
-            >
-              <span>{currentData.vehicle_name_2}</span>
-              <XIcon size={12} className="ml-1" />
-            </button>
-          </div>
-        ) : (
-          <Popover>
-            <PopoverTrigger asChild>
-              <button className="w-full h-8 text-xs border border-border rounded-md px-2 flex items-center justify-between bg-background hover:bg-secondary/40 transition-colors">
-                <span className="text-muted-foreground">— בחר רכב —</span>
-                <ChevronDown size={12} className="opacity-50 shrink-0" />
-              </button>
-            </PopoverTrigger>
-            <PopoverContent className="w-56 p-0" align="end">
-              <Command>
-                <CommandInput placeholder="חיפוש רכב..." className="h-8 text-xs" />
-                <CommandList>
-                  <CommandEmpty>לא נמצא</CommandEmpty>
-                  <CommandGroup>
-                    {availableVehicles.filter(v => v.id !== currentData.vehicle_id).map(v => (
-                      <CommandItem key={v.id} value={v.name} onSelect={() => handleVehicleSelect(v.id, v.name, 2)} className="text-xs cursor-pointer">
-                        {v.name}{v.license_plate ? ` (${v.license_plate})` : ''}
-                      </CommandItem>
-                    ))}
-                  </CommandGroup>
-                </CommandList>
-              </Command>
-            </PopoverContent>
-          </Popover>
-        )}
       </div>
 
       {/* Exit Time */}
@@ -155,6 +122,10 @@ function WorkplaceLogisticsCard({ date, workplaceId, workplaceName, studentCount
         />
       </div>
 
+      {/* Vehicle Selectors */}
+      {renderVehicleSelector(1)}
+      {renderVehicleSelector(2)}
+      {renderVehicleSelector(3)}
     </div>
   );
 }
