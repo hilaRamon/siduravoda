@@ -7,6 +7,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Plus, Search, Upload, Pencil, Trash2, UserCircle } from 'lucide-react';
 import StudentFormModal from '@/components/students/StudentFormModal';
 import ImportModal from '@/components/students/ImportModal';
+import ForbiddenWorkplacesCell from '@/components/students/ForbiddenWorkplacesCell';
 
 const FREE_DAY_COLORS = {
   'א': 'bg-blue-100 text-blue-700',
@@ -26,6 +27,12 @@ export default function Students() {
   const { data: students = [], isLoading } = useQuery({
     queryKey: ['students'],
     queryFn: () => base44.entities.Student.list('-created_date'),
+  });
+
+  const { data: workplaces = [] } = useQuery({
+    queryKey: ['workplaces'],
+    queryFn: () => base44.entities.Workplace.list(),
+    select: (data) => [...data].sort((a, b) => (a.name || '').localeCompare(b.name || '', 'he')),
   });
 
   const cohorts = useMemo(() => [...new Set(students.map(s => s.cohort).filter(Boolean))], [students]);
@@ -121,7 +128,7 @@ export default function Students() {
                 <th className="text-right px-5 py-3 text-sm font-semibold text-muted-foreground">מחזור</th>
                 <th className="text-right px-5 py-3 text-sm font-semibold text-muted-foreground">יום חופש</th>
                 <th className="text-right px-5 py-3 text-sm font-semibold text-muted-foreground">מרחק</th>
-                <th className="text-right px-5 py-3 text-sm font-semibold text-muted-foreground">הערות</th>
+                <th className="text-right px-5 py-3 text-sm font-semibold text-muted-foreground">מקומות אסורים</th>
                 <th className="text-center px-5 py-3 text-sm font-semibold text-muted-foreground">פעיל</th>
                 <th className="px-5 py-3"></th>
               </tr>
@@ -139,7 +146,7 @@ export default function Students() {
                     ) : '—'}
                   </td>
                   <td className="px-5 py-3 text-sm text-muted-foreground">{s.distance_status || '—'}</td>
-                  <td className="px-5 py-3 text-sm text-muted-foreground max-w-[200px] truncate">{s.notes || '—'}</td>
+                  <ForbiddenWorkplacesCell student={s} workplaces={workplaces} onSave={() => queryClient.invalidateQueries({ queryKey: ['students'] })} />
                   <td className="px-5 py-3 text-center">
                     <Checkbox
                       checked={s.is_active !== false}

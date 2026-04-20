@@ -6,7 +6,8 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
 function WorkplaceLogisticsCard({ date, workplaceId, workplaceName, studentCount, logistics, allLogistics, onSave }) {
-  const [vehicleOpen, setVehicleOpen] = useState(false);
+  const [vehicleOpen1, setVehicleOpen1] = useState(false);
+  const [vehicleOpen2, setVehicleOpen2] = useState(false);
 
   const { data: vehicles = [] } = useQuery({
     queryKey: ['vehicles'],
@@ -18,8 +19,8 @@ function WorkplaceLogisticsCard({ date, workplaceId, workplaceName, studentCount
   // Vehicles already assigned to OTHER workplaces today
   const takenVehicleIds = new Set(
     allLogistics
-      .filter(l => l.workplace_id !== workplaceId && l.vehicle_id)
-      .map(l => l.vehicle_id)
+      .filter(l => l.workplace_id !== workplaceId && (l.vehicle_id || l.vehicle_id_2))
+      .flatMap(l => [l.vehicle_id, l.vehicle_id_2].filter(Boolean))
   );
   const availableVehicles = vehicles.filter(v => !takenVehicleIds.has(v.id));
 
@@ -37,12 +38,12 @@ function WorkplaceLogisticsCard({ date, workplaceId, workplaceName, studentCount
         </span>
       </div>
 
-      {/* Vehicle */}
+      {/* Vehicle 1 */}
       <div className="space-y-1">
         <label className="text-xs text-muted-foreground flex items-center gap-1">
-          <Truck size={11} /> רכב
+          <Truck size={11} /> רכב 1
         </label>
-        <Popover open={vehicleOpen} onOpenChange={setVehicleOpen}>
+        <Popover open={vehicleOpen1} onOpenChange={setVehicleOpen1}>
           <PopoverTrigger asChild>
             <button className="w-full h-8 text-xs border border-border rounded-md px-2 flex items-center justify-between bg-background hover:bg-secondary/40 transition-colors">
               <span className={currentData.vehicle_name ? '' : 'text-muted-foreground'}>
@@ -57,13 +58,51 @@ function WorkplaceLogisticsCard({ date, workplaceId, workplaceName, studentCount
               <CommandList>
                 <CommandEmpty>לא נמצא</CommandEmpty>
                 <CommandGroup>
-                  <CommandItem value="__clear__" onSelect={() => { update('vehicle_id', ''); update('vehicle_name', ''); setVehicleOpen(false); }} className="text-xs text-muted-foreground">
+                  <CommandItem value="__clear__" onSelect={() => { update('vehicle_id', ''); update('vehicle_name', ''); setVehicleOpen1(false); }} className="text-xs text-muted-foreground">
                     — ללא רכב —
                   </CommandItem>
-                  {availableVehicles.map(v => (
+                  {availableVehicles.filter(v => v.id !== currentData.vehicle_id_2).map(v => (
                     <CommandItem key={v.id} value={v.name} onSelect={() => {
                       onSave(workplaceId, workplaceName, { ...currentData, vehicle_id: v.id, vehicle_name: v.name });
-                      setVehicleOpen(false);
+                      setVehicleOpen1(false);
+                    }} className="text-xs">
+                      {v.name}{v.license_plate ? ` (${v.license_plate})` : ''}
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              </CommandList>
+            </Command>
+          </PopoverContent>
+        </Popover>
+      </div>
+
+      {/* Vehicle 2 */}
+      <div className="space-y-1">
+        <label className="text-xs text-muted-foreground flex items-center gap-1">
+          <Truck size={11} /> רכב 2
+        </label>
+        <Popover open={vehicleOpen2} onOpenChange={setVehicleOpen2}>
+          <PopoverTrigger asChild>
+            <button className="w-full h-8 text-xs border border-border rounded-md px-2 flex items-center justify-between bg-background hover:bg-secondary/40 transition-colors">
+              <span className={currentData.vehicle_name_2 ? '' : 'text-muted-foreground'}>
+                {currentData.vehicle_name_2 || '— בחר רכב —'}
+              </span>
+              <ChevronDown size={12} className="opacity-50 shrink-0" />
+            </button>
+          </PopoverTrigger>
+          <PopoverContent className="w-56 p-0" align="end">
+            <Command>
+              <CommandInput placeholder="חיפוש רכב..." className="h-8 text-xs" />
+              <CommandList>
+                <CommandEmpty>לא נמצא</CommandEmpty>
+                <CommandGroup>
+                  <CommandItem value="__clear__" onSelect={() => { update('vehicle_id_2', ''); update('vehicle_name_2', ''); setVehicleOpen2(false); }} className="text-xs text-muted-foreground">
+                    — ללא רכב —
+                  </CommandItem>
+                  {availableVehicles.filter(v => v.id !== currentData.vehicle_id).map(v => (
+                    <CommandItem key={v.id} value={v.name} onSelect={() => {
+                      onSave(workplaceId, workplaceName, { ...currentData, vehicle_id_2: v.id, vehicle_name_2: v.name });
+                      setVehicleOpen2(false);
                     }} className="text-xs">
                       {v.name}{v.license_plate ? ` (${v.license_plate})` : ''}
                     </CommandItem>

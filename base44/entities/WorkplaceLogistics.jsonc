@@ -25,11 +25,19 @@
     },
     "vehicle_id": {
       "type": "string",
-      "description": "\u05de\u05d6\u05d4\u05d4 \u05e8\u05db\u05d1"
+      "description": "\u05de\u05d6\u05d4\u05d4 \u05e8\u05db\u05d1 1"
     },
     "vehicle_name": {
       "type": "string",
-      "description": "\u05e9\u05dd \u05e8\u05db\u05d1"
+      "description": "\u05e9\u05dd \u05e8\u05db\u05d1 1"
+    },
+    "vehicle_id_2": {
+      "type": "string",
+      "description": "\u05de\u05d6\u05d4\u05d4 \u05e8\u05db\u05d1 2"
+    },
+    "vehicle_name_2": {
+      "type": "string",
+      "description": "\u05e9\u05dd \u05e8\u05db\u05d1 2"
     },
     "exit_time": {
       "type": "string",

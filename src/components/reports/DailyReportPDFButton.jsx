@@ -35,11 +35,12 @@ function buildReportGroups(assignments, logisticsMap) {
       const log = logisticsMap[g.id] || {};
       const driverAssignment = g.students.find(s => s.role === 'נהג');
       const driverName = driverAssignment?.student_name || log.driver_student_name || '';
+      const vehicles = [log.vehicle_name, log.vehicle_name_2].filter(Boolean).join(' + ');
       return {
         workplaceName: g.name,
         students: g.students.sort((a, b) => (a.student_name || '').localeCompare(b.student_name || '', 'he')),
         driverName,
-        vehicleName: log.vehicle_name || '',
+        vehicleName: vehicles || '',
         exitTime: log.exit_time || '',
         teamLeaderName: globalTeamLeader?.student_name || '',
       };
@@ -113,20 +114,22 @@ export default function DailyReportPDFButton({ date, assignments }) {
 
         {reportGroups.map((group) => (
           <div key={group.workplaceName} style={{ marginBottom: '16px' }}>
-            <div style={{ background: '#e5e7eb', padding: '6px 8px', fontWeight: 'bold', fontSize: '12px', border: '1px solid #9ca3af', borderBottom: 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span>{group.workplaceName}</span>
-              <span style={{ display: 'flex', gap: '12px' }}>
-                {group.vehicleName && (
-                  <span style={{ fontWeight: 'bold', fontSize: '11px', background: '#1e40af', color: '#fff', padding: '2px 8px', borderRadius: '4px' }}>
-                    🚐 {group.vehicleName}
-                  </span>
-                )}
-                {group.exitTime && (
-                  <span style={{ fontWeight: 'bold', fontSize: '11px', background: '#166534', color: '#fff', padding: '2px 8px', borderRadius: '4px' }}>
-                    ⏰ יציאה: {group.exitTime}
-                  </span>
-                )}
-              </span>
+            <div style={{ background: '#e5e7eb', padding: '8px 8px', fontWeight: 'bold', fontSize: '12px', border: '1px solid #9ca3af', borderBottom: 'none' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px' }}>
+                <span>{group.workplaceName}</span>
+                <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
+                  {group.vehicleName && (
+                    <span style={{ fontWeight: 'bold', fontSize: '11px', background: '#1e40af', color: '#fff', padding: '3px 8px', borderRadius: '4px', whiteSpace: 'nowrap' }}>
+                      🚐 {group.vehicleName}
+                    </span>
+                  )}
+                  {group.exitTime && (
+                    <span style={{ fontWeight: 'bold', fontSize: '11px', background: '#166534', color: '#fff', padding: '3px 8px', borderRadius: '4px', whiteSpace: 'nowrap' }}>
+                      ⏰ {group.exitTime}
+                    </span>
+                  )}
+                </div>
+              </div>
             </div>
             <table style={{ width: '100%', fontSize: '11px', borderCollapse: 'collapse' }}>
               <thead>

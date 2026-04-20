@@ -4,7 +4,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
 
 const FREE_DAYS = ['א', 'ב', 'ג', 'ד', 'ה'];
 const DISTANCES = ['קרוב', 'בינוני', 'רחוק'];
@@ -15,7 +14,6 @@ export default function StudentFormModal({ open, onClose, onSave, student }) {
     cohort: '',
     free_day: '',
     distance_status: '',
-    notes: '',
   });
 
   useEffect(() => {
@@ -25,10 +23,9 @@ export default function StudentFormModal({ open, onClose, onSave, student }) {
         cohort: student.cohort || '',
         free_day: student.free_day || '',
         distance_status: student.distance_status || '',
-        notes: student.notes || '',
       });
     } else {
-      setForm({ full_name: '', cohort: '', free_day: '', distance_status: '', notes: '' });
+      setForm({ full_name: '', cohort: '', free_day: '', distance_status: '' });
     }
   }, [student, open]);
 
@@ -90,16 +87,6 @@ export default function StudentFormModal({ open, onClose, onSave, student }) {
                 ))}
               </SelectContent>
             </Select>
-          </div>
-          <div>
-            <Label>הערות</Label>
-            <Textarea
-              value={form.notes}
-              onChange={e => setForm(p => ({ ...p, notes: e.target.value }))}
-              placeholder="הערות נוספות..."
-              className="mt-1"
-              rows={2}
-            />
           </div>
           <div className="flex gap-2 justify-end pt-2">
             <Button type="button" variant="outline" onClick={onClose}>ביטול</Button>
