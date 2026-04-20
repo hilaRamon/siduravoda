@@ -107,7 +107,7 @@ function WorkplaceLogisticsCard({ date, workplaceId, workplaceName, studentCount
                 return (
                   <span key={vehicleId} className="text-xs bg-primary/10 text-primary px-2 py-1 rounded-full flex items-center gap-1">
                     {name}
-                    <button onClick={() => removeVehicle(vehicleId)} className="hover:opacity-70">
+                    <button onClick={() => { removeVehicle(vehicleId); setVehicleOpen(false); }} className="hover:opacity-70">
                       <X size={10} />
                     </button>
                   </span>
@@ -149,7 +149,7 @@ function WorkplaceLogisticsCard({ date, workplaceId, workplaceName, studentCount
         <input
           type="time"
           value={currentData.exit_time || ''}
-          onChange={e => update('exit_time', e.target.value)}
+          onChange={e => onSave(workplaceId, workplaceName, { ...currentData, exit_time: e.target.value })}
           className="w-full h-8 text-xs border border-border rounded-md px-2 bg-background focus:outline-none focus:ring-1 focus:ring-primary/40"
         />
       </div>
