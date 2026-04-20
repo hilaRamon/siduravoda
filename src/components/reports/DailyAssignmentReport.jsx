@@ -1,6 +1,7 @@
 import { useState, useMemo, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
+// WorkplaceLogistics is available via base44.entities.WorkplaceLogistics
 import { Button } from '@/components/ui/button';
 import { Download, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
@@ -28,30 +29,40 @@ export default function DailyAssignmentReport() {
     queryFn: () => base44.entities.Assignment.filter({ date }),
   });
 
+  const { data: logisticsList = [] } = useQuery({
+    queryKey: ['workplace-logistics', date],
+    queryFn: () => base44.entities.WorkplaceLogistics.filter({ date }),
+  });
+
   const reportGroups = useMemo(() => {
     const SKIP = ['לא עובד', 'לימודים'];
     const filtered = assignments.filter(a => !SKIP.includes(a.workplace_name));
-
-    // Find the global driver for the day
-    const globalDriver = assignments.find(a => a.role === 'נהג');
     const globalTeamLeader = assignments.find(a => a.role === 'ראש צוות');
+
+    const logisticsMap = {};
+    logisticsList.forEach(l => { logisticsMap[l.workplace_id] = l; });
 
     const byWorkplace = {};
     filtered.forEach(a => {
       const key = a.workplace_id;
-      if (!byWorkplace[key]) byWorkplace[key] = { name: a.workplace_name, students: [] };
+      if (!byWorkplace[key]) byWorkplace[key] = { id: a.workplace_id, name: a.workplace_name, students: [] };
       byWorkplace[key].students.push(a);
     });
 
     return Object.values(byWorkplace)
       .sort((a, b) => a.name.localeCompare(b.name, 'he'))
-      .map(g => ({
-        workplaceName: g.name,
-        students: g.students.sort((a, b) => (a.student_name || '').localeCompare(b.student_name || '', 'he')),
-        driverName: globalDriver?.student_name || '',
-        teamLeaderName: globalTeamLeader?.student_name || '',
-      }));
-  }, [assignments]);
+      .map(g => {
+        const log = logisticsMap[g.id] || {};
+        return {
+          workplaceName: g.name,
+          students: g.students.sort((a, b) => (a.student_name || '').localeCompare(b.student_name || '', 'he')),
+          driverName: log.driver_student_name || '',
+          vehicleName: log.vehicle_name || '',
+          exitTime: log.exit_time || '',
+          teamLeaderName: globalTeamLeader?.student_name || '',
+        };
+      });
+  }, [assignments, logisticsList]);
 
   const gregDate = new Date(date + 'T12:00:00').toLocaleDateString('he-IL', {
     day: 'numeric', month: 'long', year: 'numeric'
@@ -119,8 +130,11 @@ export default function DailyAssignmentReport() {
             <div className="space-y-4">
               {reportGroups.map((group) => (
                 <div key={group.workplaceName}>
-                  <div className="bg-gray-100 px-2 py-1 font-bold text-xs border border-gray-300 rounded-t">
-                    {group.workplaceName}
+                  <div className="bg-gray-100 px-2 py-1 font-bold text-xs border border-gray-300 rounded-t flex justify-between items-center">
+                    <span>{group.workplaceName}</span>
+                    <span className="font-normal text-gray-500">
+                      {group.vehicleName ? `רכב: ${group.vehicleName}` : ''}{group.vehicleName && group.exitTime ? ' | ' : ''}{group.exitTime ? `יציאה: ${group.exitTime}` : ''}
+                    </span>
                   </div>
                   <table className="w-full text-xs border-collapse">
                     <thead>

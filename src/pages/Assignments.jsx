@@ -10,6 +10,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Checkbox } from '@/components/ui/checkbox';
 import { ChevronRight, ChevronLeft, Copy, CalendarDays, X, ChevronsUpDown, Pencil } from 'lucide-react';
 import DailyReportPDFButton from '@/components/reports/DailyReportPDFButton';
+import LogisticsSidebar from '@/components/assignments/LogisticsSidebar';
 import { format, addDays, subDays } from 'date-fns';
 
 function WorkplaceCell({ student, assignment, workplaces, onAssign, onRemove }) {
@@ -331,7 +332,8 @@ export default function Assignments() {
   const nextDay = () => setDate(format(addDays(new Date(date + 'T12:00:00'), 1), 'yyyy-MM-dd'));
 
   return (
-    <div className="p-8">
+    <div className="p-8 flex gap-6 items-start">
+      <div className="flex-1 min-w-0">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h2 className="text-2xl font-bold">שיבוצים יומיים</h2>
@@ -578,6 +580,8 @@ export default function Assignments() {
           </tbody>
         </table>
       </div>
+      </div>
+      <LogisticsSidebar date={date} assignments={assignments} />
     </div>
   );
 }

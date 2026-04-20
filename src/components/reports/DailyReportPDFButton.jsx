@@ -1,4 +1,6 @@
 import { useState, useRef } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import { Download, Loader2 } from 'lucide-react';
 import jsPDF from 'jspdf';
@@ -15,10 +17,9 @@ function toHebrewDate(dateStr) {
   }
 }
 
-function buildReportGroups(assignments) {
+function buildReportGroups(assignments, logisticsMap) {
   const SKIP = ['לא עובד', 'לימודים'];
   const filtered = assignments.filter(a => !SKIP.includes(a.workplace_name));
-  const globalDriver = assignments.find(a => a.role === 'נהג');
   const globalTeamLeader = assignments.find(a => a.role === 'ראש צוות');
 
   const byWorkplace = {};
@@ -30,23 +31,37 @@ function buildReportGroups(assignments) {
 
   return Object.values(byWorkplace)
     .sort((a, b) => a.name.localeCompare(b.name, 'he'))
-    .map(g => ({
-      workplaceName: g.name,
-      students: g.students.sort((a, b) => (a.student_name || '').localeCompare(b.student_name || '', 'he')),
-      driverName: globalDriver?.student_name || '',
-      teamLeaderName: globalTeamLeader?.student_name || '',
-    }));
+    .map(g => {
+      const wpId = filtered.find(a => a.workplace_name === g.name)?.workplace_id;
+      const log = logisticsMap[wpId] || {};
+      return {
+        workplaceName: g.name,
+        students: g.students.sort((a, b) => (a.student_name || '').localeCompare(b.student_name || '', 'he')),
+        driverName: log.driver_student_name || '',
+        vehicleName: log.vehicle_name || '',
+        exitTime: log.exit_time || '',
+        teamLeaderName: globalTeamLeader?.student_name || '',
+      };
+    });
 }
 
 export default function DailyReportPDFButton({ date, assignments }) {
   const [exporting, setExporting] = useState(false);
   const hiddenRef = useRef(null);
 
+  const { data: logisticsList = [] } = useQuery({
+    queryKey: ['workplace-logistics', date],
+    queryFn: () => base44.entities.WorkplaceLogistics.filter({ date }),
+  });
+
+  const logisticsMap = {};
+  logisticsList.forEach(l => { logisticsMap[l.workplace_id] = l; });
+
   const gregDate = new Date(date + 'T12:00:00').toLocaleDateString('he-IL', {
     day: 'numeric', month: 'long', year: 'numeric'
   });
   const hebrewDate = toHebrewDate(date);
-  const reportGroups = buildReportGroups(assignments);
+  const reportGroups = buildReportGroups(assignments, logisticsMap);
 
   const handleExport = async () => {
     setExporting(true);
@@ -97,8 +112,11 @@ export default function DailyReportPDFButton({ date, assignments }) {
 
         {reportGroups.map((group) => (
           <div key={group.workplaceName} style={{ marginBottom: '16px' }}>
-            <div style={{ background: '#f3f4f6', padding: '4px 8px', fontWeight: 'bold', fontSize: '11px', border: '1px solid #d1d5db', borderBottom: 'none' }}>
-              {group.workplaceName}
+            <div style={{ background: '#f3f4f6', padding: '4px 8px', fontWeight: 'bold', fontSize: '11px', border: '1px solid #d1d5db', borderBottom: 'none', display: 'flex', justifyContent: 'space-between' }}>
+              <span>{group.workplaceName}</span>
+              <span style={{ fontWeight: 'normal', fontSize: '10px', color: '#6b7280' }}>
+                {group.vehicleName ? `רכב: ${group.vehicleName}` : ''}{group.vehicleName && group.exitTime ? ' | ' : ''}{group.exitTime ? `יציאה: ${group.exitTime}` : ''}
+              </span>
             </div>
             <table style={{ width: '100%', fontSize: '11px', borderCollapse: 'collapse' }}>
               <thead>
