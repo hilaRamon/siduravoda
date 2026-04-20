@@ -2,9 +2,11 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
-import { Download, FileSpreadsheet, Shuffle, Loader2, UserCheck } from 'lucide-react';
+import { Download, FileSpreadsheet, Shuffle, Loader2, UserCheck, BarChart2, CalendarDays } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { format, eachDayOfInterval, parseISO } from 'date-fns';
+import PeriodicWorkReport from '@/components/reports/PeriodicWorkReport';
+import DailyAssignmentReport from '@/components/reports/DailyAssignmentReport';
 
 export default function Reports() {
   const [exportingBackup, setExportingBackup] = useState(false);
@@ -222,14 +224,39 @@ export default function Reports() {
     alert(`עודכנו תפקידים ל-${dates.length} ימים בהצלחה!`);
   };
 
+  const [activeTab, setActiveTab] = useState('tools');
+
   return (
-    <div className="p-8 max-w-2xl">
-      <div className="mb-8">
+    <div className="p-8 max-w-5xl">
+      <div className="mb-6">
         <h2 className="text-2xl font-bold">דוחות</h2>
         <p className="text-muted-foreground mt-1">ייצוא נתונים וכלי ניהול</p>
       </div>
 
-      <div className="space-y-4">
+      {/* Tabs */}
+      <div className="flex gap-1 bg-secondary/50 rounded-xl p-1 mb-6 w-fit">
+        {[
+          { key: 'tools', label: 'כלי ניהול', icon: FileSpreadsheet },
+          { key: 'periodic', label: 'דוח עבודה תקופתי', icon: BarChart2 },
+          { key: 'daily', label: 'סידור עבודה יומי', icon: CalendarDays },
+        ].map(({ key, label, icon: Icon }) => (
+          <button
+            key={key}
+            onClick={() => setActiveTab(key)}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+              activeTab === key ? 'bg-card shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <Icon size={15} />
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {activeTab === 'periodic' && <PeriodicWorkReport />}
+      {activeTab === 'daily' && <DailyAssignmentReport />}
+
+      {activeTab === 'tools' && <div className="space-y-4 max-w-2xl">
 
         {/* Backup Export */}
         <div className="bg-card border border-border rounded-2xl p-6 flex items-start justify-between gap-4">
@@ -294,7 +321,7 @@ export default function Reports() {
           </Button>
         </div>
 
-      </div>
+      </div>}
     </div>
   );
 }
