@@ -372,6 +372,9 @@ export default function Assignments() {
           />
         </div>
         <Button variant="outline" size="icon" onClick={nextDay}><ChevronLeft size={18} /></Button>
+        <Button variant="outline" onClick={() => setDate(format(new Date(), 'yyyy-MM-dd'))} className="text-xs">
+          היום
+        </Button>
         <span className="text-sm text-muted-foreground">
           {new Date(date + 'T12:00:00').toLocaleDateString('he-IL', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
         </span>
