@@ -1,7 +1,7 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
-import { Truck, Clock, ChevronDown, X } from 'lucide-react';
+import { Truck, Clock, ChevronDown, X as XIcon } from 'lucide-react';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -17,15 +17,15 @@ function WorkplaceLogisticsCard({ date, workplaceId, workplaceName, studentCount
   const currentData = logistics || {};
   const selectedVehicleIds = [currentData.vehicle_id, currentData.vehicle_id_2].filter(Boolean);
 
-  // Vehicles already assigned to OTHER workplaces today
+  // Vehicles already assigned to OTHER workplaces today (exclude current workplace's vehicles)
   const takenVehicleIds = new Set(
     allLogistics
       .filter(l => l.workplace_id !== workplaceId)
       .flatMap(l => [l.vehicle_id, l.vehicle_id_2].filter(Boolean))
   );
-  const availableVehicles = vehicles.filter(v => !takenVehicleIds.has(v.id));
+  const availableVehicles = vehicles.filter(v => !takenVehicleIds.has(v.id) || selectedVehicleIds.includes(v.id));
 
-  const toggleVehicle = (vehicleId, vehicleName) => {
+  const toggleVehicle = useCallback((vehicleId, vehicleName) => {
     const ids = [...selectedVehicleIds];
     const idx = ids.indexOf(vehicleId);
     if (idx >= 0) {
@@ -41,10 +41,12 @@ function WorkplaceLogisticsCard({ date, workplaceId, workplaceName, studentCount
       vehicle_name_2: ids[1] ? vehicles.find(v => v.id === ids[1])?.name : '',
     };
     onSave(workplaceId, workplaceName, newData);
-  };
+  }, [selectedVehicleIds, currentData, vehicles, workplaceId, workplaceName, onSave]);
 
-  const removeVehicle = (vehicleId) => {
+  const removeVehicle = useCallback((vehicleId) => {
+    console.log('removeVehicle called with:', vehicleId);
     const ids = selectedVehicleIds.filter(id => id !== vehicleId);
+    console.log('after filter, remaining ids:', ids);
     const newData = {
       ...currentData,
       vehicle_id: ids[0] || '',
@@ -52,8 +54,9 @@ function WorkplaceLogisticsCard({ date, workplaceId, workplaceName, studentCount
       vehicle_id_2: ids[1] || '',
       vehicle_name_2: ids[1] ? vehicles.find(v => v.id === ids[1])?.name : '',
     };
+    console.log('newData:', newData);
     onSave(workplaceId, workplaceName, newData);
-  };
+  }, [selectedVehicleIds, currentData, vehicles, workplaceId, workplaceName, onSave]);
 
   const selectedNames = selectedVehicleIds
     .map(id => vehicles.find(v => v.id === id)?.name)
@@ -105,11 +108,13 @@ function WorkplaceLogisticsCard({ date, workplaceId, workplaceName, studentCount
               {selectedVehicleIds.map((vehicleId) => {
                 const name = vehicles.find(v => v.id === vehicleId)?.name;
                 return (
-                  <span key={vehicleId} className="text-xs bg-primary/10 text-primary px-2 py-1 rounded-full flex items-center gap-1">
+                  <span 
+                    key={vehicleId} 
+                    className="text-xs bg-primary/10 text-primary px-2 py-1 rounded-full flex items-center gap-1 cursor-pointer hover:bg-primary/20 transition-colors"
+                    onClick={() => removeVehicle(vehicleId)}
+                  >
                     {name}
-                    <button type="button" onClick={(e) => { e.preventDefault(); removeVehicle(vehicleId); }} className="hover:opacity-70">
-                      <X size={10} />
-                    </button>
+                    <XIcon size={10} className="ml-1" />
                   </span>
                 );
               })}
