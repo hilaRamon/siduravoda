@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
@@ -67,33 +67,63 @@ export default function DailyReportPDFButton({ date, assignments }) {
 
   const handleExport = async () => {
     setExporting(true);
-    // Make hidden div visible for canvas capture
-    hiddenRef.current.style.position = 'fixed';
-    hiddenRef.current.style.top = '-9999px';
-    hiddenRef.current.style.left = '0';
-    hiddenRef.current.style.display = 'block';
-    await new Promise(r => setTimeout(r, 100));
 
-    const canvas = await html2canvas(hiddenRef.current, { scale: 1.5, useCORS: true });
+    const container = hiddenRef.current;
+    container.style.position = 'fixed';
+    container.style.top = '-9999px';
+    container.style.left = '0';
+    container.style.display = 'block';
+    await new Promise(r => setTimeout(r, 150));
 
-    hiddenRef.current.style.display = 'none';
-
+    const SCALE = 1.5;
     const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
     const pageW = pdf.internal.pageSize.getWidth();
     const pageH = pdf.internal.pageSize.getHeight();
-    const imgW = pageW - 20;
-    const ratio = canvas.width / imgW;
-    let srcY = 0;
-    while (srcY < canvas.height) {
-      const sliceH = Math.min((pageH - 20) * ratio, canvas.height - srcY);
-      const sliceCanvas = document.createElement('canvas');
-      sliceCanvas.width = canvas.width;
-      sliceCanvas.height = sliceH;
-      sliceCanvas.getContext('2d').drawImage(canvas, 0, srcY, canvas.width, sliceH, 0, 0, canvas.width, sliceH);
-      pdf.addImage(sliceCanvas.toDataURL('image/jpeg', 0.85), 'JPEG', 10, 10, imgW, sliceH / ratio);
-      srcY += sliceH;
-      if (srcY < canvas.height) pdf.addPage();
+    const margin = 10;
+    const contentW = pageW - margin * 2;
+    const contentH = pageH - margin * 2;
+
+    // Collect the block elements: header + each group div
+    const blocks = Array.from(container.children);
+    // containerOffsetTop relative to container itself = 0 since we measure offsetTop within container
+    const containerTop = container.getBoundingClientRect().top;
+
+    let curPageUsedMM = 0; // how many mm used on current page
+    let isFirstPage = true;
+
+    for (const block of blocks) {
+      const blockCanvas = await html2canvas(block, { scale: SCALE, useCORS: true, backgroundColor: '#ffffff' });
+      const blockHeightMM = (blockCanvas.height / SCALE) * (contentW / (blockCanvas.width / SCALE));
+      // simpler: blockHeightMM = blockCanvas.height / SCALE * (contentW / (blockCanvas.width / SCALE))
+      const ratio = blockCanvas.width / contentW; // px per mm
+      const blockH_MM = blockCanvas.height / ratio;
+
+      // If block doesn't fit on remaining page and we already have content, add new page
+      if (!isFirstPage && curPageUsedMM + blockH_MM > contentH) {
+        pdf.addPage();
+        curPageUsedMM = 0;
+      }
+
+      pdf.addImage(
+        blockCanvas.toDataURL('image/jpeg', 0.85),
+        'JPEG',
+        margin,
+        margin + curPageUsedMM,
+        contentW,
+        blockH_MM
+      );
+
+      curPageUsedMM += blockH_MM + 2; // 2mm gap between blocks
+      isFirstPage = false;
+
+      // If we overflow (large single block), move to next page for subsequent blocks
+      if (curPageUsedMM >= contentH) {
+        pdf.addPage();
+        curPageUsedMM = 0;
+      }
     }
+
+    container.style.display = 'none';
     pdf.save(`סידור_עבודה_יומי_${date}.pdf`);
     setExporting(false);
   };
