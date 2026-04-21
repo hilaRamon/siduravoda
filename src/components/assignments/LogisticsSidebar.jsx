@@ -7,7 +7,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Checkbox } from '@/components/ui/checkbox';
 
 function WorkplaceLogisticsCard({ date, workplaceId, workplaceName, studentCount, logistics, allLogistics, onSave }) {
-  const [vehicleOpen, setVehicleOpen] = useState(false);
+  const [openSlot, setOpenSlot] = useState(null);
 
   const { data: vehicles = [] } = useQuery({
     queryKey: ['vehicles'],
@@ -15,37 +15,30 @@ function WorkplaceLogisticsCard({ date, workplaceId, workplaceName, studentCount
   });
 
   const currentData = logistics || {};
-  const selectedVehicleIds = [currentData.vehicle_id, currentData.vehicle_id_2].filter(Boolean);
+  const selectedVehicleIds = [currentData.vehicle_id, currentData.vehicle_id_2, currentData.vehicle_id_3].filter(Boolean);
 
   // Vehicles assigned to ANY workplace today (global pool)
   const allTakenVehicleIds = new Set(
-    allLogistics.flatMap(l => [l.vehicle_id, l.vehicle_id_2].filter(Boolean))
+    allLogistics.flatMap(l => [l.vehicle_id, l.vehicle_id_2, l.vehicle_id_3].filter(Boolean))
   );
   // Show only vehicles that are NOT taken, or are currently selected in this workplace
   const availableVehicles = vehicles.filter(v => !allTakenVehicleIds.has(v.id) || selectedVehicleIds.includes(v.id));
 
-
-
-  const handleVehicleSelect = useCallback((vehicleId, vehicleName, slotIndex) => {
+  const handleVehicleSelect = (vehicleId, vehicleName, slotIndex) => {
     const newData = { ...currentData };
     if (slotIndex === 1) {
-      newData.vehicle_id = vehicleId;
-      newData.vehicle_name = vehicleName;
+      newData.vehicle_id = vehicleId || null;
+      newData.vehicle_name = vehicleName || null;
     } else if (slotIndex === 2) {
-      newData.vehicle_id_2 = vehicleId;
-      newData.vehicle_name_2 = vehicleName;
+      newData.vehicle_id_2 = vehicleId || null;
+      newData.vehicle_name_2 = vehicleName || null;
     } else if (slotIndex === 3) {
-      newData.vehicle_id_3 = vehicleId;
-      newData.vehicle_name_3 = vehicleName;
+      newData.vehicle_id_3 = vehicleId || null;
+      newData.vehicle_name_3 = vehicleName || null;
     }
     onSave(workplaceId, workplaceName, newData);
-  }, [currentData, vehicles, workplaceId, workplaceName, onSave]);
-
-  const selectedNames = selectedVehicleIds
-    .map(id => vehicles.find(v => v.id === id)?.name)
-    .filter(Boolean);
-
-  const [openSlot, setOpenSlot] = useState(null);
+    setOpenSlot(null);
+  };
 
   const renderVehicleSelector = (slotIndex) => {
     const vehicleId = slotIndex === 1 ? currentData.vehicle_id : slotIndex === 2 ? currentData.vehicle_id_2 : currentData.vehicle_id_3;
@@ -78,11 +71,13 @@ function WorkplaceLogisticsCard({ date, workplaceId, workplaceName, studentCount
               <CommandList>
                 <CommandEmpty>לא נמצא</CommandEmpty>
                 <CommandGroup>
+                  {vehicleId && (
+                    <CommandItem value="__clear__" onSelect={() => handleVehicleSelect('', '', slotIndex)} className="text-xs text-destructive cursor-pointer">
+                      ✕ הסר רכב
+                    </CommandItem>
+                  )}
                   {availableVehicles.filter(v => !otherIds.includes(v.id)).map(v => (
-                    <CommandItem key={v.id} value={v.name} onSelect={() => {
-                      handleVehicleSelect(v.id, v.name, slotIndex);
-                      setOpenSlot(null);
-                    }} className="text-xs cursor-pointer">
+                    <CommandItem key={v.id} value={v.name} onSelect={() => handleVehicleSelect(v.id, v.name, slotIndex)} className="text-xs cursor-pointer">
                       {v.name}{v.license_plate ? ` (${v.license_plate})` : ''}
                     </CommandItem>
                   ))}
