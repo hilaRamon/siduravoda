@@ -76,6 +76,10 @@ export default function DailyReportPDFButton({ date, assignments }) {
     await new Promise(r => setTimeout(r, 150));
 
     const SCALE = 1.5;
+    // Render the whole container once
+    const canvas = await html2canvas(container, { scale: SCALE, useCORS: true, backgroundColor: '#ffffff' });
+    container.style.display = 'none';
+
     const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
     const pageW = pdf.internal.pageSize.getWidth();
     const pageH = pdf.internal.pageSize.getHeight();
@@ -83,47 +87,45 @@ export default function DailyReportPDFButton({ date, assignments }) {
     const contentW = pageW - margin * 2;
     const contentH = pageH - margin * 2;
 
-    // Collect the block elements: header + each group div
+    // px per mm ratio
+    const pxPerMM = canvas.width / contentW;
+    const pageHeightPx = contentH * pxPerMM;
+
+    // Measure each block's offsetTop + offsetHeight (in real DOM px, not scaled)
+    const containerRect = container.getBoundingClientRect();
     const blocks = Array.from(container.children);
-    // containerOffsetTop relative to container itself = 0 since we measure offsetTop within container
-    const containerTop = container.getBoundingClientRect().top;
+    // Safe cut points: pixel rows where we can safely break (between blocks)
+    const safeCutsPx = blocks.map(block => {
+      const rect = block.getBoundingClientRect();
+      // bottom of this block relative to container top, scaled
+      return (rect.bottom - containerRect.top) * SCALE;
+    });
 
-    let curPageUsedMM = 0; // how many mm used on current page
-    let isFirstPage = true;
+    const pdf_pages = [];
+    let srcY = 0;
 
-    for (const block of blocks) {
-      const blockCanvas = await html2canvas(block, { scale: SCALE, useCORS: true, backgroundColor: '#ffffff' });
-      const blockHeightMM = (blockCanvas.height / SCALE) * (contentW / (blockCanvas.width / SCALE));
-      // simpler: blockHeightMM = blockCanvas.height / SCALE * (contentW / (blockCanvas.width / SCALE))
-      const ratio = blockCanvas.width / contentW; // px per mm
-      const blockH_MM = blockCanvas.height / ratio;
-
-      // If block doesn't fit on remaining page and we already have content, add new page
-      if (!isFirstPage && curPageUsedMM + blockH_MM > contentH) {
-        pdf.addPage();
-        curPageUsedMM = 0;
+    while (srcY < canvas.height) {
+      const idealEnd = srcY + pageHeightPx;
+      // Find the largest safe cut that is <= idealEnd (don't cut mid-block)
+      let cutY = idealEnd;
+      for (const safePx of safeCutsPx) {
+        if (safePx <= idealEnd && safePx > srcY) cutY = safePx;
       }
+      // If no safe cut found below idealEnd, just use idealEnd (single block taller than page)
+      const sliceH = Math.min(cutY, canvas.height) - srcY;
 
-      pdf.addImage(
-        blockCanvas.toDataURL('image/jpeg', 0.85),
-        'JPEG',
-        margin,
-        margin + curPageUsedMM,
-        contentW,
-        blockH_MM
-      );
+      const slice = document.createElement('canvas');
+      slice.width = canvas.width;
+      slice.height = sliceH;
+      slice.getContext('2d').drawImage(canvas, 0, srcY, canvas.width, sliceH, 0, 0, canvas.width, sliceH);
 
-      curPageUsedMM += blockH_MM + 2; // 2mm gap between blocks
-      isFirstPage = false;
+      if (pdf_pages.length > 0) pdf.addPage();
+      pdf.addImage(slice.toDataURL('image/jpeg', 0.85), 'JPEG', margin, margin, contentW, sliceH / pxPerMM);
+      pdf_pages.push(true);
 
-      // If we overflow (large single block), move to next page for subsequent blocks
-      if (curPageUsedMM >= contentH) {
-        pdf.addPage();
-        curPageUsedMM = 0;
-      }
+      srcY += sliceH;
     }
 
-    container.style.display = 'none';
     pdf.save(`סידור_עבודה_יומי_${date}.pdf`);
     setExporting(false);
   };
