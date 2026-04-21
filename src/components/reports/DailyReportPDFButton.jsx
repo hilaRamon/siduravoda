@@ -91,14 +91,17 @@ export default function DailyReportPDFButton({ date, assignments }) {
     const pxPerMM = canvas.width / contentW;
     const pageHeightPx = contentH * pxPerMM;
 
-    // Measure each block's offsetTop + offsetHeight (in real DOM px, not scaled)
-    const containerRect = container.getBoundingClientRect();
+    // Measure each block's bottom edge using offsetTop + offsetHeight (relative to container)
     const blocks = Array.from(container.children);
-    // Safe cut points: pixel rows where we can safely break (between blocks)
     const safeCutsPx = blocks.map(block => {
-      const rect = block.getBoundingClientRect();
-      // bottom of this block relative to container top, scaled
-      return (rect.bottom - containerRect.top) * SCALE;
+      // offsetTop is relative to offsetParent; since container is the fixed ancestor, sum up
+      let top = 0;
+      let el = block;
+      while (el && el !== container) {
+        top += el.offsetTop;
+        el = el.offsetParent;
+      }
+      return (top + block.offsetHeight) * SCALE;
     });
 
     const pdf_pages = [];
