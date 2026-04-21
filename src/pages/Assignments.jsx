@@ -345,7 +345,7 @@ export default function Assignments() {
         <div>
           <h2 className="text-2xl font-bold">שיבוצים יומיים</h2>
           <p className="text-muted-foreground mt-1">
-            {assignments.length} משובצים מתוך {students.length} תלמידים
+            {assignments.length} משובצים מתוך {students.filter(s => s.is_active !== false && (!s.created_date || s.created_date.slice(0, 10) <= date)).length} תלמידים
           </p>
         </div>
         <div className="flex gap-2">
