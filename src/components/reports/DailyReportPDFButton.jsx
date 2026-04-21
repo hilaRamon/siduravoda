@@ -74,7 +74,7 @@ export default function DailyReportPDFButton({ date, assignments }) {
     hiddenRef.current.style.display = 'block';
     await new Promise(r => setTimeout(r, 100));
 
-    const canvas = await html2canvas(hiddenRef.current, { scale: 2, useCORS: true });
+    const canvas = await html2canvas(hiddenRef.current, { scale: 1.5, useCORS: true });
 
     hiddenRef.current.style.display = 'none';
 
@@ -90,7 +90,7 @@ export default function DailyReportPDFButton({ date, assignments }) {
       sliceCanvas.width = canvas.width;
       sliceCanvas.height = sliceH;
       sliceCanvas.getContext('2d').drawImage(canvas, 0, srcY, canvas.width, sliceH, 0, 0, canvas.width, sliceH);
-      pdf.addImage(sliceCanvas.toDataURL('image/png'), 'PNG', 10, 10, imgW, sliceH / ratio);
+      pdf.addImage(sliceCanvas.toDataURL('image/jpeg', 0.85), 'JPEG', 10, 10, imgW, sliceH / ratio);
       srcY += sliceH;
       if (srcY < canvas.height) pdf.addPage();
     }
