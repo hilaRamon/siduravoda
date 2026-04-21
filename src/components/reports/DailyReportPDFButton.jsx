@@ -23,10 +23,14 @@ function buildReportGroups(assignments, logisticsMap) {
   const globalTeamLeader = assignments.find(a => a.role === 'ראש צוות');
 
   const byWorkplace = {};
+  const seenStudents = new Set();
   filtered.forEach(a => {
     const key = a.workplace_id;
     if (!byWorkplace[key]) byWorkplace[key] = { id: a.workplace_id, name: a.workplace_name, students: [] };
-    byWorkplace[key].students.push(a);
+    if (!seenStudents.has(a.student_id)) {
+      seenStudents.add(a.student_id);
+      byWorkplace[key].students.push(a);
+    }
   });
 
   return Object.values(byWorkplace)
