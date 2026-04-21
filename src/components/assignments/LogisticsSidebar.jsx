@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Truck, Clock } from 'lucide-react';
@@ -10,38 +10,40 @@ function WorkplaceLogisticsCard({ date, workplaceId, workplaceName, studentCount
     queryFn: () => base44.entities.Vehicle.list(),
   });
 
-  const currentData = logistics || {};
+  // Local state so UI is instant — syncs from DB when logistics prop changes
+  const [localData, setLocalData] = useState(logistics || {});
+  useEffect(() => {
+    setLocalData(logistics || {});
+  }, [logistics]);
 
-  const selectedVehicleIds = [currentData.vehicle_id, currentData.vehicle_id_2, currentData.vehicle_id_3].filter(Boolean);
+  const selectedVehicleIds = [localData.vehicle_id, localData.vehicle_id_2, localData.vehicle_id_3].filter(Boolean);
 
-  // Vehicles taken globally across all workplaces today
   const allTakenVehicleIds = new Set(
     allLogistics.flatMap(l => [l.vehicle_id, l.vehicle_id_2, l.vehicle_id_3].filter(Boolean))
   );
 
-  // Available = not taken by others, OR already selected in this workplace
   const availableVehicles = vehicles.filter(v => !allTakenVehicleIds.has(v.id) || selectedVehicleIds.includes(v.id));
 
+  const getOtherIds = (slotIndex) => [
+    slotIndex !== 1 && localData.vehicle_id,
+    slotIndex !== 2 && localData.vehicle_id_2,
+    slotIndex !== 3 && localData.vehicle_id_3,
+  ].filter(Boolean);
+
   const handleVehicleSelect = (vehicleId, vehicleName, slotIndex) => {
-    const newData = { ...currentData };
-    if (slotIndex === 1) {
-      newData.vehicle_id = vehicleId || null;
-      newData.vehicle_name = vehicleName || null;
-    } else if (slotIndex === 2) {
-      newData.vehicle_id_2 = vehicleId || null;
-      newData.vehicle_name_2 = vehicleName || null;
-    } else if (slotIndex === 3) {
-      newData.vehicle_id_3 = vehicleId || null;
-      newData.vehicle_name_3 = vehicleName || null;
-    }
+    const newData = { ...localData };
+    if (slotIndex === 1) { newData.vehicle_id = vehicleId || null; newData.vehicle_name = vehicleName || null; }
+    else if (slotIndex === 2) { newData.vehicle_id_2 = vehicleId || null; newData.vehicle_name_2 = vehicleName || null; }
+    else if (slotIndex === 3) { newData.vehicle_id_3 = vehicleId || null; newData.vehicle_name_3 = vehicleName || null; }
+    setLocalData(newData);
     onSave(workplaceId, workplaceName, newData);
   };
 
-  const getOtherIds = (slotIndex) => [
-    slotIndex !== 1 && currentData.vehicle_id,
-    slotIndex !== 2 && currentData.vehicle_id_2,
-    slotIndex !== 3 && currentData.vehicle_id_3,
-  ].filter(Boolean);
+  const handleTimeBlur = (e) => {
+    const newData = { ...localData, exit_time: e.target.value };
+    setLocalData(newData);
+    onSave(workplaceId, workplaceName, newData);
+  };
 
   return (
     <div className="bg-card border border-border rounded-xl p-3 space-y-2">
@@ -58,32 +60,33 @@ function WorkplaceLogisticsCard({ date, workplaceId, workplaceName, studentCount
         </label>
         <input
           type="time"
-          value={currentData.exit_time || ''}
-          onChange={e => onSave(workplaceId, workplaceName, { ...currentData, exit_time: e.target.value })}
+          defaultValue={localData.exit_time || ''}
+          key={localData.exit_time || 'empty'}
+          onBlur={handleTimeBlur}
           className="w-full h-8 text-xs border border-border rounded-md px-2 bg-background focus:outline-none focus:ring-1 focus:ring-primary/40"
         />
       </div>
 
       <VehicleSlot
         slotIndex={1}
-        vehicleId={currentData.vehicle_id}
-        vehicleName={currentData.vehicle_name}
+        vehicleId={localData.vehicle_id}
+        vehicleName={localData.vehicle_name}
         availableVehicles={availableVehicles}
         otherIds={getOtherIds(1)}
         onSelect={handleVehicleSelect}
       />
       <VehicleSlot
         slotIndex={2}
-        vehicleId={currentData.vehicle_id_2}
-        vehicleName={currentData.vehicle_name_2}
+        vehicleId={localData.vehicle_id_2}
+        vehicleName={localData.vehicle_name_2}
         availableVehicles={availableVehicles}
         otherIds={getOtherIds(2)}
         onSelect={handleVehicleSelect}
       />
       <VehicleSlot
         slotIndex={3}
-        vehicleId={currentData.vehicle_id_3}
-        vehicleName={currentData.vehicle_name_3}
+        vehicleId={localData.vehicle_id_3}
+        vehicleName={localData.vehicle_name_3}
         availableVehicles={availableVehicles}
         otherIds={getOtherIds(3)}
         onSelect={handleVehicleSelect}
