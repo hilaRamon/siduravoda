@@ -91,11 +91,13 @@ export default function ImportModal({ open, onClose, onImported }) {
 
   const handleImport = async () => {
     setImporting(true);
-    const existing = await base44.entities.Student.list();
+    const existing = await base44.entities.Student.list('full_name', 1000);
     const existingByName = {};
     existing.forEach(s => { existingByName[s.full_name?.trim()] = s; });
 
-    let count = 0;
+    const toCreate = [];
+    const toUpdate = [];
+
     for (const row of rows) {
       const full_name = (mapping.full_name ? row[mapping.full_name] : '')?.trim();
       if (!full_name) continue;
@@ -109,17 +111,24 @@ export default function ImportModal({ open, onClose, onImported }) {
         notes: mapping.notes ? row[mapping.notes]?.trim() : undefined,
         is_active: true,
       };
-      // Remove undefined keys
       Object.keys(data).forEach(k => data[k] === undefined && delete data[k]);
 
       if (existingByName[full_name]) {
-        await base44.entities.Student.update(existingByName[full_name].id, data);
+        toUpdate.push({ id: existingByName[full_name].id, data });
       } else {
-        await base44.entities.Student.create(data);
+        toCreate.push(data);
       }
-      count++;
     }
-    setImportCount(count);
+
+    const CHUNK = 50;
+    for (let i = 0; i < toCreate.length; i += CHUNK) {
+      await base44.entities.Student.bulkCreate(toCreate.slice(i, i + CHUNK));
+    }
+    for (const u of toUpdate) {
+      await base44.entities.Student.update(u.id, u.data);
+    }
+
+    setImportCount(toCreate.length + toUpdate.length);
     setImporting(false);
     setStep('done');
     onImported();
