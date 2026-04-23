@@ -13,6 +13,7 @@ import Assignments from './pages/Assignments.jsx';
 import Roles from './pages/Roles';
 import Reports from './pages/Reports';
 import Vehicles from './pages/Vehicles';
+import PublicSchedule from './pages/PublicSchedule';
 
 
 const AuthenticatedApp = () => {
@@ -46,6 +47,7 @@ const AuthenticatedApp = () => {
         <Route path="/vehicles" element={<Vehicles />} />
         <Route path="/reports" element={<Reports />} />
       </Route>
+      <Route path="/schedule" element={<PublicSchedule />} />
       <Route path="*" element={<PageNotFound />} />
     </Routes>
   );
