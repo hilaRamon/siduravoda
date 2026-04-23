@@ -1,0 +1,19 @@
+{
+  "name": "PublishedSchedule",
+  "type": "object",
+  "properties": {
+    "date": {
+      "type": "string",
+      "format": "date",
+      "description": "\u05ea\u05d0\u05e8\u05d9\u05da \u05d4\u05e1\u05d9\u05d3\u05d5\u05e8 \u05d4\u05de\u05e4\u05d5\u05e8\u05e1\u05dd"
+    },
+    "file_url": {
+      "type": "string",
+      "description": "\u05e7\u05d9\u05e9\u05d5\u05e8 \u05dc\u05e7\u05d5\u05d1\u05e5 PDF \u05d4\u05de\u05e4\u05d5\u05e8\u05e1\u05dd"
+    }
+  },
+  "required": [
+    "date",
+    "file_url"
+  ]
+}

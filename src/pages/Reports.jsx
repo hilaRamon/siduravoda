@@ -2,11 +2,12 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
-import { Download, FileSpreadsheet, Shuffle, Loader2, UserCheck, BarChart2, Users } from 'lucide-react';
+import { Download, FileSpreadsheet, Shuffle, Loader2, UserCheck, BarChart2, Users, Link2 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { format, eachDayOfInterval, parseISO } from 'date-fns';
 import PeriodicWorkReport from '@/components/reports/PeriodicWorkReport';
 import StudentWorkReport from '@/components/reports/StudentWorkReport';
+import PublishedScheduleCard from '@/components/reports/PublishedScheduleCard';
 
 export default function Reports() {
   const [exportingBackup, setExportingBackup] = useState(false);
@@ -257,6 +258,9 @@ export default function Reports() {
       {activeTab === 'student' && <StudentWorkReport />}
 
       {activeTab === 'tools' && <div className="space-y-4 max-w-2xl">
+
+        {/* Published Schedule Link */}
+        <PublishedScheduleCard />
 
         {/* Backup Export */}
         <div className="bg-card border border-border rounded-2xl p-6 flex items-start justify-between gap-4">

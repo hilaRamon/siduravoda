@@ -115,7 +115,7 @@ async function generatePDFBlob(container, date) {
 export default function DailyReportPDFButton({ date, assignments }) {
   const [exporting, setExporting] = useState(false);
   const [publishing, setPublishing] = useState(false);
-  const [publicUrl, setPublicUrl] = useState(null);
+  const [publishedOk, setPublishedOk] = useState(false);
   const hiddenRef = useRef(null);
 
   const { data: logisticsList = [] } = useQuery({
@@ -146,10 +146,17 @@ export default function DailyReportPDFButton({ date, assignments }) {
 
   const handlePublish = async () => {
     setPublishing(true);
+    setPublishedOk(false);
     const blob = await generatePDFBlob(hiddenRef.current, date);
     const file = new File([blob], `schedule_${date}.pdf`, { type: 'application/pdf' });
     const { file_url } = await base44.integrations.Core.UploadFile({ file });
-    setPublicUrl(file_url);
+
+    // Delete old published schedule records and create a fresh one
+    const existing = await base44.entities.PublishedSchedule.list();
+    await Promise.all(existing.map(r => base44.entities.PublishedSchedule.delete(r.id)));
+    await base44.entities.PublishedSchedule.create({ date, file_url });
+
+    setPublishedOk(true);
     setPublishing(false);
   };
 
@@ -235,18 +242,9 @@ export default function DailyReportPDFButton({ date, assignments }) {
             {publishing ? 'מפרסם...' : 'פרסום סידור'}
           </Button>
         </div>
-        {publicUrl && (
-          <div className="flex items-center gap-2 bg-green-50 border border-green-200 rounded-lg px-3 py-2 text-xs max-w-sm">
-            <span className="text-green-800 font-medium">קישור לסידור:</span>
-            <a href={publicUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline truncate max-w-[200px]">
-              {publicUrl}
-            </a>
-            <button
-              onClick={() => { navigator.clipboard.writeText(publicUrl); }}
-              className="text-green-700 hover:text-green-900 shrink-0 font-medium"
-            >
-              העתק
-            </button>
+        {publishedOk && (
+          <div className="flex items-center gap-2 bg-green-50 border border-green-200 rounded-lg px-3 py-2 text-xs">
+            <span className="text-green-700 font-medium">✓ הסידור פורסם בהצלחה!</span>
           </div>
         )}
       </div>
