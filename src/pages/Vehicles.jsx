@@ -11,7 +11,7 @@ function VehicleFormModal({ vehicle, onSave, onClose }) {
   const [form, setForm] = useState({
     name: vehicle?.name || '',
     license_plate: vehicle?.license_plate || '',
-    notes: vehicle?.notes || '',
+    insurance: vehicle?.insurance || '',
   });
 
   const handleSubmit = (e) => {
@@ -35,8 +35,8 @@ function VehicleFormModal({ vehicle, onSave, onClose }) {
             <Input value={form.license_plate} onChange={e => setForm({ ...form, license_plate: e.target.value })} />
           </div>
           <div>
-            <label className="text-xs font-medium text-muted-foreground mb-1 block">הערות</label>
-            <Input value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} />
+            <label className="text-xs font-medium text-muted-foreground mb-1 block">ביטוח</label>
+            <Input value={form.insurance} onChange={e => setForm({ ...form, insurance: e.target.value })} />
           </div>
           <div className="flex gap-2 justify-end pt-1">
             <Button type="button" variant="outline" onClick={onClose}>ביטול</Button>
@@ -112,7 +112,7 @@ export default function Vehicles() {
               <th className="px-4 py-3 text-right font-semibold text-muted-foreground text-xs">#</th>
               <th className="px-4 py-3 text-right font-semibold text-muted-foreground text-xs">שם / מספר רכב</th>
               <th className="px-4 py-3 text-right font-semibold text-muted-foreground text-xs">לוחית רישוי</th>
-              <th className="px-4 py-3 text-right font-semibold text-muted-foreground text-xs">הערות</th>
+              <th className="px-4 py-3 text-right font-semibold text-muted-foreground text-xs">ביטוח</th>
               <th className="px-4 py-3 w-20"></th>
             </tr>
           </thead>
@@ -127,7 +127,7 @@ export default function Vehicles() {
                   <td className="px-4 py-3 text-muted-foreground text-xs">{idx + 1}</td>
                   <td className="px-4 py-3 font-medium">{v.name}</td>
                   <td className="px-4 py-3 text-muted-foreground">{v.license_plate || '—'}</td>
-                  <td className="px-4 py-3 text-muted-foreground text-xs">{v.notes || '—'}</td>
+                  <td className="px-4 py-3 text-muted-foreground text-xs">{v.insurance || '—'}</td>
                   <td className="px-4 py-3">
                     <div className="flex gap-1 justify-end">
                       <button onClick={() => { setEditVehicle(v); setShowForm(true); }}
