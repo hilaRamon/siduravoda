@@ -111,36 +111,28 @@ export default function PeriodicWorkReport() {
     const pageH = pdf.internal.pageSize.getHeight();
     const margin = 10;
     const printW = pageW - margin * 2;
+    const maxImgH = pageH - margin * 2;
 
-    const canvas = await html2canvas(el, { scale: 1.5, useCORS: true, backgroundColor: '#ffffff' });
-    const pxPerMM = canvas.width / printW;
-    const pageHeightPx = (pageH - margin * 2) * pxPerMM;
-
-    // Find safe cut points between farm sections (each direct child div)
     const sections = Array.from(el.children);
-    const safeCutsPx = sections.map(s => {
-      let top = 0;
-      let node = s;
-      while (node && node !== el) { top += node.offsetTop; node = node.offsetParent; }
-      return (top + s.offsetHeight) * 1.5;
-    });
-
-    let srcY = 0;
     let firstPage = true;
-    while (srcY < canvas.height) {
-      let cutY = srcY + pageHeightPx;
-      for (const safe of safeCutsPx) {
-        if (safe > srcY && safe <= cutY) cutY = safe;
+
+    for (const section of sections) {
+      const canvas = await html2canvas(section, { scale: 1.5, useCORS: true, backgroundColor: '#ffffff' });
+      const pxPerMM = canvas.width / printW;
+      const pageHeightPx = maxImgH * pxPerMM;
+
+      let srcY = 0;
+      while (srcY < canvas.height) {
+        const sliceH = Math.min(pageHeightPx, canvas.height - srcY);
+        const slice = document.createElement('canvas');
+        slice.width = canvas.width;
+        slice.height = sliceH;
+        slice.getContext('2d').drawImage(canvas, 0, srcY, canvas.width, sliceH, 0, 0, canvas.width, sliceH);
+        if (!firstPage) pdf.addPage();
+        pdf.addImage(slice.toDataURL('image/jpeg', 0.88), 'JPEG', margin, margin, printW, sliceH / pxPerMM);
+        srcY += sliceH;
+        firstPage = false;
       }
-      const sliceH = Math.min(cutY, canvas.height) - srcY;
-      const slice = document.createElement('canvas');
-      slice.width = canvas.width;
-      slice.height = sliceH;
-      slice.getContext('2d').drawImage(canvas, 0, srcY, canvas.width, sliceH, 0, 0, canvas.width, sliceH);
-      if (!firstPage) pdf.addPage();
-      pdf.addImage(slice.toDataURL('image/jpeg', 0.88), 'JPEG', margin, margin, printW, sliceH / pxPerMM);
-      srcY += sliceH;
-      firstPage = false;
     }
 
     pdf.save(`דוח_עבודה_תקופתי_${month}_${year}.pdf`);
