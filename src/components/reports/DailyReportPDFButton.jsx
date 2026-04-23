@@ -21,11 +21,6 @@ function buildReportGroups(assignments, logisticsMap) {
   const SKIP = ['לא עובד', 'לימודים'];
   const filtered = assignments.filter(a => !SKIP.includes(a.workplace_name));
 
-  // Find global role holders (from ALL assignments, not just per-workplace)
-  const globalDriver = assignments.find(a => a.role === 'נהג');
-  const globalTeamLeader = assignments.find(a => a.role === 'ראש צוות');
-  const globalEquip = assignments.find(a => a.role === 'אחראי פק"ל');
-
   const byWorkplace = {};
   const seenStudents = new Set();
   filtered.forEach(a => {
@@ -37,21 +32,31 @@ function buildReportGroups(assignments, logisticsMap) {
     }
   });
 
-  return Object.values(byWorkplace)
-    .sort((a, b) => a.name.localeCompare(b.name, 'he'))
-    .map(g => {
-      const log = logisticsMap[g.id] || {};
-      const vehicles = [log.vehicle_name, log.vehicle_name_2, log.vehicle_name_3].filter(Boolean).join(' + ');
-      return {
-        workplaceName: g.name,
-        students: g.students.sort((a, b) => (a.student_name || '').localeCompare(b.student_name || '', 'he')),
-        vehicleName: vehicles || '',
-        exitTime: log.exit_time || '',
-        driverName: globalDriver?.student_name || '',
-        teamLeaderName: globalTeamLeader?.student_name || '',
-        equipName: globalEquip?.student_name || '',
-      };
-    });
+  const groups = Object.values(byWorkplace)
+    .sort((a, b) => a.name.localeCompare(b.name, 'he'));
+
+  // Find which workplace each role holder actually belongs to
+  const driverAssignment = assignments.find(a => a.role === 'נהג');
+  const teamLeaderAssignment = assignments.find(a => a.role === 'ראש צוות');
+  const equipAssignment = assignments.find(a => a.role === 'אחראי פק"ל');
+
+  return groups.map(g => {
+    const log = logisticsMap[g.id] || {};
+    const vehicles = [log.vehicle_name, log.vehicle_name_2, log.vehicle_name_3].filter(Boolean).join(' + ');
+    // Only show role in the workplace they are actually assigned to
+    const driverName = driverAssignment?.workplace_id === g.id ? driverAssignment.student_name : '';
+    const teamLeaderName = teamLeaderAssignment?.workplace_id === g.id ? teamLeaderAssignment.student_name : '';
+    const equipName = equipAssignment?.workplace_id === g.id ? equipAssignment.student_name : '';
+    return {
+      workplaceName: g.name,
+      students: g.students.sort((a, b) => (a.student_name || '').localeCompare(b.student_name || '', 'he')),
+      vehicleName: vehicles || '',
+      exitTime: log.exit_time || '',
+      driverName,
+      teamLeaderName,
+      equipName,
+    };
+  });
 }
 
 async function generatePDFBlob(container, date) {

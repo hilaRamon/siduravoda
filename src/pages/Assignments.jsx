@@ -75,12 +75,29 @@ function WorkplaceCell({ student, assignment, workplaces, onAssign, onRemove }) 
   );
 }
 
-function RoleCell({ assignment, roles, onUpdateRole }) {
+function RoleCell({ assignment, roles, onUpdateRole, assignments }) {
+  const handleRoleChange = (v) => {
+    if (!assignment) return;
+    if (v && v !== 'none') {
+      // Check if this role is already assigned to the same workplace by another student
+      const conflict = assignments.find(a =>
+        a.id !== assignment.id &&
+        a.workplace_id === assignment.workplace_id &&
+        a.role === v
+      );
+      if (conflict) {
+        alert(`⛔ התפקיד "${v}" כבר שובץ ל-${conflict.student_name} באותו מקום עבודה`);
+        return;
+      }
+    }
+    onUpdateRole(assignment, v);
+  };
+
   return (
     <td className="px-3 py-2 border-b border-border">
       <Select
         value={assignment?.role || ''}
-        onValueChange={(v) => assignment && onUpdateRole(assignment, v)}
+        onValueChange={handleRoleChange}
         disabled={!assignment}
       >
         <SelectTrigger className={`h-8 text-xs w-full border ${assignment ? 'bg-secondary/50 border-border' : 'bg-transparent border-dashed text-muted-foreground opacity-50'}`}>
@@ -583,7 +600,7 @@ export default function Assignments() {
                     <td className="px-3 py-2 border-b border-border font-medium">{student.full_name}</td>
                     <td className="px-3 py-2 border-b border-border text-muted-foreground text-xs">{student.cohort || '—'}</td>
                     <WorkplaceCell student={student} assignment={assignment} workplaces={workplaces} onAssign={handleAssign} onRemove={handleRemove} />
-                    <RoleCell assignment={assignment} roles={roles} onUpdateRole={handleUpdateRole} />
+                    <RoleCell assignment={assignment} roles={roles} onUpdateRole={handleUpdateRole} assignments={assignments} />
                     <EditableNumberCell value={assignment?.rate} defaultValue={40} assignment={assignment} field="rate" onUpdate={handleUpdateField} />
                     <EditableNumberCell value={assignment?.hours} defaultValue={4.5} assignment={assignment} field="hours" onUpdate={handleUpdateField} />
                     <EditableNumberCell value={assignment?.bonus} defaultValue={null} assignment={assignment} field="bonus" onUpdate={handleUpdateField} />
