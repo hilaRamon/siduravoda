@@ -9,6 +9,7 @@ import * as XLSX from 'xlsx';
 const SYSTEM_FIELDS = [
   { key: 'name', label: 'שם מקום העבודה', required: true },
   { key: 'farm_name', label: 'שם משק', required: false },
+  { key: 'address', label: 'כתובת', required: false },
   { key: 'company_id', label: 'ח.פ', required: false },
   { key: 'contact_phone', label: 'טלפון איש קשר', required: false },
   { key: 'accounting_phone', label: 'טלפון הנה"ח', required: false },
@@ -58,6 +59,7 @@ export default function ImportWorkplacesModal({ open, onClose, onImported }) {
           (sf.key === 'company_id' && (h.includes('ח.פ') || h.includes('עוסק'))) ||
           (sf.key === 'contact_phone' && (h.includes('קשר') || h.includes('טלפון'))) ||
           (sf.key === 'accounting_phone' && h.includes('הנה')) ||
+          (sf.key === 'address' && (h.includes('כתובת') || h.includes('address'))) ||
           (sf.key === 'accounting_email' && (h.includes('מייל') || h.includes('email')))
         );
         if (match) autoMap[sf.key] = match;
@@ -97,7 +99,7 @@ export default function ImportWorkplacesModal({ open, onClose, onImported }) {
       const name = (mapping.name ? row[mapping.name] : '')?.trim();
       if (!name) continue;
       const data = { name };
-      ['farm_name', 'company_id', 'contact_phone', 'accounting_phone', 'accounting_email'].forEach(k => {
+      ['farm_name', 'address', 'company_id', 'contact_phone', 'accounting_phone', 'accounting_email'].forEach(k => {
         if (mapping[k]) data[k] = row[mapping[k]]?.trim() || undefined;
       });
       Object.keys(data).forEach(k => data[k] === undefined && delete data[k]);
