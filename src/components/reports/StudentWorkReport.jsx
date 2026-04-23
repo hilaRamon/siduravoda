@@ -2,6 +2,7 @@ import { useState, useMemo, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { X, Download, Loader2 } from 'lucide-react';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
@@ -13,7 +14,8 @@ export default function StudentWorkReport() {
   const firstOfMonth = today.slice(0, 7) + '-01';
   const [fromDate, setFromDate] = useState(firstOfMonth);
   const [toDate, setToDate] = useState(today);
-  const [selectedStudents, setSelectedStudents] = useState([]); // array of student_id
+  const [selectedStudents, setSelectedStudents] = useState([]);
+  const [selectedCohort, setSelectedCohort] = useState('');
   const [searchInput, setSearchInput] = useState('');
   const [exporting, setExporting] = useState(false);
   const reportRef = useRef(null);
@@ -22,6 +24,16 @@ export default function StudentWorkReport() {
     queryKey: ['assignments-all'],
     queryFn: () => base44.entities.Assignment.list(),
   });
+
+  const { data: students = [] } = useQuery({
+    queryKey: ['students'],
+    queryFn: () => base44.entities.Student.list(),
+  });
+
+  const cohorts = useMemo(() => {
+    const s = new Set(students.map(s => s.cohort).filter(Boolean));
+    return [...s].sort();
+  }, [students]);
 
   // Unique students from assignments
   const allStudents = useMemo(() => {
@@ -34,6 +46,22 @@ export default function StudentWorkReport() {
       .sort((a, b) => a.name.localeCompare(b.name, 'he'));
   }, [allAssignments]);
 
+  const studentNameById = Object.fromEntries(allStudents.map(s => [s.id, s.name]));
+
+  // When cohort selected, auto-fill selectedStudents with that cohort's students
+  const handleCohortChange = (cohort) => {
+    setSelectedCohort(cohort);
+    if (cohort && cohort !== 'all') {
+      const cohortStudentIds = students
+        .filter(s => s.cohort === cohort)
+        .map(s => s.id)
+        .filter(id => allStudents.some(a => a.id === id));
+      setSelectedStudents(cohortStudentIds);
+    } else {
+      setSelectedStudents([]);
+    }
+  };
+
   const filteredSuggestions = useMemo(() => {
     if (!searchInput.trim()) return [];
     return allStudents.filter(
@@ -44,9 +72,13 @@ export default function StudentWorkReport() {
   const addStudent = (id) => {
     setSelectedStudents(prev => [...prev, id]);
     setSearchInput('');
+    setSelectedCohort('');
   };
 
-  const removeStudent = (id) => setSelectedStudents(prev => prev.filter(s => s !== id));
+  const removeStudent = (id) => {
+    setSelectedStudents(prev => prev.filter(s => s !== id));
+    setSelectedCohort('');
+  };
 
   const reportData = useMemo(() => {
     const filtered = allAssignments.filter(a =>
@@ -77,29 +109,48 @@ export default function StudentWorkReport() {
   const handleExportPDF = async () => {
     setExporting(true);
     await new Promise(r => setTimeout(r, 100));
+
     const el = reportRef.current;
-    const canvas = await html2canvas(el, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
     const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
     const pageW = pdf.internal.pageSize.getWidth();
     const pageH = pdf.internal.pageSize.getHeight();
-    const imgW = pageW - 20;
-    const ratio = canvas.width / imgW;
+    const margin = 10;
+    const contentW = pageW - margin * 2;
+    const contentH = pageH - margin * 2;
+
+    // Scale 1.5 = good quality without huge file size
+    const SCALE = 1.5;
+    const canvas = await html2canvas(el, {
+      scale: SCALE,
+      useCORS: true,
+      backgroundColor: '#ffffff',
+      logging: false,
+    });
+
+    const pxPerMM = canvas.width / contentW;
+    const pageHeightPx = contentH * pxPerMM;
+
+    // Find safe cut points between student rows (avoid cutting in the middle of a rowspan)
+    // We cut only at page boundaries — no smart row detection needed for this table layout
     let srcY = 0;
+    let firstPage = true;
     while (srcY < canvas.height) {
-      const sliceH = Math.min((pageH - 20) * ratio, canvas.height - srcY);
-      const sliceCanvas = document.createElement('canvas');
-      sliceCanvas.width = canvas.width;
-      sliceCanvas.height = sliceH;
-      sliceCanvas.getContext('2d').drawImage(canvas, 0, srcY, canvas.width, sliceH, 0, 0, canvas.width, sliceH);
-      if (srcY > 0) pdf.addPage();
-      pdf.addImage(sliceCanvas.toDataURL('image/png'), 'PNG', 10, 10, imgW, sliceH / ratio);
+      const sliceH = Math.min(pageHeightPx, canvas.height - srcY);
+      const slice = document.createElement('canvas');
+      slice.width = canvas.width;
+      slice.height = sliceH;
+      slice.getContext('2d').drawImage(canvas, 0, srcY, canvas.width, sliceH, 0, 0, canvas.width, sliceH);
+      if (!firstPage) pdf.addPage();
+      // JPEG at quality 0.88 keeps text crisp and reduces file size significantly vs PNG
+      pdf.addImage(slice.toDataURL('image/jpeg', 0.88), 'JPEG', margin, margin, contentW, sliceH / pxPerMM);
       srcY += sliceH;
+      firstPage = false;
     }
-    pdf.save(`דוח_עבודת_תלמיד_${fromDate}_${toDate}.pdf`);
+
+    const label = selectedCohort && selectedCohort !== 'all' ? `מחזור_${selectedCohort}` : `${fromDate}_${toDate}`;
+    pdf.save(`דוח_עבודת_תלמיד_${label}.pdf`);
     setExporting(false);
   };
-
-  const studentNameById = Object.fromEntries(allStudents.map(s => [s.id, s.name]));
 
   return (
     <div className="space-y-4">
@@ -122,6 +173,20 @@ export default function StudentWorkReport() {
             onChange={e => setToDate(e.target.value)}
             className="border border-border rounded-lg px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
           />
+        </div>
+
+        {/* Cohort filter */}
+        <div>
+          <label className="text-xs text-muted-foreground block mb-1">מחזור</label>
+          <Select value={selectedCohort} onValueChange={handleCohortChange}>
+            <SelectTrigger className="w-36 h-10 text-sm">
+              <SelectValue placeholder="כל המחזורים" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">כל המחזורים</SelectItem>
+              {cohorts.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+            </SelectContent>
+          </Select>
         </div>
 
         {/* Student search/select */}
@@ -149,18 +214,17 @@ export default function StudentWorkReport() {
               </div>
             )}
           </div>
-          {/* Selected students tags */}
           {selectedStudents.length > 0 && (
             <div className="flex flex-wrap gap-1 mt-2">
               {selectedStudents.map(id => (
                 <span key={id} className="flex items-center gap-1 bg-primary/10 text-primary text-xs px-2 py-1 rounded-full">
-                  {studentNameById[id]}
+                  {studentNameById[id] || id}
                   <button onClick={() => removeStudent(id)} className="hover:text-destructive">
                     <X size={11} />
                   </button>
                 </span>
               ))}
-              <button onClick={() => setSelectedStudents([])} className="text-xs text-muted-foreground underline px-1">
+              <button onClick={() => { setSelectedStudents([]); setSelectedCohort(''); }} className="text-xs text-muted-foreground underline px-1">
                 נקה הכל
               </button>
             </div>
@@ -186,7 +250,8 @@ export default function StudentWorkReport() {
       {!isLoading && reportData.length > 0 && (
         <div ref={reportRef} className="bg-white rounded-xl border border-border overflow-hidden" dir="rtl">
           <div className="px-4 py-2 bg-gray-50 border-b border-gray-200 text-xs text-gray-500">
-            דוח עבודת תלמיד | {fromDate} — {toDate}
+            דוח עבודת תלמיד
+            {selectedCohort && selectedCohort !== 'all' ? ` | מחזור ${selectedCohort}` : ` | ${fromDate} — ${toDate}`}
           </div>
           <table className="w-full text-sm border-collapse">
             <thead>
