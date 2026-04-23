@@ -105,9 +105,7 @@ export default function ImportWorkplacesModal({ open, onClose, onImported }) {
         if (mapping[k]) { const v = row[mapping[k]]?.trim(); if (v) data[k] = v; }
       });
 
-      if (existingByName[name]) {
-        toUpdate.push({ id: existingByName[name].id, data });
-      } else {
+      if (!existingByName[name]) {
         toCreate.push(data);
       }
     }
@@ -116,9 +114,7 @@ export default function ImportWorkplacesModal({ open, onClose, onImported }) {
     for (let i = 0; i < toCreate.length; i += CHUNK) {
       await base44.entities.Workplace.bulkCreate(toCreate.slice(i, i + CHUNK));
     }
-    for (const u of toUpdate) await base44.entities.Workplace.update(u.id, u.data);
-
-    setImportCount(toCreate.length + toUpdate.length);
+    setImportCount(toCreate.length);
     setImporting(false);
     setStep('done');
     onImported();
