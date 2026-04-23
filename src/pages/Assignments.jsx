@@ -15,24 +15,36 @@ import { format, addDays, subDays } from 'date-fns';
 
 function WorkplaceCell({ student, assignment, workplaces, onAssign, onRemove }) {
   const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState('');
 
-  const handleSelect = async (workplaceNameOrId) => {
+  const filteredWorkplaces = workplaces.filter(w =>
+    !search || w.name.includes(search)
+  );
+
+  const handleSelect = async (workplaceId) => {
     setOpen(false);
-    if (!workplaceNameOrId) return;
-    const workplace = workplaces.find(w => w.id === workplaceNameOrId || w.name === workplaceNameOrId);
+    setSearch('');
+    if (!workplaceId) return;
+    const workplace = workplaces.find(w => w.id === workplaceId);
     if (!workplace) return;
     const canAssign = await onAssign(student, workplace, assignment);
     if (!canAssign) setOpen(true);
   };
 
-
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      const first = filteredWorkplaces[0];
+      if (first) handleSelect(first.id);
+    }
+    if (e.key === 'Escape') setOpen(false);
+  };
 
   const selectedName = assignment ? workplaces.find(w => w.id === assignment.workplace_id)?.name || assignment.workplace_name : null;
 
   return (
     <td className="px-3 py-2 border-b border-border">
       <div className="flex items-center gap-1">
-        <Popover open={open} onOpenChange={setOpen}>
+        <Popover open={open} onOpenChange={(v) => { setOpen(v); if (!v) setSearch(''); }}>
           <PopoverTrigger asChild>
             <button className={`h-8 text-xs w-full border rounded-md px-2 flex items-center justify-between transition-colors ${
               assignment
@@ -44,24 +56,26 @@ function WorkplaceCell({ student, assignment, workplaces, onAssign, onRemove }) 
             </button>
           </PopoverTrigger>
           <PopoverContent className="w-64 p-0" align="start">
-            <Command>
-                <CommandInput
-                  placeholder="חיפוש מקום עבודה..."
-                  className="h-8 text-xs"
-                  onKeyDown={e => { if (e.key === 'Escape') setOpen(false); }}
-                />
-                <CommandList>
-                  <CommandEmpty>לא נמצא</CommandEmpty>
-                  <CommandGroup>
-                    {workplaces.map(w => (
-                      <CommandItem key={w.id} value={w.name} onSelect={() => handleSelect(w.id)}
-                        className="text-xs cursor-pointer">
-                        {w.name}
-                      </CommandItem>
-                    ))}
-                  </CommandGroup>
-                </CommandList>
-              </Command>
+            <Command shouldFilter={false}>
+              <CommandInput
+                placeholder="חיפוש מקום עבודה..."
+                className="h-8 text-xs"
+                value={search}
+                onValueChange={setSearch}
+                onKeyDown={handleKeyDown}
+              />
+              <CommandList>
+                <CommandEmpty>לא נמצא</CommandEmpty>
+                <CommandGroup>
+                  {filteredWorkplaces.map(w => (
+                    <CommandItem key={w.id} value={w.id} onSelect={() => handleSelect(w.id)}
+                      className="text-xs cursor-pointer">
+                      {w.name}
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              </CommandList>
+            </Command>
           </PopoverContent>
         </Popover>
         {assignment && (
