@@ -16,10 +16,11 @@ import { format, addDays, subDays } from 'date-fns';
 function WorkplaceCell({ student, assignment, workplaces, onAssign, onRemove }) {
   const [open, setOpen] = useState(false);
 
-  const handleSelect = async (workplaceId) => {
+  const handleSelect = async (workplaceNameOrId) => {
     setOpen(false);
-    if (!workplaceId) return;
-    const workplace = workplaces.find(w => w.id === workplaceId);
+    if (!workplaceNameOrId) return;
+    const workplace = workplaces.find(w => w.id === workplaceNameOrId || w.name === workplaceNameOrId);
+    if (!workplace) return;
     const canAssign = await onAssign(student, workplace, assignment);
     if (!canAssign) setOpen(true);
   };
