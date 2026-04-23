@@ -112,7 +112,10 @@ export default function ImportWorkplacesModal({ open, onClose, onImported }) {
       }
     }
 
-    if (toCreate.length > 0) await base44.entities.Workplace.bulkCreate(toCreate);
+    const CHUNK = 50;
+    for (let i = 0; i < toCreate.length; i += CHUNK) {
+      await base44.entities.Workplace.bulkCreate(toCreate.slice(i, i + CHUNK));
+    }
     for (const u of toUpdate) await base44.entities.Workplace.update(u.id, u.data);
 
     setImportCount(toCreate.length + toUpdate.length);
