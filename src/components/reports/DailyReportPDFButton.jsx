@@ -233,7 +233,7 @@ export default function DailyReportPDFButton({ date, assignments }) {
     <>
       <div className="flex flex-col items-end gap-2">
         <div className="flex gap-2">
-          <Button onClick={handleExport} disabled={exporting || reportGroups.length === 0} variant="outline">
+          <Button onClick={handleExport} disabled={exporting || reportGroups.length === 0}>
             {exporting ? <Loader2 size={16} className="animate-spin ml-2" /> : <Download size={16} className="ml-2" />}
             {exporting ? 'מייצא...' : 'סידור עבודה PDF'}
           </Button>
