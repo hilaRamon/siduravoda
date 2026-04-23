@@ -5,7 +5,6 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Download, Loader2 } from 'lucide-react';
 import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
 
 const MONTHS = [
   { value: '01', label: 'ינואר' }, { value: '02', label: 'פברואר' },
@@ -103,33 +102,78 @@ export default function PeriodicWorkReport() {
 
   const handleExportPDF = async () => {
     setExporting(true);
-    await new Promise(r => setTimeout(r, 100));
-    const el = reportRef.current;
-    // Each farm section is a direct child div
-    const farmSections = Array.from(el.children);
+    await new Promise(r => setTimeout(r, 50));
+
     const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
     const pageW = pdf.internal.pageSize.getWidth();
     const pageH = pdf.internal.pageSize.getHeight();
-    const imgW = pageW - 20;
+    const margin = 12;
+    const colWidths = [22, 52, 16, 20, 18, 18, 22, 20]; // total ~188 fits in 210-24=186, adjust
+    const headers = ['תאריך', 'מקום עבודה', 'תעריף', 'תשלום נוסף', 'תלמידים', 'סך שעות', 'ממוצע שעות', 'מחיר'];
+    const rowH = 7;
+    const headH = 8;
 
-    for (let i = 0; i < farmSections.length; i++) {
-      const section = farmSections[i];
-      const canvas = await html2canvas(section, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
-      const ratio = canvas.width / imgW;
-      let srcY = 0;
-      let firstSlice = true;
-      while (srcY < canvas.height) {
-        const sliceH = Math.min((pageH - 20) * ratio, canvas.height - srcY);
-        const sliceCanvas = document.createElement('canvas');
-        sliceCanvas.width = canvas.width;
-        sliceCanvas.height = sliceH;
-        sliceCanvas.getContext('2d').drawImage(canvas, 0, srcY, canvas.width, sliceH, 0, 0, canvas.width, sliceH);
-        if (i > 0 || !firstSlice) pdf.addPage();
-        pdf.addImage(sliceCanvas.toDataURL('image/png'), 'PNG', 10, 10, imgW, sliceH / ratio);
-        srcY += sliceH;
-        firstSlice = false;
+    const drawRow = (pdf, cols, y, widths, isHeader, isFooter) => {
+      const totalW = widths.reduce((a, b) => a + b, 0);
+      let x = pageW - margin;
+      if (isHeader) {
+        pdf.setFillColor(230, 230, 230);
+        pdf.rect(margin, y, totalW, headH, 'F');
+      } else if (isFooter) {
+        pdf.setFillColor(210, 210, 210);
+        pdf.rect(margin, y, totalW, rowH, 'F');
       }
-    }
+      pdf.setDrawColor(180, 180, 180);
+      pdf.setLineWidth(0.2);
+      pdf.rect(margin, y, totalW, isHeader ? headH : rowH);
+
+      cols.forEach((col, i) => {
+        const w = widths[i];
+        x -= w;
+        pdf.setDrawColor(180, 180, 180);
+        pdf.line(x, y, x, y + (isHeader ? headH : rowH));
+        pdf.setFontSize(isHeader || isFooter ? 8 : 7.5);
+        pdf.setFont('helvetica', isHeader || isFooter ? 'bold' : 'normal');
+        pdf.text(String(col ?? ''), x + w / 2, y + (isHeader ? headH : rowH) / 2 + 2.5, { align: 'center', maxWidth: w - 1 });
+      });
+    };
+
+    let isFirst = true;
+
+    reportByFarm.forEach(([farm, rows]) => {
+      if (!isFirst) pdf.addPage();
+      isFirst = false;
+
+      const grandTotalHours = Math.round(rows.reduce((s, r) => s + r.totalHours, 0) * 10) / 10;
+      const grandTotalPrice = rows.reduce((s, r) => s + r.totalPrice, 0);
+
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(11);
+      pdf.text(`לכבוד: ${farm}`, pageW - margin, 16, { align: 'right' });
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(8.5);
+      pdf.text(`דוח עבודה תקופתי — ${monthLabel} ${year}`, pageW - margin, 22, { align: 'right' });
+
+      let y = 26;
+      drawRow(pdf, headers, y, colWidths, true, false);
+      y += headH;
+
+      rows.forEach((r, i) => {
+        if (y + rowH > pageH - margin) { pdf.addPage(); y = margin; }
+        if (i % 2 === 1) {
+          pdf.setFillColor(248, 249, 250);
+          pdf.rect(margin, y, colWidths.reduce((a, b) => a + b, 0), rowH, 'F');
+        }
+        drawRow(pdf, [
+          formatDate(r.date), r.workplaceName, r.rate, '0',
+          r.studentCount, r.totalHours, r.avgHours, `${r.totalPrice} ₪`
+        ], y, colWidths, false, false);
+        y += rowH;
+      });
+
+      if (y + rowH > pageH - margin) { pdf.addPage(); y = margin; }
+      drawRow(pdf, ['', '', '', '', 'סה"כ', grandTotalHours, '', `${grandTotalPrice} ₪`], y, colWidths, false, true);
+    });
 
     pdf.save(`דוח_עבודה_תקופתי_${month}_${year}.pdf`);
     setExporting(false);
