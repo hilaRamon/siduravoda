@@ -94,24 +94,28 @@ export default function ImportWorkplacesModal({ open, onClose, onImported }) {
     const existingByName = {};
     existing.forEach(w => { existingByName[w.name?.trim()] = w; });
 
-    let count = 0;
+    const toCreate = [];
+    const toUpdate = [];
+
     for (const row of rows) {
       const name = (mapping.name ? row[mapping.name] : '')?.trim();
       if (!name) continue;
       const data = { name };
       ['farm_name', 'address', 'company_id', 'contact_phone', 'accounting_phone', 'accounting_email'].forEach(k => {
-        if (mapping[k]) data[k] = row[mapping[k]]?.trim() || undefined;
+        if (mapping[k]) { const v = row[mapping[k]]?.trim(); if (v) data[k] = v; }
       });
-      Object.keys(data).forEach(k => data[k] === undefined && delete data[k]);
 
       if (existingByName[name]) {
-        await base44.entities.Workplace.update(existingByName[name].id, data);
+        toUpdate.push({ id: existingByName[name].id, data });
       } else {
-        await base44.entities.Workplace.create(data);
+        toCreate.push(data);
       }
-      count++;
     }
-    setImportCount(count);
+
+    if (toCreate.length > 0) await base44.entities.Workplace.bulkCreate(toCreate);
+    for (const u of toUpdate) await base44.entities.Workplace.update(u.id, u.data);
+
+    setImportCount(toCreate.length + toUpdate.length);
     setImporting(false);
     setStep('done');
     onImported();
