@@ -298,17 +298,21 @@ export default function Assignments() {
       return false;
     }
     if (existingAssignment) {
-      await base44.entities.Assignment.delete(existingAssignment.id);
+      await base44.entities.Assignment.update(existingAssignment.id, {
+        workplace_id: workplace.id,
+        workplace_name: workplace.name,
+      });
+    } else {
+      await base44.entities.Assignment.create({
+        date,
+        student_id: student.id,
+        student_name: student.full_name,
+        workplace_id: workplace.id,
+        workplace_name: workplace.name,
+        rate: 40,
+        hours: 4.5,
+      });
     }
-    await base44.entities.Assignment.create({
-      date,
-      student_id: student.id,
-      student_name: student.full_name,
-      workplace_id: workplace.id,
-      workplace_name: workplace.name,
-      rate: 40,
-      hours: 4.5,
-    });
     queryClient.invalidateQueries({ queryKey: ['assignments', date] });
     return true;
   };
