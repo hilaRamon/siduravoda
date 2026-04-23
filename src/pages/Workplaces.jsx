@@ -10,7 +10,7 @@ import ImportWorkplacesModal from '@/components/workplaces/ImportWorkplacesModal
 
 function WorkplaceFormModal({ open, onClose, onSave, workplace }) {
   const [form, setForm] = useState(workplace || {
-    name: '', farm_name: '', company_id: '', contact_phone: '', accounting_phone: '', accounting_email: '',
+    name: '', farm_name: '', address: '', company_id: '', contact_phone: '', accounting_phone: '', accounting_email: '',
   });
 
   const set = (field) => (e) => setForm(p => ({ ...p, [field]: e.target.value }));
@@ -34,6 +34,10 @@ function WorkplaceFormModal({ open, onClose, onSave, workplace }) {
           <div>
             <Label>שם משק</Label>
             <Input value={form.farm_name} onChange={set('farm_name')} className="mt-1" placeholder="שם המשק" />
+          </div>
+          <div>
+            <Label>כתובת</Label>
+            <Input value={form.address || ''} onChange={set('address')} className="mt-1" placeholder="כתובת המשק" />
           </div>
           <div>
             <Label>ח.פ</Label>
@@ -134,6 +138,7 @@ export default function Workplaces() {
               <tr>
                 <th className="text-right px-5 py-3 text-sm font-semibold text-muted-foreground">שם מקום עבודה</th>
                 <th className="text-right px-5 py-3 text-sm font-semibold text-muted-foreground">שם משק</th>
+                <th className="text-right px-5 py-3 text-sm font-semibold text-muted-foreground">כתובת</th>
                 <th className="text-right px-5 py-3 text-sm font-semibold text-muted-foreground">ח.פ</th>
                 <th className="text-right px-5 py-3 text-sm font-semibold text-muted-foreground">טלפון איש קשר</th>
                 <th className="text-right px-5 py-3 text-sm font-semibold text-muted-foreground">טלפון הנה"ח</th>
@@ -146,6 +151,7 @@ export default function Workplaces() {
                 <tr key={w.id} className="hover:bg-secondary/30 transition-colors">
                   <td className="px-5 py-3 font-medium">{w.name}</td>
                   <td className="px-5 py-3 text-sm text-muted-foreground">{w.farm_name || '—'}</td>
+                  <td className="px-5 py-3 text-sm text-muted-foreground">{w.address || '—'}</td>
                   <td className="px-5 py-3 text-sm text-muted-foreground">{w.company_id || '—'}</td>
                   <td className="px-5 py-3 text-sm text-muted-foreground">{w.contact_phone || '—'}</td>
                   <td className="px-5 py-3 text-sm text-muted-foreground">{w.accounting_phone || '—'}</td>

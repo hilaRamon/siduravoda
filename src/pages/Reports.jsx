@@ -2,11 +2,11 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
-import { Download, FileSpreadsheet, Shuffle, Loader2, UserCheck, BarChart2, CalendarDays } from 'lucide-react';
+import { Download, FileSpreadsheet, Shuffle, Loader2, UserCheck, BarChart2, Users } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { format, eachDayOfInterval, parseISO } from 'date-fns';
 import PeriodicWorkReport from '@/components/reports/PeriodicWorkReport';
-import DailyAssignmentReport from '@/components/reports/DailyAssignmentReport';
+import StudentWorkReport from '@/components/reports/StudentWorkReport';
 
 export default function Reports() {
   const [exportingBackup, setExportingBackup] = useState(false);
@@ -238,7 +238,7 @@ export default function Reports() {
         {[
           { key: 'tools', label: 'כלי ניהול', icon: FileSpreadsheet },
           { key: 'periodic', label: 'דוח עבודה תקופתי', icon: BarChart2 },
-          { key: 'daily', label: 'סידור עבודה יומי', icon: CalendarDays },
+          { key: 'student', label: 'דוח עבודת תלמיד', icon: Users },
         ].map(({ key, label, icon: Icon }) => (
           <button
             key={key}
@@ -254,7 +254,7 @@ export default function Reports() {
       </div>
 
       {activeTab === 'periodic' && <PeriodicWorkReport />}
-      {activeTab === 'daily' && <DailyAssignmentReport />}
+      {activeTab === 'student' && <StudentWorkReport />}
 
       {activeTab === 'tools' && <div className="space-y-4 max-w-2xl">
 

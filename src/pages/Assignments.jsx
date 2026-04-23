@@ -24,6 +24,8 @@ function WorkplaceCell({ student, assignment, workplaces, onAssign, onRemove }) 
     if (!canAssign) setOpen(true);
   };
 
+
+
   const selectedName = assignment ? workplaces.find(w => w.id === assignment.workplace_id)?.name || assignment.workplace_name : null;
 
   return (
@@ -42,19 +44,23 @@ function WorkplaceCell({ student, assignment, workplaces, onAssign, onRemove }) 
           </PopoverTrigger>
           <PopoverContent className="w-64 p-0" align="start">
             <Command>
-              <CommandInput placeholder="חיפוש מקום עבודה..." className="h-8 text-xs" />
-              <CommandList>
-                <CommandEmpty>לא נמצא</CommandEmpty>
-                <CommandGroup>
-                  {workplaces.map(w => (
-                    <CommandItem key={w.id} value={w.name} onSelect={() => handleSelect(w.id)}
-                      className="text-xs cursor-pointer">
-                      {w.name}
-                    </CommandItem>
-                  ))}
-                </CommandGroup>
-              </CommandList>
-            </Command>
+                <CommandInput
+                  placeholder="חיפוש מקום עבודה..."
+                  className="h-8 text-xs"
+                  onKeyDown={e => { if (e.key === 'Escape') setOpen(false); }}
+                />
+                <CommandList>
+                  <CommandEmpty>לא נמצא</CommandEmpty>
+                  <CommandGroup>
+                    {workplaces.map(w => (
+                      <CommandItem key={w.id} value={w.name} onSelect={() => handleSelect(w.id)}
+                        className="text-xs cursor-pointer">
+                        {w.name}
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                </CommandList>
+              </Command>
           </PopoverContent>
         </Popover>
         {assignment && (

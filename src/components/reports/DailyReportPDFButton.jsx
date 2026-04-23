@@ -1,8 +1,8 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
-import { Download, Loader2 } from 'lucide-react';
+import { Download, Loader2, Share2 } from 'lucide-react';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 
@@ -20,7 +20,11 @@ function toHebrewDate(dateStr) {
 function buildReportGroups(assignments, logisticsMap) {
   const SKIP = ['לא עובד', 'לימודים'];
   const filtered = assignments.filter(a => !SKIP.includes(a.workplace_name));
+
+  // Find global role holders (from ALL assignments, not just per-workplace)
+  const globalDriver = assignments.find(a => a.role === 'נהג');
   const globalTeamLeader = assignments.find(a => a.role === 'ראש צוות');
+  const globalEquip = assignments.find(a => a.role === 'אחראי פק"ל');
 
   const byWorkplace = {};
   const seenStudents = new Set();
@@ -37,22 +41,81 @@ function buildReportGroups(assignments, logisticsMap) {
     .sort((a, b) => a.name.localeCompare(b.name, 'he'))
     .map(g => {
       const log = logisticsMap[g.id] || {};
-      const driverAssignment = g.students.find(s => s.role === 'נהג');
-      const driverName = driverAssignment?.student_name || log.driver_student_name || '';
-      const vehicles = [log.vehicle_name, log.vehicle_name_2].filter(Boolean).join(' + ');
+      const vehicles = [log.vehicle_name, log.vehicle_name_2, log.vehicle_name_3].filter(Boolean).join(' + ');
       return {
         workplaceName: g.name,
         students: g.students.sort((a, b) => (a.student_name || '').localeCompare(b.student_name || '', 'he')),
-        driverName,
         vehicleName: vehicles || '',
         exitTime: log.exit_time || '',
+        driverName: globalDriver?.student_name || '',
         teamLeaderName: globalTeamLeader?.student_name || '',
+        equipName: globalEquip?.student_name || '',
       };
     });
 }
 
+async function generatePDFBlob(container, date) {
+  container.style.position = 'fixed';
+  container.style.top = '-9999px';
+  container.style.left = '0';
+  container.style.display = 'block';
+  await new Promise(r => setTimeout(r, 150));
+
+  const SCALE = 1.5;
+  const canvas = await html2canvas(container, { scale: SCALE, useCORS: true, backgroundColor: '#ffffff' });
+  container.style.display = 'none';
+
+  const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  const pageW = pdf.internal.pageSize.getWidth();
+  const pageH = pdf.internal.pageSize.getHeight();
+  const margin = 10;
+  const contentW = pageW - margin * 2;
+  const contentH = pageH - margin * 2;
+
+  const pxPerMM = canvas.width / contentW;
+  const pageHeightPx = contentH * pxPerMM;
+
+  const blocks = Array.from(container.children);
+  const safeCutsPx = blocks.map(block => {
+    let top = 0;
+    let el = block;
+    while (el && el !== container) {
+      top += el.offsetTop;
+      el = el.offsetParent;
+    }
+    return (top + block.offsetHeight) * SCALE;
+  });
+
+  const pdf_pages = [];
+  let srcY = 0;
+
+  while (srcY < canvas.height) {
+    const idealEnd = srcY + pageHeightPx;
+    let cutY = idealEnd;
+    for (const safePx of safeCutsPx) {
+      if (safePx <= idealEnd && safePx > srcY) cutY = safePx;
+    }
+    const sliceH = Math.min(cutY, canvas.height) - srcY;
+
+    const slice = document.createElement('canvas');
+    slice.width = canvas.width;
+    slice.height = sliceH;
+    slice.getContext('2d').drawImage(canvas, 0, srcY, canvas.width, sliceH, 0, 0, canvas.width, sliceH);
+
+    if (pdf_pages.length > 0) pdf.addPage();
+    pdf.addImage(slice.toDataURL('image/jpeg', 0.85), 'JPEG', margin, margin, contentW, sliceH / pxPerMM);
+    pdf_pages.push(true);
+
+    srcY += sliceH;
+  }
+
+  return pdf.output('blob');
+}
+
 export default function DailyReportPDFButton({ date, assignments }) {
   const [exporting, setExporting] = useState(false);
+  const [publishing, setPublishing] = useState(false);
+  const [publicUrl, setPublicUrl] = useState(null);
   const hiddenRef = useRef(null);
 
   const { data: logisticsList = [] } = useQuery({
@@ -71,135 +134,124 @@ export default function DailyReportPDFButton({ date, assignments }) {
 
   const handleExport = async () => {
     setExporting(true);
-
-    const container = hiddenRef.current;
-    container.style.position = 'fixed';
-    container.style.top = '-9999px';
-    container.style.left = '0';
-    container.style.display = 'block';
-    await new Promise(r => setTimeout(r, 150));
-
-    const SCALE = 1.5;
-    // Render the whole container once
-    const canvas = await html2canvas(container, { scale: SCALE, useCORS: true, backgroundColor: '#ffffff' });
-    container.style.display = 'none';
-
-    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-    const pageW = pdf.internal.pageSize.getWidth();
-    const pageH = pdf.internal.pageSize.getHeight();
-    const margin = 10;
-    const contentW = pageW - margin * 2;
-    const contentH = pageH - margin * 2;
-
-    // px per mm ratio
-    const pxPerMM = canvas.width / contentW;
-    const pageHeightPx = contentH * pxPerMM;
-
-    // Measure each block's bottom edge using offsetTop + offsetHeight (relative to container)
-    const blocks = Array.from(container.children);
-    const safeCutsPx = blocks.map(block => {
-      // offsetTop is relative to offsetParent; since container is the fixed ancestor, sum up
-      let top = 0;
-      let el = block;
-      while (el && el !== container) {
-        top += el.offsetTop;
-        el = el.offsetParent;
-      }
-      return (top + block.offsetHeight) * SCALE;
-    });
-
-    const pdf_pages = [];
-    let srcY = 0;
-
-    while (srcY < canvas.height) {
-      const idealEnd = srcY + pageHeightPx;
-      // Find the largest safe cut that is <= idealEnd (don't cut mid-block)
-      let cutY = idealEnd;
-      for (const safePx of safeCutsPx) {
-        if (safePx <= idealEnd && safePx > srcY) cutY = safePx;
-      }
-      // If no safe cut found below idealEnd, just use idealEnd (single block taller than page)
-      const sliceH = Math.min(cutY, canvas.height) - srcY;
-
-      const slice = document.createElement('canvas');
-      slice.width = canvas.width;
-      slice.height = sliceH;
-      slice.getContext('2d').drawImage(canvas, 0, srcY, canvas.width, sliceH, 0, 0, canvas.width, sliceH);
-
-      if (pdf_pages.length > 0) pdf.addPage();
-      pdf.addImage(slice.toDataURL('image/jpeg', 0.85), 'JPEG', margin, margin, contentW, sliceH / pxPerMM);
-      pdf_pages.push(true);
-
-      srcY += sliceH;
-    }
-
-    pdf.save(`סידור_עבודה_יומי_${date}.pdf`);
+    const blob = await generatePDFBlob(hiddenRef.current, date);
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `סידור_עבודה_יומי_${date}.pdf`;
+    a.click();
+    URL.revokeObjectURL(url);
     setExporting(false);
   };
 
-  return (
-    <>
-      <Button onClick={handleExport} disabled={exporting || reportGroups.length === 0}>
-        {exporting ? <Loader2 size={16} className="animate-spin ml-2" /> : <Download size={16} className="ml-2" />}
-        {exporting ? 'מייצא...' : 'סידור עבודה PDF'}
-      </Button>
+  const handlePublish = async () => {
+    setPublishing(true);
+    const blob = await generatePDFBlob(hiddenRef.current, date);
+    const file = new File([blob], `schedule_${date}.pdf`, { type: 'application/pdf' });
+    const { file_url } = await base44.integrations.Core.UploadFile({ file });
+    setPublicUrl(file_url);
+    setPublishing(false);
+  };
 
-      {/* Hidden report for PDF rendering */}
-      <div ref={hiddenRef} style={{ display: 'none', width: '794px', background: 'white', padding: '16px', fontFamily: 'Arial, sans-serif' }} dir="rtl">
-        <div style={{ marginBottom: '16px', textAlign: 'center' }}>
-          <h2 style={{ fontSize: '16px', fontWeight: 'bold', margin: 0 }}>סידור עבודה</h2>
-          <p style={{ fontSize: '13px', margin: '4px 0 0' }}>{gregDate} — {hebrewDate}</p>
-        </div>
+  const reportContent = (
+    <div ref={hiddenRef} style={{ display: 'none', width: '794px', background: 'white', padding: '16px', fontFamily: 'Arial, sans-serif' }} dir="rtl">
+      <div style={{ marginBottom: '16px', textAlign: 'center' }}>
+        <h2 style={{ fontSize: '16px', fontWeight: 'bold', margin: 0 }}>סידור עבודה</h2>
+        <p style={{ fontSize: '13px', margin: '4px 0 0' }}>{gregDate} — {hebrewDate}</p>
+      </div>
 
-        {reportGroups.map((group) => (
-          <div key={group.workplaceName} style={{ marginBottom: '16px' }}>
-            <div style={{ background: '#e5e7eb', padding: '8px 8px', fontWeight: 'bold', fontSize: '12px', border: '1px solid #9ca3af', borderBottom: 'none' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px' }}>
-                <span>{group.workplaceName}</span>
-                <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
-                  {group.vehicleName && (
-                    <span style={{ fontWeight: 'bold', fontSize: '11px', background: '#1e40af', color: '#fff', padding: '3px 8px', borderRadius: '4px', whiteSpace: 'nowrap' }}>
-                      🚐 {group.vehicleName}
-                    </span>
-                  )}
-                  {group.exitTime && (
-                    <span style={{ fontWeight: 'bold', fontSize: '11px', background: '#166534', color: '#fff', padding: '3px 8px', borderRadius: '4px', whiteSpace: 'nowrap' }}>
-                      ⏰ {group.exitTime}
-                    </span>
-                  )}
-                </div>
+      {reportGroups.map((group) => (
+        <div key={group.workplaceName} style={{ marginBottom: '16px' }}>
+          <div style={{ background: '#e5e7eb', padding: '8px 8px', fontWeight: 'bold', fontSize: '12px', border: '1px solid #9ca3af', borderBottom: 'none' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px' }}>
+              <span>{group.workplaceName}</span>
+              <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
+                {group.vehicleName && (
+                  <span style={{ fontWeight: 'bold', fontSize: '11px', background: '#1e40af', color: '#fff', padding: '3px 8px', borderRadius: '4px', whiteSpace: 'nowrap' }}>
+                    🚐 {group.vehicleName}
+                  </span>
+                )}
+                {group.exitTime && (
+                  <span style={{ fontWeight: 'bold', fontSize: '11px', background: '#166534', color: '#fff', padding: '3px 8px', borderRadius: '4px', whiteSpace: 'nowrap' }}>
+                    ⏰ {group.exitTime}
+                  </span>
+                )}
               </div>
             </div>
-            <table style={{ width: '100%', fontSize: '11px', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr style={{ background: '#f9fafb' }}>
-                  <th style={{ border: '1px solid #d1d5db', padding: '4px 8px', textAlign: 'right' }}>שם תלמיד</th>
-                  <th style={{ border: '1px solid #d1d5db', padding: '4px 8px', textAlign: 'center', width: '80px' }}>אחראי פק"ל</th>
-                  <th style={{ border: '1px solid #d1d5db', padding: '4px 8px', textAlign: 'right', width: '110px' }}>נהג</th>
-                  <th style={{ border: '1px solid #d1d5db', padding: '4px 8px', textAlign: 'right', width: '110px' }}>ראש צוות</th>
-                </tr>
-              </thead>
-              <tbody>
-                {group.students.map((s, i) => (
-                  <tr key={s.id} style={{ background: i % 2 === 0 ? '#fff' : '#f9fafb' }}>
-                    <td style={{ border: '1px solid #d1d5db', padding: '3px 8px' }}>{s.student_name}</td>
-                    <td style={{ border: '1px solid #d1d5db', padding: '3px 8px', textAlign: 'center' }}>{s.role === 'אחראי פק"ל' ? 'כן' : ''}</td>
-                    <td style={{ border: '1px solid #d1d5db', padding: '3px 8px' }}>{group.driverName}</td>
-                    <td style={{ border: '1px solid #d1d5db', padding: '3px 8px' }}>{group.teamLeaderName}</td>
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot>
-                <tr style={{ background: '#f3f4f6' }}>
-                  <td colSpan={4} style={{ border: '1px solid #d1d5db', padding: '3px 8px', textAlign: 'right', fontWeight: '500' }}>
-                    סה"כ תלמידים: {group.students.length}
+          </div>
+          <table style={{ width: '100%', fontSize: '11px', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr style={{ background: '#f9fafb' }}>
+                <th style={{ border: '1px solid #d1d5db', padding: '4px 8px', textAlign: 'right' }}>שם תלמיד</th>
+                <th style={{ border: '1px solid #d1d5db', padding: '4px 8px', textAlign: 'center', width: '80px' }}>אחראי פק"ל</th>
+                <th style={{ border: '1px solid #d1d5db', padding: '4px 8px', textAlign: 'right', width: '110px' }}>נהג</th>
+                <th style={{ border: '1px solid #d1d5db', padding: '4px 8px', textAlign: 'right', width: '110px' }}>ראש צוות</th>
+              </tr>
+            </thead>
+            <tbody>
+              {group.students.map((s, i) => (
+                <tr key={s.id} style={{ background: i % 2 === 0 ? '#fff' : '#f9fafb' }}>
+                  <td style={{ border: '1px solid #d1d5db', padding: '3px 8px' }}>{s.student_name}</td>
+                  <td style={{ border: '1px solid #d1d5db', padding: '3px 8px', textAlign: 'center' }}>
+                    {s.role === 'אחראי פק"ל' ? '✓' : (group.equipName && i === 0 && !group.students.some(st => st.role === 'אחראי פק"ל') ? '' : '')}
+                  </td>
+                  <td style={{ border: '1px solid #d1d5db', padding: '3px 8px' }}>
+                    {i === 0 ? group.driverName : ''}
+                  </td>
+                  <td style={{ border: '1px solid #d1d5db', padding: '3px 8px' }}>
+                    {i === 0 ? group.teamLeaderName : ''}
                   </td>
                 </tr>
-              </tfoot>
-            </table>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr style={{ background: '#f3f4f6' }}>
+                <td colSpan={4} style={{ border: '1px solid #d1d5db', padding: '3px 8px', textAlign: 'right', fontWeight: '500' }}>
+                  סה"כ תלמידים: {group.students.length}
+                </td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      ))}
+    </div>
+  );
+
+  return (
+    <>
+      <div className="flex flex-col items-end gap-2">
+        <div className="flex gap-2">
+          <Button onClick={handleExport} disabled={exporting || reportGroups.length === 0} variant="outline">
+            {exporting ? <Loader2 size={16} className="animate-spin ml-2" /> : <Download size={16} className="ml-2" />}
+            {exporting ? 'מייצא...' : 'סידור עבודה PDF'}
+          </Button>
+          <Button
+            onClick={handlePublish}
+            disabled={publishing || reportGroups.length === 0}
+            style={{ backgroundColor: '#166534', color: 'white' }}
+            className="hover:opacity-90"
+          >
+            {publishing ? <Loader2 size={16} className="animate-spin ml-2" /> : <Share2 size={16} className="ml-2" />}
+            {publishing ? 'מפרסם...' : 'פרסום סידור'}
+          </Button>
+        </div>
+        {publicUrl && (
+          <div className="flex items-center gap-2 bg-green-50 border border-green-200 rounded-lg px-3 py-2 text-xs max-w-sm">
+            <span className="text-green-800 font-medium">קישור לסידור:</span>
+            <a href={publicUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline truncate max-w-[200px]">
+              {publicUrl}
+            </a>
+            <button
+              onClick={() => { navigator.clipboard.writeText(publicUrl); }}
+              className="text-green-700 hover:text-green-900 shrink-0 font-medium"
+            >
+              העתק
+            </button>
           </div>
-        ))}
+        )}
       </div>
+
+      {reportContent}
     </>
   );
 }

@@ -85,8 +85,12 @@ export default function PeriodicWorkReport() {
       byFarm[fn].push(row);
     });
 
-    // Sort each farm's rows by date
-    Object.values(byFarm).forEach(rows => rows.sort((a, b) => a.date.localeCompare(b.date)));
+    // Sort each farm's rows by workplace name then date
+    Object.values(byFarm).forEach(rows => rows.sort((a, b) => {
+      const wpCmp = (a.workplaceName || '').localeCompare(b.workplaceName || '', 'he');
+      if (wpCmp !== 0) return wpCmp;
+      return a.date.localeCompare(b.date);
+    }));
 
     // Return sorted by farm name
     return Object.entries(byFarm).sort(([a], [b]) => a.localeCompare(b, 'he'));
@@ -101,23 +105,32 @@ export default function PeriodicWorkReport() {
     setExporting(true);
     await new Promise(r => setTimeout(r, 100));
     const el = reportRef.current;
-    const canvas = await html2canvas(el, { scale: 2, useCORS: true });
+    // Each farm section is a direct child div
+    const farmSections = Array.from(el.children);
     const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
     const pageW = pdf.internal.pageSize.getWidth();
     const pageH = pdf.internal.pageSize.getHeight();
     const imgW = pageW - 20;
-    const ratio = canvas.width / imgW;
-    let srcY = 0;
-    while (srcY < canvas.height) {
-      const sliceH = Math.min((pageH - 20) * ratio, canvas.height - srcY);
-      const sliceCanvas = document.createElement('canvas');
-      sliceCanvas.width = canvas.width;
-      sliceCanvas.height = sliceH;
-      sliceCanvas.getContext('2d').drawImage(canvas, 0, srcY, canvas.width, sliceH, 0, 0, canvas.width, sliceH);
-      pdf.addImage(sliceCanvas.toDataURL('image/png'), 'PNG', 10, 10, imgW, sliceH / ratio);
-      srcY += sliceH;
-      if (srcY < canvas.height) pdf.addPage();
+
+    for (let i = 0; i < farmSections.length; i++) {
+      const section = farmSections[i];
+      const canvas = await html2canvas(section, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
+      const ratio = canvas.width / imgW;
+      let srcY = 0;
+      let firstSlice = true;
+      while (srcY < canvas.height) {
+        const sliceH = Math.min((pageH - 20) * ratio, canvas.height - srcY);
+        const sliceCanvas = document.createElement('canvas');
+        sliceCanvas.width = canvas.width;
+        sliceCanvas.height = sliceH;
+        sliceCanvas.getContext('2d').drawImage(canvas, 0, srcY, canvas.width, sliceH, 0, 0, canvas.width, sliceH);
+        if (i > 0 || !firstSlice) pdf.addPage();
+        pdf.addImage(sliceCanvas.toDataURL('image/png'), 'PNG', 10, 10, imgW, sliceH / ratio);
+        srcY += sliceH;
+        firstSlice = false;
+      }
     }
+
     pdf.save(`דוח_עבודה_תקופתי_${month}_${year}.pdf`);
     setExporting(false);
   };
