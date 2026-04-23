@@ -79,9 +79,9 @@ export default function Workplaces() {
     queryFn: () => base44.entities.Workplace.list('-created_date'),
   });
 
-  const filtered = workplaces.filter(w =>
-    w.name?.includes(search) || w.farm_name?.includes(search)
-  );
+  const filtered = workplaces
+    .filter(w => w.name?.includes(search) || w.farm_name?.includes(search))
+    .sort((a, b) => (a.name || '').localeCompare(b.name || '', 'he'));
 
   const handleSave = async (form) => {
     if (editWp) {
