@@ -17,9 +17,11 @@ function toHebrewDate(dateStr) {
   }
 }
 
+const SKIP_KEYWORDS = ['לא עובד', 'לימודים', 'לא יצא'];
+const shouldSkip = (name) => !name || SKIP_KEYWORDS.some(kw => name.includes(kw));
+
 function buildReportGroups(assignments, logisticsMap) {
-  const SKIP = ['לא עובד', 'לימודים'];
-  const filtered = assignments.filter(a => !SKIP.includes(a.workplace_name));
+  const filtered = assignments.filter(a => !shouldSkip(a.workplace_name));
 
   const byWorkplace = {};
   const seenStudents = new Set();

@@ -109,16 +109,18 @@ export default function LogisticsSidebar({ date, assignments }) {
     return map;
   }, [logisticsList]);
 
-  const SKIP = ['לא עובד', 'לימודים'];
+  const SKIP_KEYWORDS = ['לא עובד', 'לימודים', 'לא יצא'];
+  const shouldSkip = (name) => !name || SKIP_KEYWORDS.some(kw => name.includes(kw));
+
   const activeWorkplaces = useMemo(() => {
     const map = {};
-    assignments.filter(a => !SKIP.includes(a.workplace_name)).forEach(a => {
-      if (!map[a.workplace_id]) map[a.workplace_id] = { name: a.workplace_name, count: 0 };
-      map[a.workplace_id].count++;
+    assignments.filter(a => !shouldSkip(a.workplace_name)).forEach(a => {
+      if (!map[a.workplace_id]) map[a.workplace_id] = { name: a.workplace_name, students: new Set() };
+      map[a.workplace_id].students.add(a.student_id);
     });
     return Object.entries(map)
       .sort(([, a], [, b]) => a.name.localeCompare(b.name, 'he'))
-      .map(([id, v]) => ({ id, name: v.name, count: v.count }));
+      .map(([id, v]) => ({ id, name: v.name, count: v.students.size }));
   }, [assignments]);
 
   const handleSave = async (workplaceId, workplaceName, data) => {

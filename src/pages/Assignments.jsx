@@ -413,7 +413,7 @@ export default function Assignments() {
         <div>
           <h2 className="text-2xl font-bold">שיבוצים יומיים</h2>
           <p className="text-muted-foreground mt-1">
-            {new Set(assignments.filter(a => !['לא עובד','לימודים'].includes(a.workplace_name)).map(a => a.student_id)).size} משובצים מתוך {students.filter(s => s.is_active !== false && (!s.created_date || s.created_date.slice(0, 10) <= date)).length} תלמידים
+            {new Set(assignments.filter(a => a.workplace_name && !['לא עובד','לימודים','לא יצא'].some(kw => a.workplace_name.includes(kw))).map(a => a.student_id)).size} משובצים מתוך {students.filter(s => s.is_active !== false && (!s.created_date || s.created_date.slice(0, 10) <= date)).length} תלמידים
           </p>
         </div>
         <div className="flex gap-2">
