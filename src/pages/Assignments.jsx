@@ -327,20 +327,49 @@ export default function Assignments() {
   };
 
   const handleBulkSave = async () => {
-    // Only update real assignment IDs (not student IDs used as placeholders for unassigned)
-    const assignmentIds = new Set(assignments.map(a => a.id));
-    const ids = Array.from(selectedIds).filter(id => assignmentIds.has(id));
-    const updates = {};
-    if (bulkWorkplace) {
-      const wp = workplaces.find(w => w.id === bulkWorkplace);
-      if (wp) { updates.workplace_id = wp.id; updates.workplace_name = wp.name; }
+    const wp = bulkWorkplace ? workplaces.find(w => w.id === bulkWorkplace) : null;
+    const hasChanges = wp || bulkHours !== '' || bulkRate !== '';
+    if (!hasChanges) { setShowBulkDialog(false); return; }
+
+    // Build a map: assignmentId -> assignment, and studentId -> assignment
+    const assignmentById = {};
+    const assignmentByStudentId = {};
+    assignments.forEach(a => {
+      assignmentById[a.id] = a;
+      assignmentByStudentId[a.student_id] = a;
+    });
+    const studentById = {};
+    students.forEach(s => { studentById[s.id] = s; });
+
+    const ops = [];
+    for (const selId of selectedIds) {
+      const existingAssignment = assignmentById[selId] || assignmentByStudentId[selId];
+
+      if (existingAssignment) {
+        // Update existing assignment
+        const updates = {};
+        if (wp) { updates.workplace_id = wp.id; updates.workplace_name = wp.name; }
+        if (bulkHours !== '') updates.hours = parseFloat(bulkHours);
+        if (bulkRate !== '') updates.rate = parseFloat(bulkRate);
+        ops.push(base44.entities.Assignment.update(existingAssignment.id, updates));
+      } else if (wp) {
+        // Create new assignment for unassigned student
+        const student = studentById[selId];
+        if (student) {
+          ops.push(base44.entities.Assignment.create({
+            date,
+            student_id: student.id,
+            student_name: student.full_name,
+            workplace_id: wp.id,
+            workplace_name: wp.name,
+            rate: bulkRate !== '' ? parseFloat(bulkRate) : 40,
+            hours: bulkHours !== '' ? parseFloat(bulkHours) : 4.5,
+          }));
+        }
+      }
     }
-    if (bulkHours !== '') updates.hours = parseFloat(bulkHours);
-    if (bulkRate !== '') updates.rate = parseFloat(bulkRate);
 
-    if (Object.keys(updates).length === 0) { setShowBulkDialog(false); return; }
-
-    await Promise.all(ids.map(id => base44.entities.Assignment.update(id, updates)));
+    await Promise.all(ops);
     queryClient.invalidateQueries({ queryKey: ['assignments', date] });
     setSelectedIds(new Set());
     setShowBulkDialog(false);
