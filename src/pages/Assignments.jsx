@@ -291,8 +291,20 @@ export default function Assignments() {
       alert(`⛔ לא ניתן לשבץ את ${student.full_name} ל-${workplace.name} — זה מקום עבודה אסור`);
       return false;
     }
-    if (existingAssignment) {
-      await base44.entities.Assignment.update(existingAssignment.id, {
+
+    // Find ALL assignments for this student on this date (there may be duplicates)
+    const allForStudent = assignments.filter(a => a.student_id === student.id);
+
+    if (allForStudent.length > 1) {
+      // Delete all duplicates, keep only the first, update it
+      const [keep, ...extras] = allForStudent;
+      await Promise.all(extras.map(a => base44.entities.Assignment.delete(a.id)));
+      await base44.entities.Assignment.update(keep.id, {
+        workplace_id: workplace.id,
+        workplace_name: workplace.name,
+      });
+    } else if (allForStudent.length === 1) {
+      await base44.entities.Assignment.update(allForStudent[0].id, {
         workplace_id: workplace.id,
         workplace_name: workplace.name,
       });
