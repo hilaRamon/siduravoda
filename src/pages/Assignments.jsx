@@ -190,7 +190,7 @@ export default function Assignments() {
 
   const { data: assignments = [] } = useQuery({
     queryKey: ['assignments', date],
-    queryFn: () => base44.entities.Assignment.filter({ date }),
+    queryFn: () => base44.entities.Assignment.filter({ date }, '-created_date', 500),
   });
 
   const { data: students = [] } = useQuery({
