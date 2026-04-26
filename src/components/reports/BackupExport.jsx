@@ -212,14 +212,7 @@ export default function BackupExport() {
         </Button>
       </div>
 
-      <div className="divide-y divide-border">
-        {EXPORTS.map(item => (
-          <div key={item.key} className="py-3">
-            <p className="font-medium text-sm">{item.label}</p>
-            <p className="text-xs text-muted-foreground mt-0.5">{item.desc}</p>
-          </div>
-        ))}
-      </div>
+
     </div>
   );
 }
