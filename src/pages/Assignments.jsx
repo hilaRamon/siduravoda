@@ -21,11 +21,9 @@ function WorkplaceCell({ student, assignment, workplaces, onAssign, onRemove }) 
     !search || w.name.includes(search)
   );
 
-  const handleSelect = async (workplaceId) => {
+  const handleSelect = async (workplace) => {
     setOpen(false);
     setSearch('');
-    if (!workplaceId) return;
-    const workplace = workplaces.find(w => w.id === workplaceId);
     if (!workplace) return;
     const canAssign = await onAssign(student, workplace, assignment);
     if (!canAssign) setOpen(true);
@@ -34,7 +32,7 @@ function WorkplaceCell({ student, assignment, workplaces, onAssign, onRemove }) 
   const handleKeyDown = (e) => {
     if (e.key === 'Enter') {
       const first = filteredWorkplaces[0];
-      if (first) handleSelect(first.id);
+      if (first) handleSelect(first);
     }
     if (e.key === 'Escape') setOpen(false);
   };
@@ -68,7 +66,7 @@ function WorkplaceCell({ student, assignment, workplaces, onAssign, onRemove }) 
                 <CommandEmpty>לא נמצא</CommandEmpty>
                 <CommandGroup>
                   {filteredWorkplaces.map(w => (
-                    <CommandItem key={w.id} value={w.id} onSelect={() => handleSelect(w.id)}
+                    <CommandItem key={w.id} value={w.name} onSelect={() => handleSelect(w)}
                       className="text-xs cursor-pointer">
                       {w.name}
                     </CommandItem>
