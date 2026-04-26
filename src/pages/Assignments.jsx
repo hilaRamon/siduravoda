@@ -581,7 +581,7 @@ export default function Assignments() {
                     <SelectTrigger className="h-7 text-xs w-full"><SelectValue placeholder="הכל" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">הכל</SelectItem>
-                      {workplaces.map(w => <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>)}
+                      {workplaces.filter(w => assignments.some(a => a.workplace_id === w.id)).map(w => <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
