@@ -2,15 +2,14 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
-import { Download, FileSpreadsheet, Shuffle, Loader2, UserCheck, BarChart2, Users, Link2 } from 'lucide-react';
-import * as XLSX from 'xlsx';
+import { FileSpreadsheet, Shuffle, Loader2, UserCheck, BarChart2, Users } from 'lucide-react';
 import { format, eachDayOfInterval, parseISO } from 'date-fns';
 import PeriodicWorkReport from '@/components/reports/PeriodicWorkReport';
 import StudentWorkReport from '@/components/reports/StudentWorkReport';
 import PublishedScheduleCard from '@/components/reports/PublishedScheduleCard';
+import BackupExport from '@/components/reports/BackupExport';
 
 export default function Reports() {
-  const [exportingBackup, setExportingBackup] = useState(false);
   const [randomizing, setRandomizing] = useState(false);
   const [randomStatus, setRandomStatus] = useState('');
 
@@ -23,50 +22,6 @@ export default function Reports() {
     queryKey: ['workplaces'],
     queryFn: () => base44.entities.Workplace.list('-created_date'),
   });
-
-  // --- Backup Export ---
-  const handleBackupExport = async () => {
-    setExportingBackup(true);
-    const allAssignments = await base44.entities.Assignment.list();
-    if (!allAssignments.length) {
-      alert('אין שיבוצים לייצוא');
-      setExportingBackup(false);
-      return;
-    }
-
-    // Get unique sorted dates
-    const dates = [...new Set(allAssignments.map(a => a.date))].sort();
-
-    // Get unique students (by id)
-    const studentMap = {};
-    allAssignments.forEach(a => {
-      if (!studentMap[a.student_id]) {
-        studentMap[a.student_id] = a.student_name || a.student_id;
-      }
-    });
-    const studentIds = Object.keys(studentMap);
-
-    // Build assignment lookup: studentId -> date -> workplace_name
-    const lookup = {};
-    allAssignments.forEach(a => {
-      if (!lookup[a.student_id]) lookup[a.student_id] = {};
-      lookup[a.student_id][a.date] = a.workplace_name || '';
-    });
-
-    // Build rows: first col = student name, then one col per date
-    const header = ['שם תלמיד', ...dates];
-    const rows = studentIds.map(sid => {
-      const row = [studentMap[sid]];
-      dates.forEach(d => row.push(lookup[sid]?.[d] || ''));
-      return row;
-    });
-
-    const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'שיבוצים');
-    XLSX.writeFile(wb, `גיבוי_שיבוצים_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
-    setExportingBackup(false);
-  };
 
   // --- Random Assignment ---
   const handleRandomAssignment = async () => {
@@ -263,23 +218,7 @@ export default function Reports() {
         <PublishedScheduleCard />
 
         {/* Backup Export */}
-        <div className="bg-card border border-border rounded-2xl p-6 flex items-start justify-between gap-4">
-          <div className="flex items-start gap-4">
-            <div className="bg-primary/10 rounded-xl p-3">
-              <FileSpreadsheet size={24} className="text-primary" />
-            </div>
-            <div>
-              <h3 className="font-semibold text-base">הורדת גיבוי שיבוצים</h3>
-              <p className="text-sm text-muted-foreground mt-1">
-                מוריד קובץ Excel עם כל השיבוצים. שורות = תלמידים, עמודות = תאריכים.
-              </p>
-            </div>
-          </div>
-          <Button onClick={handleBackupExport} disabled={exportingBackup} className="shrink-0">
-            {exportingBackup ? <Loader2 size={16} className="animate-spin ml-2" /> : <Download size={16} className="ml-2" />}
-            {exportingBackup ? 'מייצא...' : 'הורד Excel'}
-          </Button>
-        </div>
+        <BackupExport />
 
         {/* Random Assignment */}
         <div className="bg-card border border-border rounded-2xl p-6 flex items-start justify-between gap-4">

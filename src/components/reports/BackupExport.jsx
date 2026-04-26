@@ -1,0 +1,155 @@
+import { useState } from 'react';
+import { base44 } from '@/api/base44Client';
+import { Button } from '@/components/ui/button';
+import { Download, Loader2, Database } from 'lucide-react';
+import * as XLSX from 'xlsx';
+import { format } from 'date-fns';
+
+function downloadWorkbook(wb, filename) {
+  XLSX.writeFile(wb, filename);
+}
+
+async function exportStudents() {
+  const students = await base44.entities.Student.list('full_name', 1000);
+  const rows = students.map(s => ({
+    'שם מלא': s.full_name || '',
+    'מחזור': s.cohort || '',
+    'יום חופש': s.free_day || '',
+    'סטטוס מרחק': s.distance_status || '',
+    'פעיל': s.is_active !== false ? 'כן' : 'לא',
+    'הערות': s.notes || '',
+  }));
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'תלמידים וצוות');
+  downloadWorkbook(wb, `גיבוי_תלמידים_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
+}
+
+async function exportWorkplaces() {
+  const workplaces = await base44.entities.Workplace.list('name', 1000);
+  const rows = workplaces.map(w => ({
+    'שם מקום העבודה': w.name || '',
+    'שם משק': w.farm_name || '',
+    'כתובת': w.address || '',
+    'ח.פ': w.company_id || '',
+    'טלפון איש קשר': w.contact_phone || '',
+    'טלפון הנה"ח': w.accounting_phone || '',
+    'מייל הנה"ח': w.accounting_email || '',
+  }));
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'מקומות עבודה');
+  downloadWorkbook(wb, `גיבוי_מקומות_עבודה_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
+}
+
+async function exportVehicles() {
+  const vehicles = await base44.entities.Vehicle.list('name', 1000);
+  const rows = vehicles.map(v => ({
+    'שם / מספר רכב': v.name || '',
+    'לוחית רישוי': v.license_plate || '',
+    'ביטוח': v.insurance || '',
+  }));
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'רכבים');
+  downloadWorkbook(wb, `גיבוי_רכבים_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
+}
+
+async function exportAssignments() {
+  const assignments = await base44.entities.Assignment.list('date', 10000);
+  // Sort by date asc, then student name
+  const sorted = [...assignments].sort((a, b) => {
+    if (a.date !== b.date) return a.date.localeCompare(b.date);
+    return (a.student_name || '').localeCompare(b.student_name || '', 'he');
+  });
+
+  const rows = sorted.map(a => ({
+    'תאריך': a.date || '',
+    'שם תלמיד': a.student_name || '',
+    'מקום עבודה': a.workplace_name || '',
+    'תפקיד': a.role || '',
+    'תעריף': a.rate ?? '',
+    'שעות': a.hours ?? '',
+    'תשלום נוסף': a.bonus ?? '',
+    'הערות': a.notes || '',
+  }));
+
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'שיבוצים');
+  downloadWorkbook(wb, `גיבוי_שיבוצים_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
+}
+
+const EXPORTS = [
+  {
+    key: 'students',
+    label: 'תלמידים וצוות',
+    desc: 'שם, מחזור, יום חופש, סטטוס מרחק, הערות',
+    fn: exportStudents,
+  },
+  {
+    key: 'workplaces',
+    label: 'מקומות עבודה',
+    desc: 'שם, שם משק, כתובת, ח.פ, טלפונים, מייל',
+    fn: exportWorkplaces,
+  },
+  {
+    key: 'vehicles',
+    label: 'רכבים',
+    desc: 'שם רכב, לוחית רישוי, ביטוח',
+    fn: exportVehicles,
+  },
+  {
+    key: 'assignments',
+    label: 'שיבוצים יומיים',
+    desc: 'תאריך, שם תלמיד, מקום עבודה, תפקיד, שעות, תעריף — שורה לכל שיבוץ',
+    fn: exportAssignments,
+  },
+];
+
+export default function BackupExport() {
+  const [loading, setLoading] = useState({});
+
+  const handleExport = async (item) => {
+    setLoading(prev => ({ ...prev, [item.key]: true }));
+    await item.fn();
+    setLoading(prev => ({ ...prev, [item.key]: false }));
+  };
+
+  return (
+    <div className="bg-card border border-border rounded-2xl p-6 space-y-4">
+      <div className="flex items-center gap-3 mb-2">
+        <div className="bg-primary/10 rounded-xl p-3">
+          <Database size={22} className="text-primary" />
+        </div>
+        <div>
+          <h3 className="font-semibold text-base">הורדת גיבוי נתונים</h3>
+          <p className="text-sm text-muted-foreground">קובץ Excel נפרד לכל ישות</p>
+        </div>
+      </div>
+
+      <div className="divide-y divide-border">
+        {EXPORTS.map(item => (
+          <div key={item.key} className="flex items-center justify-between py-3 gap-4">
+            <div>
+              <p className="font-medium text-sm">{item.label}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">{item.desc}</p>
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => handleExport(item)}
+              disabled={loading[item.key]}
+              className="shrink-0"
+            >
+              {loading[item.key]
+                ? <Loader2 size={14} className="animate-spin ml-1" />
+                : <Download size={14} className="ml-1" />}
+              {loading[item.key] ? 'מוריד...' : 'הורד Excel'}
+            </Button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
