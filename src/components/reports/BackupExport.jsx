@@ -214,23 +214,9 @@ export default function BackupExport() {
 
       <div className="divide-y divide-border">
         {EXPORTS.map(item => (
-          <div key={item.key} className="flex items-center justify-between py-3 gap-4">
-            <div>
-              <p className="font-medium text-sm">{item.label}</p>
-              <p className="text-xs text-muted-foreground mt-0.5">{item.desc}</p>
-            </div>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => handleExport(item)}
-              disabled={loading[item.key]}
-              className="shrink-0"
-            >
-              {loading[item.key]
-                ? <Loader2 size={14} className="animate-spin ml-1" />
-                : <Download size={14} className="ml-1" />}
-              {loading[item.key] ? 'מוריד...' : 'הורד Excel'}
-            </Button>
+          <div key={item.key} className="py-3">
+            <p className="font-medium text-sm">{item.label}</p>
+            <p className="text-xs text-muted-foreground mt-0.5">{item.desc}</p>
           </div>
         ))}
       </div>
