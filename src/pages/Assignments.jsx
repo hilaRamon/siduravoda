@@ -256,23 +256,18 @@ export default function Assignments() {
     return (a.full_name || '').localeCompare(b.full_name || '', 'he');
   }), [students, assignmentByStudent, filterName, filterCohort, filterWorkplace, filterRole, filterAssigned]);
 
-  const assignedFilteredStudents = useMemo(
-    () => filteredStudents.filter(s => assignmentByStudent[s.id]),
-    [filteredStudents, assignmentByStudent]
-  );
-
-  const allVisibleSelected = assignedFilteredStudents.length > 0 &&
-    assignedFilteredStudents.every(s => selectedIds.has(assignmentByStudent[s.id]?.id));
+  const allVisibleSelected = filteredStudents.length > 0 &&
+    filteredStudents.every(s => selectedIds.has(assignmentByStudent[s.id]?.id || s.id));
 
   const toggleSelectAll = () => {
     if (allVisibleSelected) {
       setSelectedIds(new Set());
     } else {
-      setSelectedIds(new Set(assignedFilteredStudents.map(s => assignmentByStudent[s.id].id)));
+      setSelectedIds(new Set(filteredStudents.map(s => assignmentByStudent[s.id]?.id || s.id)));
     }
   };
 
-  const toggleSelect = (assignmentId, rowIdx, shiftKey) => {
+  const toggleSelect = (studentId, rowIdx, shiftKey) => {
     setSelectedIds(prev => {
       const next = new Set(prev);
       if (shiftKey && lastSelectedIdx !== null) {
@@ -280,12 +275,11 @@ export default function Assignments() {
         const to = Math.max(lastSelectedIdx, rowIdx);
         for (let i = from; i <= to; i++) {
           const s = filteredStudents[i];
-          const a = assignmentByStudent[s?.id];
-          if (a) next.add(a.id);
+          if (s) next.add(assignmentByStudent[s.id]?.id || s.id);
         }
       } else {
-        if (next.has(assignmentId)) next.delete(assignmentId);
-        else next.add(assignmentId);
+        if (next.has(studentId)) next.delete(studentId);
+        else next.add(studentId);
       }
       return next;
     });
@@ -333,7 +327,9 @@ export default function Assignments() {
   };
 
   const handleBulkSave = async () => {
-    const ids = Array.from(selectedIds);
+    // Only update real assignment IDs (not student IDs used as placeholders for unassigned)
+    const assignmentIds = new Set(assignments.map(a => a.id));
+    const ids = Array.from(selectedIds).filter(id => assignmentIds.has(id));
     const updates = {};
     if (bulkWorkplace) {
       const wp = workplaces.find(w => w.id === bulkWorkplace);
@@ -600,17 +596,16 @@ export default function Assignments() {
             ) : (
               filteredStudents.map((student, idx) => {
                 const assignment = assignmentByStudent[student.id];
-                const isSelected = assignment && selectedIds.has(assignment.id);
+                const selectKey = assignment?.id || student.id;
+                const isSelected = selectedIds.has(selectKey);
                 return (
                   <tr key={student.id} className={`transition-colors ${isSelected ? 'bg-primary/10' : assignment ? 'bg-primary/5' : 'hover:bg-secondary/20'}`}>
                     <td className="px-3 py-2 border-b border-border">
                       <Checkbox
                         checked={!!isSelected}
-                        disabled={!assignment}
                         onClick={(e) => {
-                          if (!assignment) return;
                           e.preventDefault();
-                          toggleSelect(assignment.id, idx, e.shiftKey);
+                          toggleSelect(selectKey, idx, e.shiftKey);
                         }}
                       />
                     </td>
