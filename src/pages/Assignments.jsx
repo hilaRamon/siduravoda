@@ -29,14 +29,6 @@ function WorkplaceCell({ student, assignment, workplaces, onAssign, onRemove }) 
     if (!canAssign) setOpen(true);
   };
 
-  const handleKeyDown = (e) => {
-    if (e.key === 'Enter') {
-      const first = filteredWorkplaces[0];
-      if (first) handleSelect(first);
-    }
-    if (e.key === 'Escape') setOpen(false);
-  };
-
   const selectedName = assignment ? workplaces.find(w => w.id === assignment.workplace_id)?.name || assignment.workplace_name : null;
 
   return (
@@ -60,7 +52,6 @@ function WorkplaceCell({ student, assignment, workplaces, onAssign, onRemove }) 
                 className="h-8 text-xs"
                 value={search}
                 onValueChange={setSearch}
-                onKeyDown={handleKeyDown}
               />
               <CommandList>
                 <CommandEmpty>לא נמצא</CommandEmpty>
