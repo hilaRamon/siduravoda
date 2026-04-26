@@ -113,12 +113,18 @@ export default function LogisticsSidebar({ date, assignments }) {
   const shouldSkip = (name) => !name || SKIP_KEYWORDS.some(kw => name.includes(kw));
 
   const activeWorkplaces = useMemo(() => {
+    // First deduplicate: keep only the last assignment per student (same logic as the main table)
+    const assignmentByStudent = {};
+    assignments.forEach(a => { assignmentByStudent[a.student_id] = a; });
+    const deduped = Object.values(assignmentByStudent);
+
     const map = {};
-    assignments.filter(a => !shouldSkip(a.workplace_name)).forEach(a => {
+    deduped.filter(a => !shouldSkip(a.workplace_name)).forEach(a => {
       if (!map[a.workplace_id]) map[a.workplace_id] = { name: a.workplace_name, students: new Set() };
       map[a.workplace_id].students.add(a.student_id);
     });
     return Object.entries(map)
+      .filter(([, v]) => v.students.size > 0)
       .sort(([, a], [, b]) => a.name.localeCompare(b.name, 'he'))
       .map(([id, v]) => ({ id, name: v.name, count: v.students.size }));
   }, [assignments]);
