@@ -8,6 +8,7 @@ import PeriodicWorkReport from '@/components/reports/PeriodicWorkReport';
 import StudentWorkReport from '@/components/reports/StudentWorkReport';
 import PublishedScheduleCard from '@/components/reports/PublishedScheduleCard';
 import BackupExport from '@/components/reports/BackupExport';
+import BackupEmailSettings from '@/components/reports/BackupEmailSettings';
 
 export default function Reports() {
   const [randomizing, setRandomizing] = useState(false);
@@ -219,6 +220,9 @@ export default function Reports() {
 
         {/* Backup Export */}
         <BackupExport />
+
+        {/* Backup Email Settings */}
+        <BackupEmailSettings />
 
         {/* Random Assignment */}
         <div className="bg-card border border-border rounded-2xl p-6 flex items-start justify-between gap-4">
