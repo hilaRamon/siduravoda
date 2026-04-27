@@ -53,7 +53,8 @@ function buildReportGroups(assignments, logisticsMap) {
       workplaceName: g.name,
       students: g.students.sort((a, b) => (a.student_name || '').localeCompare(b.student_name || '', 'he')),
       vehicleName: vehicles || '',
-      exitTime: log.exit_time || '',
+      exitTime: log.exit_time || '06:35',
+      notes: log.notes || '',
       driverName,
       teamLeaderName,
       equipName,
@@ -193,6 +194,11 @@ export default function DailyReportPDFButton({ date, assignments }) {
               </div>
             </div>
           </div>
+          {group.notes && (
+            <div style={{ background: '#fffbeb', border: '1px solid #fcd34d', borderTop: 'none', padding: '4px 8px', fontSize: '11px', color: '#92400e' }}>
+              📝 {group.notes}
+            </div>
+          )}
           <table style={{ width: '100%', fontSize: '11px', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ background: '#f9fafb' }}>

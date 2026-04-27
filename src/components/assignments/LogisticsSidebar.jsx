@@ -60,10 +60,26 @@ function WorkplaceLogisticsCard({ date, workplaceId, workplaceName, studentCount
         </label>
         <input
           type="time"
-          defaultValue={localData.exit_time || ''}
-          key={localData.exit_time || 'empty'}
+          defaultValue={localData.exit_time || '06:35'}
+          key={localData.exit_time || 'default'}
           onBlur={handleTimeBlur}
           className="w-full h-8 text-xs border border-border rounded-md px-2 bg-background focus:outline-none focus:ring-1 focus:ring-primary/40"
+        />
+      </div>
+
+      <div className="space-y-1">
+        <label className="text-xs text-muted-foreground">הערות</label>
+        <textarea
+          defaultValue={localData.notes || ''}
+          key={`notes-${localData.notes || 'empty'}`}
+          onBlur={(e) => {
+            const newData = { ...localData, notes: e.target.value };
+            setLocalData(newData);
+            onSave(workplaceId, workplaceName, newData);
+          }}
+          placeholder="הערות למקום עבודה..."
+          rows={2}
+          className="w-full text-xs border border-border rounded-md px-2 py-1.5 bg-background focus:outline-none focus:ring-1 focus:ring-primary/40 resize-none"
         />
       </div>
 

@@ -39,9 +39,21 @@
       "type": "string",
       "description": "\u05e9\u05dd \u05e8\u05db\u05d1 2"
     },
+    "vehicle_id_3": {
+      "type": "string",
+      "description": "\u05de\u05d6\u05d4\u05d4 \u05e8\u05db\u05d1 3"
+    },
+    "vehicle_name_3": {
+      "type": "string",
+      "description": "\u05e9\u05dd \u05e8\u05db\u05d1 3"
+    },
     "exit_time": {
       "type": "string",
       "description": "\u05e9\u05e2\u05ea \u05d9\u05e6\u05d9\u05d0\u05d4"
+    },
+    "notes": {
+      "type": "string",
+      "description": "\u05d4\u05e2\u05e8\u05d5\u05ea"
     }
   },
   "required": [
