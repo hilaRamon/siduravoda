@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
-import { Truck, Clock } from 'lucide-react';
+import { Truck, Clock, Check } from 'lucide-react';
 import VehicleSlot from './VehicleSlot';
 
 function WorkplaceLogisticsCard({ date, workplaceId, workplaceName, studentCount, logistics, allLogistics, onSave }) {
@@ -39,8 +39,13 @@ function WorkplaceLogisticsCard({ date, workplaceId, workplaceName, studentCount
     onSave(workplaceId, workplaceName, newData);
   };
 
-  const handleTimeBlur = (e) => {
-    const newData = { ...localData, exit_time: e.target.value };
+  const [timeInput, setTimeInput] = useState(localData.exit_time || '06:35');
+  useEffect(() => {
+    setTimeInput(localData.exit_time || '06:35');
+  }, [localData.exit_time]);
+
+  const handleTimeSave = () => {
+    const newData = { ...localData, exit_time: timeInput };
     setLocalData(newData);
     onSave(workplaceId, workplaceName, newData);
   };
@@ -58,14 +63,21 @@ function WorkplaceLogisticsCard({ date, workplaceId, workplaceName, studentCount
         <label className="text-xs text-muted-foreground flex items-center gap-1">
           <Clock size={11} /> שעת יציאה
         </label>
-        <input
-          type="time"
-          defaultValue={localData.exit_time || '06:35'}
-          key={localData.exit_time || 'default'}
-          onBlur={handleTimeBlur}
-          onChange={handleTimeBlur}
-          className="w-full h-8 text-xs border border-border rounded-md px-2 bg-background focus:outline-none focus:ring-1 focus:ring-primary/40"
-        />
+        <div className="flex gap-1">
+          <input
+            type="time"
+            value={timeInput}
+            onChange={e => setTimeInput(e.target.value)}
+            className="flex-1 h-8 text-xs border border-border rounded-md px-2 bg-background focus:outline-none focus:ring-1 focus:ring-primary/40"
+          />
+          <button
+            onClick={handleTimeSave}
+            className="h-8 w-8 flex items-center justify-center bg-primary text-white rounded-md hover:bg-primary/90 transition-colors shrink-0"
+            title="אשר שעה"
+          >
+            <Check size={14} />
+          </button>
+        </div>
       </div>
 
       <div className="space-y-1">
