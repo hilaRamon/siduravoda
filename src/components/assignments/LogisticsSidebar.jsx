@@ -63,6 +63,7 @@ function WorkplaceLogisticsCard({ date, workplaceId, workplaceName, studentCount
           defaultValue={localData.exit_time || '06:35'}
           key={localData.exit_time || 'default'}
           onBlur={handleTimeBlur}
+          onChange={handleTimeBlur}
           className="w-full h-8 text-xs border border-border rounded-md px-2 bg-background focus:outline-none focus:ring-1 focus:ring-primary/40"
         />
       </div>
