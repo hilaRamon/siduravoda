@@ -179,7 +179,12 @@ export default function DailyReportPDFButton({ date, assignments }) {
         <div key={group.workplaceName} style={{ marginBottom: '16px' }}>
           <div style={{ background: '#e5e7eb', padding: '8px 8px', fontWeight: 'bold', fontSize: '12px', border: '1px solid #9ca3af', borderBottom: 'none' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px' }}>
-              <span>{group.workplaceName}</span>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <span>{group.workplaceName}</span>
+                {group.notes && (
+                  <span style={{ fontWeight: 'normal', fontSize: '11px', color: '#78350f' }}>📝 {group.notes}</span>
+                )}
+              </div>
               <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
                 {group.vehicleName && (
                   <span style={{ fontWeight: 'bold', fontSize: '11px', background: '#1e40af', color: '#fff', padding: '3px 8px', borderRadius: '4px', whiteSpace: 'nowrap' }}>
@@ -194,11 +199,6 @@ export default function DailyReportPDFButton({ date, assignments }) {
               </div>
             </div>
           </div>
-          {group.notes && (
-            <div style={{ background: '#fffbeb', border: '1px solid #fcd34d', borderTop: 'none', padding: '4px 8px', fontSize: '11px', color: '#92400e' }}>
-              📝 {group.notes}
-            </div>
-          )}
           <table style={{ width: '100%', fontSize: '11px', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ background: '#f9fafb' }}>
