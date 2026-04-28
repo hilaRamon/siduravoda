@@ -132,9 +132,15 @@ export default function LogisticsSidebar({ date, assignments }) {
     queryFn: () => base44.entities.WorkplaceLogistics.filter({ date }),
   });
 
+  // De-duplicate: keep only the most recently updated record per workplace
   const logisticsMap = useMemo(() => {
     const map = {};
-    logisticsList.forEach(l => { map[l.workplace_id] = l; });
+    logisticsList.forEach(l => {
+      const existing = map[l.workplace_id];
+      if (!existing || l.updated_date > existing.updated_date) {
+        map[l.workplace_id] = l;
+      }
+    });
     return map;
   }, [logisticsList]);
 
