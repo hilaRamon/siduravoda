@@ -78,21 +78,9 @@ function WorkplaceCell({ student, assignment, workplaces, onAssign, onRemove }) 
   );
 }
 
-function RoleCell({ assignment, roles, onUpdateRole, assignments }) {
+function RoleCell({ assignment, roles, onUpdateRole }) {
   const handleRoleChange = (v) => {
     if (!assignment) return;
-    if (v && v !== 'none') {
-      // Check if this role is already assigned to the same workplace by another student
-      const conflict = assignments.find(a =>
-        a.id !== assignment.id &&
-        a.workplace_id === assignment.workplace_id &&
-        a.role === v
-      );
-      if (conflict) {
-        alert(`⛔ התפקיד "${v}" כבר שובץ ל-${conflict.student_name} באותו מקום עבודה`);
-        return;
-      }
-    }
     onUpdateRole(assignment, v);
   };
 
@@ -305,7 +293,7 @@ export default function Assignments() {
         workplace_id: workplace.id,
         workplace_name: workplace.name,
         rate: 40,
-        hours: 4.5,
+        hours: 4.75,
       });
     }
     queryClient.invalidateQueries({ queryKey: ['assignments', date] });
@@ -321,6 +309,8 @@ export default function Assignments() {
     await base44.entities.Assignment.update(assignment.id, { role: roleName === 'none' ? '' : roleName });
     queryClient.invalidateQueries({ queryKey: ['assignments', date] });
   };
+
+
 
   const handleUpdateField = async (assignment, field, value) => {
     await base44.entities.Assignment.update(assignment.id, { [field]: value });
@@ -364,7 +354,7 @@ export default function Assignments() {
             workplace_id: wp.id,
             workplace_name: wp.name,
             rate: bulkRate !== '' ? parseFloat(bulkRate) : 40,
-            hours: bulkHours !== '' ? parseFloat(bulkHours) : 4.5,
+            hours: bulkHours !== '' ? parseFloat(bulkHours) : 4.75,
           }));
         }
       }
@@ -393,7 +383,7 @@ export default function Assignments() {
         workplace_name: a.workplace_name,
         role: a.role,
         rate: a.rate ?? 40,
-        hours: a.hours ?? 4.5,
+        hours: a.hours ?? 4.75,
       }));
     await base44.entities.Assignment.bulkCreate(toCreate);
     queryClient.invalidateQueries({ queryKey: ['assignments'] });
@@ -643,9 +633,9 @@ export default function Assignments() {
                     <td className="px-3 py-2 border-b border-border font-medium">{student.full_name}</td>
                     <td className="px-3 py-2 border-b border-border text-muted-foreground text-xs">{student.cohort || '—'}</td>
                     <WorkplaceCell student={student} assignment={assignment} workplaces={workplaces} onAssign={handleAssign} onRemove={handleRemove} />
-                    <RoleCell assignment={assignment} roles={roles} onUpdateRole={handleUpdateRole} assignments={assignments} />
+                    <RoleCell assignment={assignment} roles={roles} onUpdateRole={handleUpdateRole} />
                     <EditableNumberCell value={assignment?.rate} defaultValue={40} assignment={assignment} field="rate" onUpdate={handleUpdateField} />
-                    <EditableNumberCell value={assignment?.hours} defaultValue={4.5} assignment={assignment} field="hours" onUpdate={handleUpdateField} />
+                    <EditableNumberCell value={assignment?.hours} defaultValue={4.75} assignment={assignment} field="hours" onUpdate={handleUpdateField} />
                     <EditableNumberCell value={assignment?.bonus} defaultValue={null} assignment={assignment} field="bonus" onUpdate={handleUpdateField} />
                     <td className="px-3 py-2 border-b border-border text-muted-foreground text-xs">
                       {assignment?.notes || '—'}
