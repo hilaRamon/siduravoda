@@ -138,7 +138,7 @@ export default function LogisticsSidebar({ date, assignments }) {
     return map;
   }, [logisticsList]);
 
-  const SKIP_KEYWORDS = ['לא עובד', 'לימודים', 'לא יצא', 'תתת', 'תתצ'];
+  const SKIP_KEYWORDS = ['לא עובד', 'לימודים', 'לא יצא'];
   const shouldSkip = (name) => !name || SKIP_KEYWORDS.some(kw => name.includes(kw));
 
   const activeWorkplaces = useMemo(() => {
