@@ -15,34 +15,29 @@ const SKIP_WORKPLACES = ['לא עובד', 'לימודים'];
 export default function PeriodWorkReport() {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
-  const [selectedFarm, setSelectedFarm] = useState('');
-  const [farmOpen, setFarmOpen] = useState(false);
+  const [selectedWorkplace, setSelectedWorkplace] = useState('');
+  const [wpOpen, setWpOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [exportingXlsx, setExportingXlsx] = useState(false);
   const reportRef = useRef(null);
-
-  const { data: workplaces = [] } = useQuery({
-    queryKey: ['workplaces'],
-    queryFn: () => base44.entities.Workplace.list(),
-  });
 
   const { data: allAssignments = [], isLoading } = useQuery({
     queryKey: ['assignments-all'],
     queryFn: () => base44.entities.Assignment.list(),
   });
 
-  const workplaceFarmMap = useMemo(() => {
-    const map = {};
-    workplaces.forEach(w => { map[w.id] = w.farm_name || ''; });
-    return map;
-  }, [workplaces]);
-
-  const farmNames = useMemo(() => {
-    const names = new Set(workplaces.map(w => w.farm_name).filter(Boolean));
+  // Unique workplace names from assignments in range (or all if no range yet)
+  const workplaceNames = useMemo(() => {
+    const names = new Set(
+      allAssignments
+        .filter(a => !SKIP_WORKPLACES.includes(a.workplace_name) && a.workplace_name)
+        .map(a => a.workplace_name)
+    );
     return [...names].sort((a, b) => a.localeCompare(b, 'he'));
-  }, [workplaces]);
+  }, [allAssignments]);
 
-  const reportByFarm = useMemo(() => {
+  // Group by workplace, then by date within each workplace
+  const reportByWorkplace = useMemo(() => {
     if (!startDate || !endDate) return [];
 
     const filtered = allAssignments.filter(a =>
@@ -50,40 +45,40 @@ export default function PeriodWorkReport() {
       !SKIP_WORKPLACES.includes(a.workplace_name)
     );
 
+    // Group by date+workplace
     const grouped = {};
     filtered.forEach(a => {
-      const farmName = workplaceFarmMap[a.workplace_id] || '';
-      const key = `${a.date}__${a.workplace_id}`;
-      if (!grouped[key]) grouped[key] = { date: a.date, workplaceName: a.workplace_name, farmName, rate: a.rate || 0, students: [] };
+      const key = `${a.workplace_name}__${a.date}`;
+      if (!grouped[key]) grouped[key] = { date: a.date, workplaceName: a.workplace_name, rate: a.rate || 0, students: [] };
       grouped[key].students.push(a);
     });
 
-    const byFarm = {};
+    // Aggregate rows per workplace
+    const byWorkplace = {};
     Object.values(grouped).forEach(g => {
       const totalHours = g.students.reduce((s, a) => s + (a.hours || 0), 0);
       const avgHours = g.students.length ? totalHours / g.students.length : 0;
       const rate = g.rate || 0;
       const row = {
-        date: g.date, workplaceName: g.workplaceName, rate,
+        date: g.date,
+        workplaceName: g.workplaceName,
+        rate,
         studentCount: g.students.length,
         totalHours: Math.round(totalHours * 10) / 10,
         avgHours: Math.round(avgHours * 10) / 10,
         totalPrice: Math.round(totalHours * rate),
       };
-      const fn = g.farmName || g.workplaceName;
-      if (!byFarm[fn]) byFarm[fn] = [];
-      byFarm[fn].push(row);
+      if (!byWorkplace[g.workplaceName]) byWorkplace[g.workplaceName] = [];
+      byWorkplace[g.workplaceName].push(row);
     });
 
-    Object.values(byFarm).forEach(rows => rows.sort((a, b) => {
-      const wpCmp = (a.workplaceName || '').localeCompare(b.workplaceName || '', 'he');
-      return wpCmp !== 0 ? wpCmp : a.date.localeCompare(b.date);
-    }));
+    // Sort rows within each workplace by date
+    Object.values(byWorkplace).forEach(rows => rows.sort((a, b) => a.date.localeCompare(b.date)));
 
-    return Object.entries(byFarm)
-      .filter(([farm]) => !selectedFarm || farm === selectedFarm)
+    return Object.entries(byWorkplace)
+      .filter(([wp]) => !selectedWorkplace || wp === selectedWorkplace)
       .sort(([a], [b]) => a.localeCompare(b, 'he'));
-  }, [startDate, endDate, allAssignments, workplaceFarmMap, selectedFarm]);
+  }, [startDate, endDate, allAssignments, selectedWorkplace]);
 
   const formatDate = (d) => { const [y, m, day] = d.split('-'); return `${day}/${m}/${y}`; };
 
@@ -121,12 +116,20 @@ export default function PeriodWorkReport() {
   const handleExportXLSX = () => {
     setExportingXlsx(true);
     const rows = [];
-    reportByFarm.forEach(([farm, farmRows]) => {
-      farmRows.forEach(r => rows.push({
-        'משק': farm, 'תאריך': formatDate(r.date), 'מקום עבודה': r.workplaceName,
-        'תעריף': r.rate, 'כמות תלמידים': r.studentCount,
-        'סך שעות': r.totalHours, 'ממוצע שעות': r.avgHours, 'מחיר': r.totalPrice,
+    reportByWorkplace.forEach(([wp, wpRows]) => {
+      const grandTotalHours = Math.round(wpRows.reduce((s, r) => s + r.totalHours, 0) * 10) / 10;
+      const grandTotalPrice = wpRows.reduce((s, r) => s + r.totalPrice, 0);
+      wpRows.forEach(r => rows.push({
+        'מקום עבודה': wp,
+        'תאריך': formatDate(r.date),
+        'תעריף': r.rate,
+        'כמות תלמידים': r.studentCount,
+        'סך שעות': r.totalHours,
+        'ממוצע שעות': r.avgHours,
+        'מחיר': r.totalPrice,
       }));
+      rows.push({ 'מקום עבודה': '', 'תאריך': 'סה"כ', 'תעריף': '', 'כמות תלמידים': '', 'סך שעות': grandTotalHours, 'ממוצע שעות': '', 'מחיר': grandTotalPrice });
+      rows.push({});
     });
     const ws = XLSX.utils.json_to_sheet(rows);
     const wb = XLSX.utils.book_new();
@@ -135,7 +138,7 @@ export default function PeriodWorkReport() {
     setExportingXlsx(false);
   };
 
-  const hasData = reportByFarm.length > 0;
+  const hasData = reportByWorkplace.length > 0;
   const canSearch = startDate && endDate;
 
   return (
@@ -152,23 +155,23 @@ export default function PeriodWorkReport() {
             className="border border-border rounded-lg px-3 py-2 text-sm bg-card focus:outline-none focus:ring-2 focus:ring-primary/30 h-9" />
         </div>
         <div>
-          <label className="text-xs text-muted-foreground block mb-1">משק</label>
-          <Popover open={farmOpen} onOpenChange={setFarmOpen}>
+          <label className="text-xs text-muted-foreground block mb-1">מקום עבודה</label>
+          <Popover open={wpOpen} onOpenChange={setWpOpen}>
             <PopoverTrigger asChild>
               <button className="h-9 w-52 border border-border rounded-md px-3 text-sm flex items-center justify-between bg-card hover:bg-secondary/40 transition-colors">
-                <span className={selectedFarm ? '' : 'text-muted-foreground'}>{selectedFarm || 'כל המשקים'}</span>
+                <span className={selectedWorkplace ? '' : 'text-muted-foreground'}>{selectedWorkplace || 'כל מקומות העבודה'}</span>
                 <ChevronsUpDown size={14} className="opacity-50" />
               </button>
             </PopoverTrigger>
             <PopoverContent className="w-52 p-0" align="start">
               <Command>
-                <CommandInput placeholder="חיפוש משק..." className="h-8 text-xs" />
+                <CommandInput placeholder="חיפוש מקום עבודה..." className="h-8 text-xs" />
                 <CommandList>
                   <CommandEmpty>לא נמצא</CommandEmpty>
                   <CommandGroup>
-                    <CommandItem value="__all__" onSelect={() => { setSelectedFarm(''); setFarmOpen(false); }} className="text-xs text-muted-foreground">כל המשקים</CommandItem>
-                    {farmNames.map(f => (
-                      <CommandItem key={f} value={f} onSelect={() => { setSelectedFarm(f); setFarmOpen(false); }} className="text-xs">{f}</CommandItem>
+                    <CommandItem value="__all__" onSelect={() => { setSelectedWorkplace(''); setWpOpen(false); }} className="text-xs text-muted-foreground">כל מקומות העבודה</CommandItem>
+                    {workplaceNames.map(w => (
+                      <CommandItem key={w} value={w} onSelect={() => { setSelectedWorkplace(w); setWpOpen(false); }} className="text-xs">{w}</CommandItem>
                     ))}
                   </CommandGroup>
                 </CommandList>
@@ -198,19 +201,19 @@ export default function PeriodWorkReport() {
           {!hasData ? (
             <p className="text-sm text-muted-foreground py-4 text-center">אין נתונים לתקופה זו</p>
           ) : (
-            reportByFarm.map(([farm, rows]) => {
+            reportByWorkplace.map(([wp, rows]) => {
               const grandTotalHours = Math.round(rows.reduce((s, r) => s + r.totalHours, 0) * 10) / 10;
               const grandTotalPrice = rows.reduce((s, r) => s + r.totalPrice, 0);
               return (
-                <div key={farm}>
+                <div key={wp}>
                   <div className="mb-2">
-                    <p className="text-sm font-bold">לכבוד: {farm}</p>
+                    <p className="text-sm font-bold">לכבוד: {wp}</p>
                     <p className="text-xs text-gray-500">דוח עבודה לתקופה — {formatDate(startDate)} עד {formatDate(endDate)}</p>
                   </div>
                   <table className="w-full text-xs border-collapse">
                     <thead>
                       <tr className="bg-gray-100">
-                        {['תאריך','שם מקום עבודה','תעריף','כמות תלמידים','סך שעות','ממוצע שעות','מחיר'].map(h => (
+                        {['תאריך','תעריף','כמות תלמידים','סך שעות','ממוצע שעות','מחיר'].map(h => (
                           <th key={h} className="border border-gray-300 px-2 py-1.5 text-right font-semibold">{h}</th>
                         ))}
                       </tr>
@@ -219,7 +222,6 @@ export default function PeriodWorkReport() {
                       {rows.map((r, i) => (
                         <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                           <td className="border border-gray-300 px-2 py-1.5">{formatDate(r.date)}</td>
-                          <td className="border border-gray-300 px-2 py-1.5">{r.workplaceName}</td>
                           <td className="border border-gray-300 px-2 py-1.5 text-center">{r.rate}</td>
                           <td className="border border-gray-300 px-2 py-1.5 text-center">{r.studentCount}</td>
                           <td className="border border-gray-300 px-2 py-1.5 text-center">{r.totalHours}</td>
@@ -230,7 +232,7 @@ export default function PeriodWorkReport() {
                     </tbody>
                     <tfoot>
                       <tr className="bg-gray-200 font-bold">
-                        <td colSpan={4} className="border border-gray-300 px-2 py-1.5 text-right">סה"כ</td>
+                        <td colSpan={3} className="border border-gray-300 px-2 py-1.5 text-right">סה"כ</td>
                         <td className="border border-gray-300 px-2 py-1.5 text-center">{grandTotalHours}</td>
                         <td className="border border-gray-300 px-2 py-1.5"></td>
                         <td className="border border-gray-300 px-2 py-1.5 text-center">{grandTotalPrice} ₪</td>
