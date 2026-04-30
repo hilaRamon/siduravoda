@@ -381,7 +381,6 @@ export default function Assignments() {
         student_name: a.student_name,
         workplace_id: a.workplace_id,
         workplace_name: a.workplace_name,
-        role: a.role,
         rate: a.rate ?? 40,
         hours: a.hours ?? 4.75,
       }));
@@ -407,11 +406,6 @@ export default function Assignments() {
           </p>
         </div>
         <div className="flex gap-2">
-          {selectedIds.size > 0 && (
-            <Button variant="outline" onClick={() => setShowBulkDialog(true)}>
-              <Pencil size={16} className="ml-2" /> עריכת {selectedIds.size} שורות
-            </Button>
-          )}
           <DailyReportPDFButton date={date} assignments={assignments} />
           <Button variant="outline" onClick={() => { setCloneTargetDate(format(addDays(new Date(date + 'T12:00:00'), 1), 'yyyy-MM-dd')); setShowCloneDialog(true); }}>
             <Copy size={16} className="ml-2" /> שכפל שיבוצים
@@ -438,6 +432,20 @@ export default function Assignments() {
           {new Date(date + 'T12:00:00').toLocaleDateString('he-IL', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
         </span>
       </div>
+
+      {/* Floating Bulk Edit Toolbar */}
+      {selectedIds.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-card border border-border shadow-2xl rounded-2xl px-4 py-3 flex items-center gap-3">
+          <span className="text-sm font-medium text-primary">{selectedIds.size} שורות נבחרו</span>
+          <div className="w-px h-5 bg-border" />
+          <Button size="sm" onClick={() => setShowBulkDialog(true)}>
+            <Pencil size={14} className="ml-1" /> עריכה מרובה
+          </Button>
+          <Button size="sm" variant="ghost" onClick={() => setSelectedIds(new Set())} className="text-muted-foreground">
+            ביטול
+          </Button>
+        </div>
+      )}
 
       {/* Clone Dialog */}
       <Dialog open={showCloneDialog} onOpenChange={setShowCloneDialog}>

@@ -23,12 +23,19 @@ export default function PeriodicWorkReport() {
   const [month, setMonth] = useState('04');
   const [year, setYear] = useState('2026');
   const [exporting, setExporting] = useState(false);
+  const [selectedFarm, setSelectedFarm] = useState('all');
   const reportRef = useRef(null);
 
   const { data: workplaces = [] } = useQuery({
     queryKey: ['workplaces'],
     queryFn: () => base44.entities.Workplace.list(),
   });
+
+  // Unique farm names for filter
+  const farmNames = useMemo(() => {
+    const names = new Set(workplaces.map(w => w.farm_name).filter(Boolean));
+    return [...names].sort((a, b) => a.localeCompare(b, 'he'));
+  }, [workplaces]);
 
   const { data: allAssignments = [], isLoading } = useQuery({
     queryKey: ['assignments-all'],
@@ -92,9 +99,11 @@ export default function PeriodicWorkReport() {
       return a.date.localeCompare(b.date);
     }));
 
-    // Return sorted by farm name
-    return Object.entries(byFarm).sort(([a], [b]) => a.localeCompare(b, 'he'));
-  }, [month, year, allAssignments, workplaceFarmMap]);
+    // Return sorted by farm name, filtered by selectedFarm if set
+    return Object.entries(byFarm)
+      .filter(([farm]) => selectedFarm === 'all' || farm === selectedFarm)
+      .sort(([a], [b]) => a.localeCompare(b, 'he'));
+  }, [month, year, allAssignments, workplaceFarmMap, selectedFarm]);
 
   const formatDate = (d) => {
     const [y, m, day] = d.split('-');
@@ -160,6 +169,16 @@ export default function PeriodicWorkReport() {
             <SelectTrigger className="w-24 h-9 text-sm"><SelectValue /></SelectTrigger>
             <SelectContent>
               {YEARS.map(y => <SelectItem key={y} value={y}>{y}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+        <div>
+          <label className="text-xs text-muted-foreground block mb-1">משק</label>
+          <Select value={selectedFarm} onValueChange={setSelectedFarm}>
+            <SelectTrigger className="w-44 h-9 text-sm"><SelectValue placeholder="כל המשקים" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">כל המשקים</SelectItem>
+              {farmNames.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}
             </SelectContent>
           </Select>
         </div>
