@@ -10,6 +10,7 @@ import StudentWorkReport from '@/components/reports/StudentWorkReport';
 import PublishedScheduleCard from '@/components/reports/PublishedScheduleCard';
 import BackupExport from '@/components/reports/BackupExport';
 import BackupEmailSettings from '@/components/reports/BackupEmailSettings';
+import ImportAssignments from '@/components/reports/ImportAssignments';
 
 export default function Reports() {
   const [randomizing, setRandomizing] = useState(false);
@@ -223,6 +224,9 @@ export default function Reports() {
 
         {/* Backup Export */}
         <BackupExport />
+
+        {/* Import Assignments */}
+        <ImportAssignments />
 
         {/* Backup Email Settings */}
         <BackupEmailSettings />
