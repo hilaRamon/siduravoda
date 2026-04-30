@@ -1,17 +1,21 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
-import { Plus, Search, Pencil, Trash2, Building2, Upload } from 'lucide-react';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { ChevronsUpDown, Plus, Search, Pencil, Trash2, Building2, Upload } from 'lucide-react';
 import ImportWorkplacesModal from '@/components/workplaces/ImportWorkplacesModal';
 
-function WorkplaceFormModal({ open, onClose, onSave, workplace }) {
+function WorkplaceFormModal({ open, onClose, onSave, workplace, existingFarms }) {
   const [form, setForm] = useState(workplace || {
     name: '', farm_name: '', address: '', company_id: '', contact_phone: '', accounting_phone: '', accounting_email: '',
   });
+  const [farmOpen, setFarmOpen] = useState(false);
+  const [farmInputValue, setFarmInputValue] = useState('');
 
   const set = (field) => (e) => setForm(p => ({ ...p, [field]: e.target.value }));
 
@@ -19,6 +23,8 @@ function WorkplaceFormModal({ open, onClose, onSave, workplace }) {
     e.preventDefault();
     onSave(form);
   };
+
+  const filteredFarms = existingFarms.filter(f => !farmInputValue || f.includes(farmInputValue));
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
@@ -33,7 +39,44 @@ function WorkplaceFormModal({ open, onClose, onSave, workplace }) {
           </div>
           <div>
             <Label>שם משק</Label>
-            <Input value={form.farm_name} onChange={set('farm_name')} className="mt-1" placeholder="שם המשק" />
+            <Popover open={farmOpen} onOpenChange={setFarmOpen}>
+              <PopoverTrigger asChild>
+                <button type="button" className="mt-1 h-9 w-full border border-input rounded-md px-3 text-sm flex items-center justify-between bg-card hover:bg-secondary/40 transition-colors">
+                  <span className={form.farm_name ? '' : 'text-muted-foreground'}>{form.farm_name || 'בחר או צור משק...'}</span>
+                  <ChevronsUpDown size={14} className="opacity-50" />
+                </button>
+              </PopoverTrigger>
+              <PopoverContent className="w-72 p-0" align="start">
+                <Command shouldFilter={false}>
+                  <CommandInput
+                    placeholder="חיפוש או שם משק חדש..."
+                    className="h-8 text-xs"
+                    value={farmInputValue}
+                    onValueChange={setFarmInputValue}
+                  />
+                  <CommandList>
+                    <CommandEmpty>
+                      {farmInputValue ? (
+                        <button type="button" className="w-full text-xs text-primary px-2 py-1.5 text-right"
+                          onClick={() => { setForm(p => ({ ...p, farm_name: farmInputValue })); setFarmOpen(false); setFarmInputValue(''); }}>
+                          + צור משק: "{farmInputValue}"
+                        </button>
+                      ) : 'לא נמצא'}
+                    </CommandEmpty>
+                    <CommandGroup>
+                      {farmInputValue && !existingFarms.includes(farmInputValue) && (
+                        <CommandItem value={`__new__${farmInputValue}`} onSelect={() => { setForm(p => ({ ...p, farm_name: farmInputValue })); setFarmOpen(false); setFarmInputValue(''); }} className="text-xs text-primary">
+                          + צור משק: "{farmInputValue}"
+                        </CommandItem>
+                      )}
+                      {filteredFarms.map(f => (
+                        <CommandItem key={f} value={f} onSelect={() => { setForm(p => ({ ...p, farm_name: f })); setFarmOpen(false); setFarmInputValue(''); }} className="text-xs">{f}</CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
           </div>
           <div>
             <Label>כתובת</Label>
@@ -78,6 +121,11 @@ export default function Workplaces() {
     queryKey: ['workplaces'],
     queryFn: () => base44.entities.Workplace.list('-created_date'),
   });
+
+  const existingFarms = useMemo(() => {
+    const names = new Set(workplaces.map(w => w.farm_name).filter(Boolean));
+    return [...names].sort((a, b) => a.localeCompare(b, 'he'));
+  }, [workplaces]);
 
   const filtered = workplaces
     .filter(w => w.name?.includes(search) || w.farm_name?.includes(search))
@@ -180,6 +228,7 @@ export default function Workplaces() {
         onClose={() => { setShowForm(false); setEditWp(null); }}
         onSave={handleSave}
         workplace={editWp}
+        existingFarms={existingFarms}
       />
       <ImportWorkplacesModal
         open={showImport}

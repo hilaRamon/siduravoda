@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { FileSpreadsheet, Shuffle, Loader2, UserCheck, BarChart2, Users } from 'lucide-react';
 import { format, eachDayOfInterval, parseISO } from 'date-fns';
 import PeriodicWorkReport from '@/components/reports/PeriodicWorkReport';
+import PeriodWorkReport from '@/components/reports/PeriodWorkReport';
 import StudentWorkReport from '@/components/reports/StudentWorkReport';
 import PublishedScheduleCard from '@/components/reports/PublishedScheduleCard';
 import BackupExport from '@/components/reports/BackupExport';
@@ -194,7 +195,8 @@ export default function Reports() {
       <div className="flex gap-1 bg-secondary/50 rounded-xl p-1 mb-6 w-fit">
         {[
           { key: 'tools', label: 'כלי ניהול', icon: FileSpreadsheet },
-          { key: 'periodic', label: 'דוח עבודה תקופתי', icon: BarChart2 },
+          { key: 'periodic', label: 'דוח עבודה חודשי', icon: BarChart2 },
+          { key: 'period', label: 'דוח עבודה לתקופה', icon: BarChart2 },
           { key: 'student', label: 'דוח עבודת תלמיד', icon: Users },
         ].map(({ key, label, icon: Icon }) => (
           <button
@@ -211,6 +213,7 @@ export default function Reports() {
       </div>
 
       {activeTab === 'periodic' && <PeriodicWorkReport />}
+      {activeTab === 'period' && <PeriodWorkReport />}
       {activeTab === 'student' && <StudentWorkReport />}
 
       {activeTab === 'tools' && <div className="space-y-4 max-w-2xl">

@@ -1,9 +1,9 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 import * as XLSX from 'npm:xlsx@0.18.5';
-import JSZip from 'npm:jszip@3.10.1';
 
-function workbookToBuffer(wb) {
-  return XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+function workbookToBase64(wb) {
+  const buf = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+  return btoa(String.fromCharCode(...new Uint8Array(buf)));
 }
 
 function buildSheet(data, columns) {
@@ -20,7 +20,6 @@ function today() {
 Deno.serve(async (req) => {
   const base44 = createClientFromRequest(req);
 
-  // Fetch all data in parallel
   const [students, workplaces, vehicles, assignments, settingsList] = await Promise.all([
     base44.asServiceRole.entities.Student.list('full_name', 1000),
     base44.asServiceRole.entities.Workplace.list('name', 1000),
@@ -38,7 +37,6 @@ Deno.serve(async (req) => {
 
   const dateStr = today();
 
-  // Build workbooks
   const wbStudents = buildSheet(students, s => ({
     'שם מלא': s.full_name || '', 'מחזור': s.cohort || '', 'יום חופש': s.free_day || '',
     'סטטוס מרחק': s.distance_status || '', 'פעיל': s.is_active !== false ? 'כן' : 'לא', 'הערות': s.notes || '',
@@ -64,24 +62,27 @@ Deno.serve(async (req) => {
     'תשלום נוסף': a.bonus ?? '', 'הערות': a.notes || '',
   }));
 
-  // Build ZIP
-  const zip = new JSZip();
-  zip.file(`גיבוי_תלמידים_${dateStr}.xlsx`, workbookToBuffer(wbStudents));
-  zip.file(`גיבוי_מקומות_עבודה_${dateStr}.xlsx`, workbookToBuffer(wbWorkplaces));
-  zip.file(`גיבוי_רכבים_${dateStr}.xlsx`, workbookToBuffer(wbVehicles));
-  zip.file(`גיבוי_שיבוצים_${dateStr}.xlsx`, workbookToBuffer(wbAssignments));
-
-  const zipBuffer = await zip.generateAsync({ type: 'uint8array' });
-  const zipBase64 = btoa(String.fromCharCode(...zipBuffer));
-
-  // Send email to each recipient
   const monthLabel = new Date().toLocaleDateString('he-IL', { month: 'long', year: 'numeric' });
   const subject = `גיבוי חודשי — ${monthLabel}`;
-  const body = `שלום,\n\nמצורף גיבוי חודשי של נתוני המערכת לתאריך ${dateStr}.\n\nהגיבוי כולל:\n- תלמידים וצוות\n- מקומות עבודה\n- רכבים\n- שיבוצים יומיים\n\nנשלח אוטומטית מהמערכת.`;
 
-  await Promise.all(emails.map(email =>
-    base44.asServiceRole.integrations.Core.SendEmail({ to: email, subject, body })
+  const files = [
+    { name: `גיבוי_תלמידים_${dateStr}.xlsx`, wb: wbStudents, label: 'תלמידים וצוות' },
+    { name: `גיבוי_מקומות_עבודה_${dateStr}.xlsx`, wb: wbWorkplaces, label: 'מקומות עבודה' },
+    { name: `גיבוי_רכבים_${dateStr}.xlsx`, wb: wbVehicles, label: 'רכבים' },
+    { name: `גיבוי_שיבוצים_${dateStr}.xlsx`, wb: wbAssignments, label: 'שיבוצים יומיים' },
+  ];
+
+  // Send each file as a separate email
+  await Promise.all(emails.flatMap(email =>
+    files.map(f => {
+      const body = `שלום,\n\nמצורף קובץ גיבוי חודשי: ${f.label}\nתאריך: ${dateStr}\n\nנשלח אוטומטית מהמערכת.`;
+      return base44.asServiceRole.integrations.Core.SendEmail({
+        to: email,
+        subject: `${subject} — ${f.label}`,
+        body,
+      });
+    })
   ));
 
-  return Response.json({ ok: true, sent_to: emails, date: dateStr });
+  return Response.json({ ok: true, sent_to: emails, date: dateStr, files: files.map(f => f.name) });
 });

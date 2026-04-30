@@ -2,33 +2,23 @@ import { useState, useMemo, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Download, Loader2, FileSpreadsheet } from 'lucide-react';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { ChevronsUpDown, Download, Loader2, FileSpreadsheet } from 'lucide-react';
+import { ChevronsUpDown } from 'lucide-react';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import * as XLSX from 'xlsx';
 
-const MONTHS = [
-  { value: '01', label: 'ינואר' }, { value: '02', label: 'פברואר' },
-  { value: '03', label: 'מרץ' }, { value: '04', label: 'אפריל' },
-  { value: '05', label: 'מאי' }, { value: '06', label: 'יוני' },
-  { value: '07', label: 'יולי' }, { value: '08', label: 'אוגוסט' },
-  { value: '09', label: 'ספטמבר' }, { value: '10', label: 'אוקטובר' },
-  { value: '11', label: 'נובמבר' }, { value: '12', label: 'דצמבר' },
-];
-
-const YEARS = ['2026', '2025'];
 const SKIP_WORKPLACES = ['לא עובד', 'לימודים'];
 
-export default function PeriodicWorkReport() {
-  const [month, setMonth] = useState('04');
-  const [year, setYear] = useState('2026');
+export default function PeriodWorkReport() {
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [selectedFarm, setSelectedFarm] = useState('');
+  const [farmOpen, setFarmOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [exportingXlsx, setExportingXlsx] = useState(false);
-  const [selectedFarm, setSelectedFarm] = useState('all');
-  const [farmOpen, setFarmOpen] = useState(false);
   const reportRef = useRef(null);
 
   const { data: workplaces = [] } = useQuery({
@@ -36,57 +26,45 @@ export default function PeriodicWorkReport() {
     queryFn: () => base44.entities.Workplace.list(),
   });
 
-  // Unique farm names for filter
-  const farmNames = useMemo(() => {
-    const names = new Set(workplaces.map(w => w.farm_name).filter(Boolean));
-    return [...names].sort((a, b) => a.localeCompare(b, 'he'));
-  }, [workplaces]);
-
   const { data: allAssignments = [], isLoading } = useQuery({
     queryKey: ['assignments-all'],
     queryFn: () => base44.entities.Assignment.list(),
   });
 
-  // Build workplace -> farm_name lookup
   const workplaceFarmMap = useMemo(() => {
     const map = {};
     workplaces.forEach(w => { map[w.id] = w.farm_name || ''; });
     return map;
   }, [workplaces]);
 
-  // Group by farm -> rows
+  const farmNames = useMemo(() => {
+    const names = new Set(workplaces.map(w => w.farm_name).filter(Boolean));
+    return [...names].sort((a, b) => a.localeCompare(b, 'he'));
+  }, [workplaces]);
+
   const reportByFarm = useMemo(() => {
-    const prefix = `${year}-${month}`;
+    if (!startDate || !endDate) return [];
+
     const filtered = allAssignments.filter(a =>
-      a.date?.startsWith(prefix) && !SKIP_WORKPLACES.includes(a.workplace_name)
+      a.date >= startDate && a.date <= endDate &&
+      !SKIP_WORKPLACES.includes(a.workplace_name)
     );
 
-    // Group by date + workplace
     const grouped = {};
     filtered.forEach(a => {
       const farmName = workplaceFarmMap[a.workplace_id] || '';
       const key = `${a.date}__${a.workplace_id}`;
-      if (!grouped[key]) grouped[key] = {
-        date: a.date,
-        workplaceName: a.workplace_name,
-        farmName,
-        rate: a.rate || 0,
-        students: [],
-      };
+      if (!grouped[key]) grouped[key] = { date: a.date, workplaceName: a.workplace_name, farmName, rate: a.rate || 0, students: [] };
       grouped[key].students.push(a);
     });
 
-    // Collect rows and group by farm
     const byFarm = {};
     Object.values(grouped).forEach(g => {
       const totalHours = g.students.reduce((s, a) => s + (a.hours || 0), 0);
       const avgHours = g.students.length ? totalHours / g.students.length : 0;
       const rate = g.rate || 0;
       const row = {
-        date: g.date,
-        workplaceName: g.workplaceName,
-        rate,
-        bonus: 0,
+        date: g.date, workplaceName: g.workplaceName, rate,
         studentCount: g.students.length,
         totalHours: Math.round(totalHours * 10) / 10,
         avgHours: Math.round(avgHours * 10) / 10,
@@ -97,28 +75,21 @@ export default function PeriodicWorkReport() {
       byFarm[fn].push(row);
     });
 
-    // Sort each farm's rows by workplace name then date
     Object.values(byFarm).forEach(rows => rows.sort((a, b) => {
       const wpCmp = (a.workplaceName || '').localeCompare(b.workplaceName || '', 'he');
-      if (wpCmp !== 0) return wpCmp;
-      return a.date.localeCompare(b.date);
+      return wpCmp !== 0 ? wpCmp : a.date.localeCompare(b.date);
     }));
 
-    // Return sorted by farm name, filtered by selectedFarm if set
     return Object.entries(byFarm)
-      .filter(([farm]) => selectedFarm === 'all' || farm === selectedFarm)
+      .filter(([farm]) => !selectedFarm || farm === selectedFarm)
       .sort(([a], [b]) => a.localeCompare(b, 'he'));
-  }, [month, year, allAssignments, workplaceFarmMap, selectedFarm]);
+  }, [startDate, endDate, allAssignments, workplaceFarmMap, selectedFarm]);
 
-  const formatDate = (d) => {
-    const [y, m, day] = d.split('-');
-    return `${day}/${m}/${y}`;
-  };
+  const formatDate = (d) => { const [y, m, day] = d.split('-'); return `${day}/${m}/${y}`; };
 
   const handleExportPDF = async () => {
     setExporting(true);
     await new Promise(r => setTimeout(r, 100));
-
     const el = reportRef.current;
     const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
     const pageW = pdf.internal.pageSize.getWidth();
@@ -126,30 +97,24 @@ export default function PeriodicWorkReport() {
     const margin = 10;
     const printW = pageW - margin * 2;
     const maxImgH = pageH - margin * 2;
-
     const sections = Array.from(el.children);
     let firstPage = true;
-
     for (const section of sections) {
       const canvas = await html2canvas(section, { scale: 1.5, useCORS: true, backgroundColor: '#ffffff' });
       const pxPerMM = canvas.width / printW;
       const pageHeightPx = maxImgH * pxPerMM;
-
       let srcY = 0;
       while (srcY < canvas.height) {
         const sliceH = Math.min(pageHeightPx, canvas.height - srcY);
         const slice = document.createElement('canvas');
-        slice.width = canvas.width;
-        slice.height = sliceH;
+        slice.width = canvas.width; slice.height = sliceH;
         slice.getContext('2d').drawImage(canvas, 0, srcY, canvas.width, sliceH, 0, 0, canvas.width, sliceH);
         if (!firstPage) pdf.addPage();
         pdf.addImage(slice.toDataURL('image/jpeg', 0.88), 'JPEG', margin, margin, printW, sliceH / pxPerMM);
-        srcY += sliceH;
-        firstPage = false;
+        srcY += sliceH; firstPage = false;
       }
     }
-
-    pdf.save(`דוח_עבודה_תקופתי_${month}_${year}.pdf`);
+    pdf.save(`דוח_עבודה_לתקופה_${startDate}_${endDate}.pdf`);
     setExporting(false);
   };
 
@@ -157,63 +122,51 @@ export default function PeriodicWorkReport() {
     setExportingXlsx(true);
     const rows = [];
     reportByFarm.forEach(([farm, farmRows]) => {
-      const grandTotalHours = Math.round(farmRows.reduce((s, r) => s + r.totalHours, 0) * 10) / 10;
-      const grandTotalPrice = farmRows.reduce((s, r) => s + r.totalPrice, 0);
       farmRows.forEach(r => rows.push({
         'משק': farm, 'תאריך': formatDate(r.date), 'מקום עבודה': r.workplaceName,
         'תעריף': r.rate, 'כמות תלמידים': r.studentCount,
         'סך שעות': r.totalHours, 'ממוצע שעות': r.avgHours, 'מחיר': r.totalPrice,
       }));
-      rows.push({ 'משק': '', 'תאריך': '', 'מקום עבודה': 'סה"כ', 'תעריף': '', 'כמות תלמידים': '', 'סך שעות': grandTotalHours, 'ממוצע שעות': '', 'מחיר': grandTotalPrice });
-      rows.push({});
     });
     const ws = XLSX.utils.json_to_sheet(rows);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'דוח חודשי');
-    XLSX.writeFile(wb, `דוח_עבודה_חודשי_${month}_${year}.xlsx`);
+    XLSX.utils.book_append_sheet(wb, ws, 'דוח לתקופה');
+    XLSX.writeFile(wb, `דוח_עבודה_לתקופה_${startDate}_${endDate}.xlsx`);
     setExportingXlsx(false);
   };
 
-  const monthLabel = MONTHS.find(m => m.value === month)?.label || '';
   const hasData = reportByFarm.length > 0;
+  const canSearch = startDate && endDate;
 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap gap-3 items-end">
         <div>
-          <label className="text-xs text-muted-foreground block mb-1">חודש</label>
-          <Select value={month} onValueChange={setMonth}>
-            <SelectTrigger className="w-32 h-9 text-sm"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {MONTHS.map(m => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}
-            </SelectContent>
-          </Select>
+          <label className="text-xs text-muted-foreground block mb-1">תאריך התחלה</label>
+          <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)}
+            className="border border-border rounded-lg px-3 py-2 text-sm bg-card focus:outline-none focus:ring-2 focus:ring-primary/30 h-9" />
         </div>
         <div>
-          <label className="text-xs text-muted-foreground block mb-1">שנה</label>
-          <Select value={year} onValueChange={setYear}>
-            <SelectTrigger className="w-24 h-9 text-sm"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {YEARS.map(y => <SelectItem key={y} value={y}>{y}</SelectItem>)}
-            </SelectContent>
-          </Select>
+          <label className="text-xs text-muted-foreground block mb-1">תאריך סוף</label>
+          <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)}
+            className="border border-border rounded-lg px-3 py-2 text-sm bg-card focus:outline-none focus:ring-2 focus:ring-primary/30 h-9" />
         </div>
         <div>
           <label className="text-xs text-muted-foreground block mb-1">משק</label>
           <Popover open={farmOpen} onOpenChange={setFarmOpen}>
             <PopoverTrigger asChild>
-              <button className="h-9 w-44 border border-border rounded-md px-3 text-sm flex items-center justify-between bg-card hover:bg-secondary/40 transition-colors">
-                <span className={selectedFarm === 'all' ? 'text-muted-foreground' : ''}>{selectedFarm === 'all' ? 'כל המשקים' : selectedFarm}</span>
+              <button className="h-9 w-52 border border-border rounded-md px-3 text-sm flex items-center justify-between bg-card hover:bg-secondary/40 transition-colors">
+                <span className={selectedFarm ? '' : 'text-muted-foreground'}>{selectedFarm || 'כל המשקים'}</span>
                 <ChevronsUpDown size={14} className="opacity-50" />
               </button>
             </PopoverTrigger>
-            <PopoverContent className="w-44 p-0" align="start">
+            <PopoverContent className="w-52 p-0" align="start">
               <Command>
                 <CommandInput placeholder="חיפוש משק..." className="h-8 text-xs" />
                 <CommandList>
                   <CommandEmpty>לא נמצא</CommandEmpty>
                   <CommandGroup>
-                    <CommandItem value="all" onSelect={() => { setSelectedFarm('all'); setFarmOpen(false); }} className="text-xs text-muted-foreground">כל המשקים</CommandItem>
+                    <CommandItem value="__all__" onSelect={() => { setSelectedFarm(''); setFarmOpen(false); }} className="text-xs text-muted-foreground">כל המשקים</CommandItem>
                     {farmNames.map(f => (
                       <CommandItem key={f} value={f} onSelect={() => { setSelectedFarm(f); setFarmOpen(false); }} className="text-xs">{f}</CommandItem>
                     ))}
@@ -237,9 +190,10 @@ export default function PeriodicWorkReport() {
         )}
       </div>
 
+      {!canSearch && <p className="text-sm text-muted-foreground">בחר תאריך התחלה וסוף להצגת הדוח</p>}
       {isLoading && <p className="text-sm text-muted-foreground">טוען...</p>}
 
-      {!isLoading && (
+      {canSearch && !isLoading && (
         <div ref={reportRef} className="bg-white p-4 rounded-xl border border-border space-y-6" dir="rtl">
           {!hasData ? (
             <p className="text-sm text-muted-foreground py-4 text-center">אין נתונים לתקופה זו</p>
@@ -251,12 +205,12 @@ export default function PeriodicWorkReport() {
                 <div key={farm}>
                   <div className="mb-2">
                     <p className="text-sm font-bold">לכבוד: {farm}</p>
-                    <p className="text-xs text-gray-500">דוח עבודה תקופתי — {monthLabel} {year}</p>
+                    <p className="text-xs text-gray-500">דוח עבודה לתקופה — {formatDate(startDate)} עד {formatDate(endDate)}</p>
                   </div>
                   <table className="w-full text-xs border-collapse">
                     <thead>
                       <tr className="bg-gray-100">
-                        {['תאריך','שם מקום עבודה','תעריף','תשלום נוסף','כמות תלמידים','סך שעות','ממוצע שעות','מחיר'].map(h => (
+                        {['תאריך','שם מקום עבודה','תעריף','כמות תלמידים','סך שעות','ממוצע שעות','מחיר'].map(h => (
                           <th key={h} className="border border-gray-300 px-2 py-1.5 text-right font-semibold">{h}</th>
                         ))}
                       </tr>
@@ -267,7 +221,6 @@ export default function PeriodicWorkReport() {
                           <td className="border border-gray-300 px-2 py-1.5">{formatDate(r.date)}</td>
                           <td className="border border-gray-300 px-2 py-1.5">{r.workplaceName}</td>
                           <td className="border border-gray-300 px-2 py-1.5 text-center">{r.rate}</td>
-                          <td className="border border-gray-300 px-2 py-1.5 text-center">0</td>
                           <td className="border border-gray-300 px-2 py-1.5 text-center">{r.studentCount}</td>
                           <td className="border border-gray-300 px-2 py-1.5 text-center">{r.totalHours}</td>
                           <td className="border border-gray-300 px-2 py-1.5 text-center">{r.avgHours}</td>
@@ -277,7 +230,7 @@ export default function PeriodicWorkReport() {
                     </tbody>
                     <tfoot>
                       <tr className="bg-gray-200 font-bold">
-                        <td colSpan={5} className="border border-gray-300 px-2 py-1.5 text-right">סה"כ</td>
+                        <td colSpan={4} className="border border-gray-300 px-2 py-1.5 text-right">סה"כ</td>
                         <td className="border border-gray-300 px-2 py-1.5 text-center">{grandTotalHours}</td>
                         <td className="border border-gray-300 px-2 py-1.5"></td>
                         <td className="border border-gray-300 px-2 py-1.5 text-center">{grandTotalPrice} ₪</td>
