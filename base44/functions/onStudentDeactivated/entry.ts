@@ -17,12 +17,15 @@ Deno.serve(async (req) => {
     const base44 = createClientFromRequest(req);
     const entities = base44.asServiceRole.entities;
 
-    // Get today's date in Israel timezone
-    const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Jerusalem' }); // YYYY-MM-DD
+    // Get tomorrow's date in Israel timezone
+    const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Jerusalem' }); // YYYY-MM-DD
+    const tomorrow = new Date(todayStr + 'T12:00:00');
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const tomorrowStr = tomorrow.toISOString().slice(0, 10);
 
-    // Fetch all future assignments for this student (today and onwards)
+    // Fetch all future assignments for this student (tomorrow and onwards)
     const allAssignments = await entities.Assignment.filter({ student_id: studentId });
-    const futureAssignments = allAssignments.filter(a => a.date >= today);
+    const futureAssignments = allAssignments.filter(a => a.date >= tomorrowStr);
 
     // Delete them one by one with small delay
     for (const assignment of futureAssignments) {
