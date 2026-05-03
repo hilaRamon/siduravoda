@@ -2,16 +2,18 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
-async function withRetry(fn, maxRetries = 6) {
-  let delay = 800;
+async function withRetry(fn, maxRetries = 8) {
+  let delay = 1000;
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
       return await fn();
     } catch (err) {
       const is429 = err?.message?.includes('429') || err?.message?.includes('Rate limit');
+      const is404 = err?.message?.includes('404') || err?.message?.includes('not found');
+      if (is404) return; // record already gone — skip silently
       if (is429 && attempt < maxRetries) {
         await sleep(delay);
-        delay = Math.min(delay * 2, 10000);
+        delay = Math.min(delay * 2, 12000);
       } else {
         throw err;
       }
@@ -28,19 +30,15 @@ Deno.serve(async (req) => {
     const base44 = createClientFromRequest(clonedReq);
     const entities = base44.asServiceRole.entities;
 
-    // Delete existing records one by one (serial + retry) then bulk-recreate
-    // This avoids N individual updates — only N deletes + 1 bulkCreate
+    // Serial updates — one at a time with 400ms gap + retry on rate limit
     if (toUpdate && toUpdate.length > 0) {
-      for (const { id } of toUpdate) {
-        await withRetry(() => entities.Assignment.delete(id));
-        await sleep(150);
+      for (const { id, fullRecord } of toUpdate) {
+        await withRetry(() => entities.Assignment.update(id, fullRecord));
+        await sleep(400);
       }
-
-      const recreate = toUpdate.map(({ fullRecord }) => fullRecord);
-      await withRetry(() => entities.Assignment.bulkCreate(recreate));
     }
 
-    // New records
+    // New records — single bulk call
     if (toCreate && toCreate.length > 0) {
       await withRetry(() => entities.Assignment.bulkCreate(toCreate));
     }
