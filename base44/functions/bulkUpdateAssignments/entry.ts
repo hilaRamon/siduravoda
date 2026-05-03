@@ -4,22 +4,24 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
 Deno.serve(async (req) => {
   try {
-    const base44 = createClientFromRequest(req);
+    // Clone the request so we can read body twice (once for SDK auth, once for our data)
+    const bodyText = await req.text();
+    const { toCreate, toUpdate } = JSON.parse(bodyText);
+
+    const clonedReq = new Request(req, { body: bodyText });
+    const base44 = createClientFromRequest(clonedReq);
     const user = await base44.auth.me();
     if (!user) {
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { toCreate, toUpdate } = await req.json();
-
-    // Bulk create - single API call, no rate limit issue
+    // Bulk create - single API call
     if (toCreate && toCreate.length > 0) {
       await base44.asServiceRole.entities.Assignment.bulkCreate(toCreate);
     }
 
-    // For updates: batch into groups of 10 with a small delay between batches
+    // Serial updates with small delay to avoid rate limits
     if (toUpdate && toUpdate.length > 0) {
-      // Serial updates with small delay — most reliable against rate limits
       for (const { id, fullRecord } of toUpdate) {
         await base44.asServiceRole.entities.Assignment.update(id, fullRecord);
         await sleep(80);
