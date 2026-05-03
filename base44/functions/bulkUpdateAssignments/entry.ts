@@ -2,14 +2,16 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
-async function withRetry(fn, retries = 5, delayMs = 1000) {
+async function withRetry(fn, retries = 6, baseDelayMs = 2000) {
   for (let i = 0; i < retries; i++) {
     try {
       return await fn();
     } catch (err) {
-      const isRateLimit = err?.message?.includes('Rate limit') || err?.status === 429 || err?.response?.status === 429;
+      const msg = err?.message || '';
+      const isRateLimit = msg.includes('Rate limit') || msg.includes('429') || err?.status === 429;
       if (isRateLimit && i < retries - 1) {
-        await sleep(delayMs * (i + 1));
+        const delay = baseDelayMs * (i + 1);
+        await sleep(delay);
       } else {
         throw err;
       }
@@ -24,7 +26,8 @@ Deno.serve(async (req) => {
 
     const clonedReq = new Request(req, { body: bodyText });
     const base44 = createClientFromRequest(clonedReq);
-    const user = await base44.auth.me();
+
+    const user = await withRetry(() => base44.auth.me());
     if (!user) {
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -38,7 +41,7 @@ Deno.serve(async (req) => {
     if (toUpdate && toUpdate.length > 0) {
       for (const { id, fullRecord } of toUpdate) {
         await withRetry(() => base44.asServiceRole.entities.Assignment.update(id, fullRecord));
-        await sleep(100);
+        await sleep(200);
       }
     }
 
