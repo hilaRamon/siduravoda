@@ -365,10 +365,10 @@ export default function Assignments() {
       await base44.entities.Assignment.bulkCreate(toCreate);
     }
 
-    // Updates sequentially with small delay every 5 to avoid rate limiting
+    // Updates sequentially with delay between each to avoid rate limiting
     for (let i = 0; i < toUpdate.length; i++) {
       await base44.entities.Assignment.update(toUpdate[i].id, toUpdate[i].updates);
-      if (i % 5 === 4) await new Promise(r => setTimeout(r, 400));
+      await new Promise(r => setTimeout(r, 200));
     }
     queryClient.invalidateQueries({ queryKey: ['assignments', date] });
     setSelectedIds(new Set());
