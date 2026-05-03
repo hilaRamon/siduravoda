@@ -15,9 +15,29 @@ Deno.serve(async (req) => {
       await base44.asServiceRole.entities.Assignment.bulkCreate(toCreate);
     }
 
+    // Delete old records and recreate with updated data (bulk operations bypass rate limits)
     if (toUpdate && toUpdate.length > 0) {
-      for (const { id, updates } of toUpdate) {
-        await base44.asServiceRole.entities.Assignment.update(id, updates);
+      const ids = toUpdate.map(({ id }) => id);
+      // Fetch current records to merge with updates
+      const existing = await base44.asServiceRole.entities.Assignment.list();
+      const existingMap = {};
+      existing.forEach(a => { existingMap[a.id] = a; });
+
+      // Delete all in bulk-friendly sequential batches
+      for (const id of ids) {
+        await base44.asServiceRole.entities.Assignment.delete(id);
+      }
+
+      // Recreate with merged data
+      const recreated = toUpdate
+        .filter(({ id }) => existingMap[id])
+        .map(({ id, updates }) => {
+          const { id: _id, created_date, updated_date, created_by, ...rest } = existingMap[id];
+          return { ...rest, ...updates };
+        });
+
+      if (recreated.length > 0) {
+        await base44.asServiceRole.entities.Assignment.bulkCreate(recreated);
       }
     }
 
