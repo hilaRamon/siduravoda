@@ -339,11 +339,12 @@ export default function Assignments() {
       const existingAssignment = assignmentById[selId] || assignmentByStudentId[selId];
 
       if (existingAssignment) {
-        const updates = {};
-        if (wp) { updates.workplace_id = wp.id; updates.workplace_name = wp.name; }
-        if (bulkHours !== '') updates.hours = parseFloat(bulkHours);
-        if (bulkRate !== '') updates.rate = parseFloat(bulkRate);
-        toUpdate.push({ id: existingAssignment.id, updates });
+        const { id, created_date, updated_date, created_by, ...rest } = existingAssignment;
+        const fullRecord = { ...rest };
+        if (wp) { fullRecord.workplace_id = wp.id; fullRecord.workplace_name = wp.name; }
+        if (bulkHours !== '') fullRecord.hours = parseFloat(bulkHours);
+        if (bulkRate !== '') fullRecord.rate = parseFloat(bulkRate);
+        toUpdate.push({ id, fullRecord });
       } else if (wp) {
         const student = studentById[selId];
         if (student) {

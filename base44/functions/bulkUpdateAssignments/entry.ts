@@ -8,37 +8,22 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { toUpdate, toCreate } = await req.json();
+    // toCreate: array of full assignment objects to create
+    // toUpdate: array of { id, fullRecord } where fullRecord is the complete merged assignment (no need to fetch from DB)
+    const { toCreate, toUpdate } = await req.json();
 
-    // Use service role to avoid rate limits
     if (toCreate && toCreate.length > 0) {
       await base44.asServiceRole.entities.Assignment.bulkCreate(toCreate);
     }
 
-    // Delete old records and recreate with updated data (bulk operations bypass rate limits)
     if (toUpdate && toUpdate.length > 0) {
-      const ids = toUpdate.map(({ id }) => id);
-      // Fetch current records to merge with updates
-      const existing = await base44.asServiceRole.entities.Assignment.list();
-      const existingMap = {};
-      existing.forEach(a => { existingMap[a.id] = a; });
-
-      // Delete all in bulk-friendly sequential batches
-      for (const id of ids) {
+      // Delete old records first
+      for (const { id } of toUpdate) {
         await base44.asServiceRole.entities.Assignment.delete(id);
       }
-
-      // Recreate with merged data
-      const recreated = toUpdate
-        .filter(({ id }) => existingMap[id])
-        .map(({ id, updates }) => {
-          const { id: _id, created_date, updated_date, created_by, ...rest } = existingMap[id];
-          return { ...rest, ...updates };
-        });
-
-      if (recreated.length > 0) {
-        await base44.asServiceRole.entities.Assignment.bulkCreate(recreated);
-      }
+      // Recreate with updated data
+      const recreated = toUpdate.map(({ fullRecord }) => fullRecord);
+      await base44.asServiceRole.entities.Assignment.bulkCreate(recreated);
     }
 
     return Response.json({ success: true, updated: toUpdate?.length || 0, created: toCreate?.length || 0 });
