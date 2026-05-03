@@ -2,6 +2,23 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
+async function withRetry(fn, maxRetries = 6) {
+  let delay = 800;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      const is429 = err?.message?.includes('429') || err?.message?.includes('Rate limit');
+      if (is429 && attempt < maxRetries) {
+        await sleep(delay);
+        delay = Math.min(delay * 2, 10000);
+      } else {
+        throw err;
+      }
+    }
+  }
+}
+
 Deno.serve(async (req) => {
   try {
     const bodyText = await req.text();
@@ -9,25 +26,23 @@ Deno.serve(async (req) => {
 
     const clonedReq = new Request(req, { body: bodyText });
     const base44 = createClientFromRequest(clonedReq);
+    const entities = base44.asServiceRole.entities;
 
-    // For updates: delete the old records and bulk-recreate them — 2 API calls instead of N
+    // Delete existing records one by one (serial + retry) then bulk-recreate
+    // This avoids N individual updates — only N deletes + 1 bulkCreate
     if (toUpdate && toUpdate.length > 0) {
-      const ids = toUpdate.map(({ id }) => id);
-      // Delete all old records in parallel batches of 10
-      const BATCH = 10;
-      for (let i = 0; i < ids.length; i += BATCH) {
-        const batch = ids.slice(i, i + BATCH);
-        await Promise.all(batch.map(id => base44.asServiceRole.entities.Assignment.delete(id)));
-        if (i + BATCH < ids.length) await sleep(300);
+      for (const { id } of toUpdate) {
+        await withRetry(() => entities.Assignment.delete(id));
+        await sleep(150);
       }
-      // Recreate all as bulk (single API call)
+
       const recreate = toUpdate.map(({ fullRecord }) => fullRecord);
-      await base44.asServiceRole.entities.Assignment.bulkCreate(recreate);
+      await withRetry(() => entities.Assignment.bulkCreate(recreate));
     }
 
-    // New records: single bulk create
+    // New records
     if (toCreate && toCreate.length > 0) {
-      await base44.asServiceRole.entities.Assignment.bulkCreate(toCreate);
+      await withRetry(() => entities.Assignment.bulkCreate(toCreate));
     }
 
     return Response.json({ success: true, updated: toUpdate?.length || 0, created: toCreate?.length || 0 });
