@@ -332,22 +332,20 @@ export default function Assignments() {
     const studentById = {};
     students.forEach(s => { studentById[s.id] = s; });
 
-    const ops = [];
+    // Process sequentially to avoid rate limiting
     for (const selId of selectedIds) {
       const existingAssignment = assignmentById[selId] || assignmentByStudentId[selId];
 
       if (existingAssignment) {
-        // Update existing assignment
         const updates = {};
         if (wp) { updates.workplace_id = wp.id; updates.workplace_name = wp.name; }
         if (bulkHours !== '') updates.hours = parseFloat(bulkHours);
         if (bulkRate !== '') updates.rate = parseFloat(bulkRate);
-        ops.push(base44.entities.Assignment.update(existingAssignment.id, updates));
+        await base44.entities.Assignment.update(existingAssignment.id, updates);
       } else if (wp) {
-        // Create new assignment for unassigned student
         const student = studentById[selId];
         if (student) {
-          ops.push(base44.entities.Assignment.create({
+          await base44.entities.Assignment.create({
             date,
             student_id: student.id,
             student_name: student.full_name,
@@ -355,14 +353,9 @@ export default function Assignments() {
             workplace_name: wp.name,
             rate: bulkRate !== '' ? parseFloat(bulkRate) : 40,
             hours: bulkHours !== '' ? parseFloat(bulkHours) : 4.75,
-          }));
+          });
         }
       }
-    }
-
-    // Process sequentially to avoid rate limiting
-    for (const op of ops) {
-      await op;
     }
     queryClient.invalidateQueries({ queryKey: ['assignments', date] });
     setSelectedIds(new Set());
