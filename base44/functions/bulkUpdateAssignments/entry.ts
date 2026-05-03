@@ -1,5 +1,7 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
@@ -8,22 +10,29 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // toCreate: array of full assignment objects to create
-    // toUpdate: array of { id, fullRecord } where fullRecord is the complete merged assignment (no need to fetch from DB)
     const { toCreate, toUpdate } = await req.json();
 
+    // Bulk create - single API call, no rate limit issue
     if (toCreate && toCreate.length > 0) {
       await base44.asServiceRole.entities.Assignment.bulkCreate(toCreate);
     }
 
+    // For updates: batch into groups of 10 with a small delay between batches
     if (toUpdate && toUpdate.length > 0) {
-      // Delete old records first
-      for (const { id } of toUpdate) {
-        await base44.asServiceRole.entities.Assignment.delete(id);
+      const BATCH_SIZE = 10;
+      const DELAY_MS = 300;
+
+      for (let i = 0; i < toUpdate.length; i += BATCH_SIZE) {
+        const batch = toUpdate.slice(i, i + BATCH_SIZE);
+        await Promise.all(
+          batch.map(({ id, fullRecord }) =>
+            base44.asServiceRole.entities.Assignment.update(id, fullRecord)
+          )
+        );
+        if (i + BATCH_SIZE < toUpdate.length) {
+          await sleep(DELAY_MS);
+        }
       }
-      // Recreate with updated data
-      const recreated = toUpdate.map(({ fullRecord }) => fullRecord);
-      await base44.asServiceRole.entities.Assignment.bulkCreate(recreated);
     }
 
     return Response.json({ success: true, updated: toUpdate?.length || 0, created: toCreate?.length || 0 });
