@@ -360,7 +360,10 @@ export default function Assignments() {
       }
     }
 
-    await Promise.all(ops);
+    // Process in batches of 5 to avoid rate limiting
+    for (let i = 0; i < ops.length; i += 5) {
+      await Promise.all(ops.slice(i, i + 5));
+    }
     queryClient.invalidateQueries({ queryKey: ['assignments', date] });
     setSelectedIds(new Set());
     setShowBulkDialog(false);
