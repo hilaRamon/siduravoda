@@ -19,19 +19,10 @@ Deno.serve(async (req) => {
 
     // For updates: batch into groups of 10 with a small delay between batches
     if (toUpdate && toUpdate.length > 0) {
-      const BATCH_SIZE = 10;
-      const DELAY_MS = 300;
-
-      for (let i = 0; i < toUpdate.length; i += BATCH_SIZE) {
-        const batch = toUpdate.slice(i, i + BATCH_SIZE);
-        await Promise.all(
-          batch.map(({ id, fullRecord }) =>
-            base44.asServiceRole.entities.Assignment.update(id, fullRecord)
-          )
-        );
-        if (i + BATCH_SIZE < toUpdate.length) {
-          await sleep(DELAY_MS);
-        }
+      // Serial updates with small delay — most reliable against rate limits
+      for (const { id, fullRecord } of toUpdate) {
+        await base44.asServiceRole.entities.Assignment.update(id, fullRecord);
+        await sleep(80);
       }
     }
 
