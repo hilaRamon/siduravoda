@@ -360,16 +360,8 @@ export default function Assignments() {
       }
     }
 
-    // Bulk create in one shot
-    if (toCreate.length > 0) {
-      await base44.entities.Assignment.bulkCreate(toCreate);
-    }
-
-    // Updates sequentially with delay between each to avoid rate limiting
-    for (let i = 0; i < toUpdate.length; i++) {
-      await base44.entities.Assignment.update(toUpdate[i].id, toUpdate[i].updates);
-      await new Promise(r => setTimeout(r, 200));
-    }
+    // Send all updates/creates to backend function (no rate limit)
+    await base44.functions.invoke('bulkUpdateAssignments', { toCreate, toUpdate });
     queryClient.invalidateQueries({ queryKey: ['assignments', date] });
     setSelectedIds(new Set());
     setShowBulkDialog(false);
