@@ -365,13 +365,10 @@ export default function Assignments() {
       await base44.entities.Assignment.bulkCreate(toCreate);
     }
 
-    // Updates in batches of 10 with small delay
-    const BATCH = 10;
-    for (let i = 0; i < toUpdate.length; i += BATCH) {
-      await Promise.all(toUpdate.slice(i, i + BATCH).map(({ id, updates }) =>
-        base44.entities.Assignment.update(id, updates)
-      ));
-      if (i + BATCH < toUpdate.length) await new Promise(r => setTimeout(r, 300));
+    // Updates sequentially with small delay every 5 to avoid rate limiting
+    for (let i = 0; i < toUpdate.length; i++) {
+      await base44.entities.Assignment.update(toUpdate[i].id, toUpdate[i].updates);
+      if (i % 5 === 4) await new Promise(r => setTimeout(r, 400));
     }
     queryClient.invalidateQueries({ queryKey: ['assignments', date] });
     setSelectedIds(new Set());
