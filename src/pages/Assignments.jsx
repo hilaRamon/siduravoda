@@ -332,7 +332,9 @@ export default function Assignments() {
     const studentById = {};
     students.forEach(s => { studentById[s.id] = s; });
 
-    // Process sequentially to avoid rate limiting
+    const toCreate = [];
+    const toUpdate = []; // { id, updates }
+
     for (const selId of selectedIds) {
       const existingAssignment = assignmentById[selId] || assignmentByStudentId[selId];
 
@@ -341,11 +343,11 @@ export default function Assignments() {
         if (wp) { updates.workplace_id = wp.id; updates.workplace_name = wp.name; }
         if (bulkHours !== '') updates.hours = parseFloat(bulkHours);
         if (bulkRate !== '') updates.rate = parseFloat(bulkRate);
-        await base44.entities.Assignment.update(existingAssignment.id, updates);
+        toUpdate.push({ id: existingAssignment.id, updates });
       } else if (wp) {
         const student = studentById[selId];
         if (student) {
-          await base44.entities.Assignment.create({
+          toCreate.push({
             date,
             student_id: student.id,
             student_name: student.full_name,
@@ -356,6 +358,20 @@ export default function Assignments() {
           });
         }
       }
+    }
+
+    // Bulk create in one shot
+    if (toCreate.length > 0) {
+      await base44.entities.Assignment.bulkCreate(toCreate);
+    }
+
+    // Updates in batches of 10 with small delay
+    const BATCH = 10;
+    for (let i = 0; i < toUpdate.length; i += BATCH) {
+      await Promise.all(toUpdate.slice(i, i + BATCH).map(({ id, updates }) =>
+        base44.entities.Assignment.update(id, updates)
+      ));
+      if (i + BATCH < toUpdate.length) await new Promise(r => setTimeout(r, 300));
     }
     queryClient.invalidateQueries({ queryKey: ['assignments', date] });
     setSelectedIds(new Set());
