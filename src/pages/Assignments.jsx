@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Checkbox } from '@/components/ui/checkbox';
-import { ChevronRight, ChevronLeft, Copy, CalendarDays, X, ChevronsUpDown, Pencil, AlertCircle } from 'lucide-react';
+import { ChevronRight, ChevronLeft, Copy, CalendarDays, X, ChevronsUpDown, Pencil, UserPlus } from 'lucide-react';
 import DailyReportPDFButton from '@/components/reports/DailyReportPDFButton';
 import LogisticsSidebar from '@/components/assignments/LogisticsSidebar';
 import { format, addDays, subDays } from 'date-fns';
@@ -175,6 +175,9 @@ export default function Assignments() {
   const [bulkWorkplaceOpen, setBulkWorkplaceOpen] = useState(false);
   const [bulkSaving, setBulkSaving] = useState(false);
 
+  const [showAddGuestDialog, setShowAddGuestDialog] = useState(false);
+  const [guestName, setGuestName] = useState('');
+
   const queryClient = useQueryClient();
 
   const { data: assignments = [] } = useQuery({
@@ -205,6 +208,11 @@ export default function Assignments() {
   }, [assignments]);
 
   const cohorts = useMemo(() => [...new Set(students.map(s => s.cohort).filter(Boolean))], [students]);
+
+  // Guest assignments (student_id starts with "guest_") — shown as virtual rows
+  const guestAssignments = useMemo(() =>
+    assignments.filter(a => a.student_id?.startsWith('guest_')),
+  [assignments]);
 
   const filteredStudents = useMemo(() => students.filter(s => {
     const a = assignmentByStudent[s.id];
@@ -386,6 +394,23 @@ export default function Assignments() {
     }
   };
 
+  const handleAddGuest = async () => {
+    if (!guestName.trim()) return;
+    const guestId = `guest_${Date.now()}`;
+    await base44.entities.Assignment.create({
+      date,
+      student_id: guestId,
+      student_name: guestName.trim(),
+      workplace_id: '',
+      workplace_name: '',
+      rate: 40,
+      hours: 4.75,
+    });
+    queryClient.invalidateQueries({ queryKey: ['assignments', date] });
+    setGuestName('');
+    setShowAddGuestDialog(false);
+  };
+
   const handleCloneDay = async () => {
     if (!cloneTargetDate) return;
     setCloning(true);
@@ -424,6 +449,9 @@ export default function Assignments() {
         </div>
         <div className="flex gap-2">
           <DailyReportPDFButton date={date} assignments={assignments} />
+          <Button variant="outline" onClick={() => setShowAddGuestDialog(true)}>
+            <UserPlus size={16} className="ml-2" /> הוסף תלמיד יומי
+          </Button>
           <Button variant="outline" onClick={() => { setCloneTargetDate(format(addDays(new Date(date + 'T12:00:00'), 1), 'yyyy-MM-dd')); setShowCloneDialog(true); }}>
             <Copy size={16} className="ml-2" /> שכפל שיבוצים
           </Button>
@@ -463,6 +491,32 @@ export default function Assignments() {
           </Button>
         </div>
       )}
+
+      {/* Add Guest Dialog */}
+      <Dialog open={showAddGuestDialog} onOpenChange={setShowAddGuestDialog}>
+        <DialogContent className="max-w-sm" dir="rtl">
+          <DialogHeader>
+            <DialogTitle>הוספת תלמיד יומי</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 mt-2">
+            <p className="text-xs text-muted-foreground">תלמיד זה יופיע רק ביום {date} ולא יועתק בשכפול שיבוצים.</p>
+            <Input
+              autoFocus
+              placeholder="שם התלמיד..."
+              value={guestName}
+              onChange={e => setGuestName(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') handleAddGuest(); }}
+              className="h-9 text-sm"
+            />
+            <div className="flex gap-2 justify-end pt-1">
+              <Button variant="outline" onClick={() => { setShowAddGuestDialog(false); setGuestName(''); }}>ביטול</Button>
+              <Button onClick={handleAddGuest} disabled={!guestName.trim()}>
+                <UserPlus size={14} className="ml-2" /> הוסף
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Clone Dialog */}
       <Dialog open={showCloneDialog} onOpenChange={setShowCloneDialog}>
@@ -671,6 +725,36 @@ export default function Assignments() {
                 );
               })
             )}
+            {/* Guest rows */}
+            {guestAssignments.map((ga, idx) => {
+              const guestStudent = { id: ga.student_id, full_name: ga.student_name, cohort: null, forbidden_workplaces: [] };
+              const selectKey = ga.id;
+              const isSelected = selectedIds.has(selectKey);
+              return (
+                <tr key={ga.id} className={`transition-colors border-t-2 border-dashed border-amber-200 ${isSelected ? 'bg-primary/10' : 'bg-amber-50/60 hover:bg-amber-50'}`}>
+                  <td className="px-3 py-2 border-b border-border">
+                    <Checkbox
+                      checked={!!isSelected}
+                      onClick={(e) => { e.preventDefault(); toggleSelect(selectKey, filteredStudents.length + idx, e.shiftKey); }}
+                    />
+                  </td>
+                  <td className="px-3 py-2 border-b border-border text-muted-foreground text-xs">{filteredStudents.length + idx + 1}</td>
+                  <td className="px-3 py-2 border-b border-border font-medium">
+                    <span className="flex items-center gap-1">
+                      <UserPlus size={12} className="text-amber-500 shrink-0" />
+                      {ga.student_name}
+                    </span>
+                  </td>
+                  <td className="px-3 py-2 border-b border-border text-muted-foreground text-xs">—</td>
+                  <WorkplaceCell student={guestStudent} assignment={ga} workplaces={workplaces} onAssign={handleAssign} onRemove={(id) => handleRemove(id)} />
+                  <RoleCell assignment={ga} roles={roles} onUpdateRole={handleUpdateRole} />
+                  <EditableNumberCell value={ga.rate} defaultValue={40} assignment={ga} field="rate" onUpdate={handleUpdateField} />
+                  <EditableNumberCell value={ga.hours} defaultValue={4.75} assignment={ga} field="hours" onUpdate={handleUpdateField} />
+                  <EditableNumberCell value={ga.bonus} defaultValue={null} assignment={ga} field="bonus" onUpdate={handleUpdateField} />
+                  <td className="px-3 py-2 border-b border-border text-muted-foreground text-xs">{ga.notes || '—'}</td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
