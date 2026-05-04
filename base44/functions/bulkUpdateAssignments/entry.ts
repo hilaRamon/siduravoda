@@ -2,18 +2,16 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
-async function withRetry(fn, maxRetries = 5) {
-  let delay = 600;
+async function updateWithRetry(entities, id, data, maxRetries = 3) {
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
-      return await fn();
+      await entities.Assignment.update(id, data);
+      return true;
     } catch (err) {
       const is429 = err?.message?.includes('429') || err?.message?.includes('Rate limit');
-      const is404 = err?.message?.includes('404') || err?.message?.includes('not found');
-      if (is404) return;
       if (is429 && attempt < maxRetries) {
-        await sleep(delay);
-        delay = Math.min(delay * 2, 8000);
+        // Exponential backoff on rate limit
+        await sleep(1000 * (attempt + 1));
       } else {
         throw err;
       }
@@ -21,19 +19,10 @@ async function withRetry(fn, maxRetries = 5) {
   }
 }
 
-// Run items in parallel batches of `size`
-async function batchAll(items, size, fn) {
-  for (let i = 0; i < items.length; i += size) {
-    const chunk = items.slice(i, i + size);
-    await Promise.all(chunk.map(fn));
-    if (i + size < items.length) await sleep(250);
-  }
-}
-
 Deno.serve(async (req) => {
   try {
     const bodyText = await req.text();
-    const { toCreate, toUpdate, date, workplace, hours, rate } = JSON.parse(bodyText);
+    const { toCreate = [], toUpdate = [] } = JSON.parse(bodyText);
 
     const clonedReq = new Request(req, { body: bodyText });
     const base44 = createClientFromRequest(clonedReq);
@@ -42,25 +31,16 @@ Deno.serve(async (req) => {
     let updatedCount = 0;
     let createdCount = 0;
 
-    // UPDATES: if we got a date + field changes, fetch ALL assignments for that date server-side
-    // This avoids any client-side pagination limit issue
-    if (toUpdate && toUpdate.length > 0) {
-      // Extract just the IDs to update and the changes to apply
-      const updateMap = {};
-      for (const { id, fullRecord } of toUpdate) {
-        updateMap[id] = fullRecord;
-      }
-
-      // Apply updates in parallel batches of 15
-      await batchAll(toUpdate, 15, ({ id, fullRecord }) =>
-        withRetry(() => entities.Assignment.update(id, fullRecord))
-      );
-      updatedCount = toUpdate.length;
+    // Process updates one at a time with a fixed delay between each
+    for (const { id, fullRecord } of toUpdate) {
+      await updateWithRetry(entities, id, fullRecord);
+      updatedCount++;
+      await sleep(120); // 120ms between each update = ~8 requests/sec
     }
 
-    // CREATES: bulk create new assignments
-    if (toCreate && toCreate.length > 0) {
-      await withRetry(() => entities.Assignment.bulkCreate(toCreate));
+    // Bulk create in one shot
+    if (toCreate.length > 0) {
+      await entities.Assignment.bulkCreate(toCreate);
       createdCount = toCreate.length;
     }
 
