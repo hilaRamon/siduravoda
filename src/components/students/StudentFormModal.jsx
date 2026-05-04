@@ -31,7 +31,7 @@ export default function StudentFormModal({ open, onClose, onSave, student }) {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    onSave(form);
+    onSave(student ? form : { ...form, is_active: false });
   };
 
   return (
