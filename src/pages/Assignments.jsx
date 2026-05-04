@@ -173,6 +173,7 @@ export default function Assignments() {
   const [bulkHours, setBulkHours] = useState('');
   const [bulkRate, setBulkRate] = useState('');
   const [bulkWorkplaceOpen, setBulkWorkplaceOpen] = useState(false);
+  const [bulkSaving, setBulkSaving] = useState(false);
 
   const queryClient = useQueryClient();
 
@@ -318,6 +319,7 @@ export default function Assignments() {
   };
 
   const handleBulkSave = async () => {
+    if (bulkSaving) return;
     const wp = bulkWorkplace ? workplaces.find(w => w.id === bulkWorkplace) : null;
     const hasChanges = wp || bulkHours !== '' || bulkRate !== '';
     if (!hasChanges) { setShowBulkDialog(false); return; }
@@ -361,14 +363,18 @@ export default function Assignments() {
       }
     }
 
-    // Send all updates/creates to backend function (no rate limit)
-    await base44.functions.invoke('bulkUpdateAssignments', { toCreate, toUpdate });
-    queryClient.invalidateQueries({ queryKey: ['assignments', date] });
-    setSelectedIds(new Set());
-    setShowBulkDialog(false);
-    setBulkWorkplace('');
-    setBulkHours('');
-    setBulkRate('');
+    setBulkSaving(true);
+    try {
+      await base44.functions.invoke('bulkUpdateAssignments', { toCreate, toUpdate });
+      queryClient.invalidateQueries({ queryKey: ['assignments', date] });
+      setSelectedIds(new Set());
+      setShowBulkDialog(false);
+      setBulkWorkplace('');
+      setBulkHours('');
+      setBulkRate('');
+    } finally {
+      setBulkSaving(false);
+    }
   };
 
   const handleCloneDay = async () => {
@@ -540,8 +546,10 @@ export default function Assignments() {
             </div>
 
             <div className="flex gap-2 justify-end pt-1">
-              <Button variant="outline" onClick={() => setShowBulkDialog(false)}>ביטול</Button>
-              <Button onClick={handleBulkSave}>שמור שינויים</Button>
+              <Button variant="outline" onClick={() => setShowBulkDialog(false)} disabled={bulkSaving}>ביטול</Button>
+              <Button onClick={handleBulkSave} disabled={bulkSaving}>
+                {bulkSaving ? `מעדכן ${selectedIds.size} שורות...` : 'שמור שינויים'}
+              </Button>
             </div>
           </div>
         </DialogContent>
