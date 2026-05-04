@@ -365,7 +365,16 @@ export default function Assignments() {
 
     setBulkSaving(true);
     try {
-      await base44.functions.invoke('bulkUpdateAssignments', { toCreate, toUpdate });
+      const CHUNK_SIZE = 40;
+      // Send creates once
+      if (toCreate.length > 0) {
+        await base44.functions.invoke('bulkUpdateAssignments', { toCreate, toUpdate: [] });
+      }
+      // Send updates in chunks to avoid timeout
+      for (let i = 0; i < toUpdate.length; i += CHUNK_SIZE) {
+        const chunk = toUpdate.slice(i, i + CHUNK_SIZE);
+        await base44.functions.invoke('bulkUpdateAssignments', { toCreate: [], toUpdate: chunk });
+      }
       queryClient.invalidateQueries({ queryKey: ['assignments', date] });
       setSelectedIds(new Set());
       setShowBulkDialog(false);
