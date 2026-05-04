@@ -174,6 +174,7 @@ export default function Assignments() {
   const [bulkRate, setBulkRate] = useState('');
   const [bulkWorkplaceOpen, setBulkWorkplaceOpen] = useState(false);
   const [bulkSaving, setBulkSaving] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState(0); // 0-100
 
   const [showAddGuestDialog, setShowAddGuestDialog] = useState(false);
   const [guestName, setGuestName] = useState('');
@@ -372,23 +373,32 @@ export default function Assignments() {
     }
 
     setBulkSaving(true);
+    setBulkProgress(0);
     try {
       const CHUNK_SIZE = 40;
-      // Send creates once
+      const totalOps = (toCreate.length > 0 ? 1 : 0) + Math.ceil(toUpdate.length / CHUNK_SIZE);
+      let doneOps = 0;
+
       if (toCreate.length > 0) {
         await base44.functions.invoke('bulkUpdateAssignments', { toCreate, toUpdate: [] });
+        doneOps++;
+        setBulkProgress(Math.round((doneOps / totalOps) * 100));
       }
-      // Send updates in chunks to avoid timeout
       for (let i = 0; i < toUpdate.length; i += CHUNK_SIZE) {
         const chunk = toUpdate.slice(i, i + CHUNK_SIZE);
         await base44.functions.invoke('bulkUpdateAssignments', { toCreate: [], toUpdate: chunk });
+        doneOps++;
+        setBulkProgress(Math.round((doneOps / totalOps) * 100));
       }
+      setBulkProgress(100);
+      await new Promise(r => setTimeout(r, 400)); // brief moment to show 100%
       queryClient.invalidateQueries({ queryKey: ['assignments', date] });
       setSelectedIds(new Set());
       setShowBulkDialog(false);
       setBulkWorkplace('');
       setBulkHours('');
       setBulkRate('');
+      setBulkProgress(0);
     } finally {
       setBulkSaving(false);
     }
@@ -608,10 +618,25 @@ export default function Assignments() {
               />
             </div>
 
+            {bulkSaving && (
+              <div className="space-y-2">
+                <div className="flex justify-between text-xs text-muted-foreground">
+                  <span>מעדכן שורות...</span>
+                  <span className="font-medium text-primary">{bulkProgress}%</span>
+                </div>
+                <div className="w-full h-3 bg-secondary rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-primary rounded-full transition-all duration-500 ease-out"
+                    style={{ width: `${bulkProgress}%` }}
+                  />
+                </div>
+              </div>
+            )}
+
             <div className="flex gap-2 justify-end pt-1">
               <Button variant="outline" onClick={() => setShowBulkDialog(false)} disabled={bulkSaving}>ביטול</Button>
               <Button onClick={handleBulkSave} disabled={bulkSaving}>
-                {bulkSaving ? `מעדכן ${selectedIds.size} שורות...` : 'שמור שינויים'}
+                {bulkSaving ? 'מעדכן...' : 'שמור שינויים'}
               </Button>
             </div>
           </div>
