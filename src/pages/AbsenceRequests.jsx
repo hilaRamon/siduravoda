@@ -20,7 +20,7 @@ const STATUS_ICONS = {
   'נדחה': <X size={12} />,
 };
 
-function RequestRow({ request, students, onUpdate }) {
+function RequestRow({ request, students }) {
   const [showDetail, setShowDetail] = useState(false);
   const [notes, setNotes] = useState(request.notes || '');
   const [linkedStudent, setLinkedStudent] = useState(request.student_id || '');
@@ -66,12 +66,10 @@ function RequestRow({ request, students, onUpdate }) {
           {request.sms_date || new Date(request.created_date).toLocaleString('he-IL')}
         </td>
         <td className="px-4 py-3 border-b border-border" onClick={e => e.stopPropagation()}>
-          <div className="flex items-center gap-1">
-            <Badge className={`text-xs px-2 py-0.5 border flex items-center gap-1 ${STATUS_COLORS[request.status]}`}>
-              {STATUS_ICONS[request.status]}
-              {request.status}
-            </Badge>
-          </div>
+          <Badge className={`text-xs px-2 py-0.5 border flex items-center gap-1 w-fit ${STATUS_COLORS[request.status]}`}>
+            {STATUS_ICONS[request.status]}
+            {request.status}
+          </Badge>
         </td>
         <td className="px-4 py-3 border-b border-border" onClick={e => e.stopPropagation()}>
           <div className="flex gap-1">
@@ -159,8 +157,20 @@ function RequestRow({ request, students, onUpdate }) {
   );
 }
 
+const TABLE_HEADERS = (
+  <tr>
+    <th className="px-4 py-3 text-right font-semibold text-muted-foreground text-xs">שם תלמיד</th>
+    <th className="px-4 py-3 text-right font-semibold text-muted-foreground text-xs">תאריך היעדרות</th>
+    <th className="px-4 py-3 text-right font-semibold text-muted-foreground text-xs">סיבה</th>
+    <th className="px-4 py-3 text-right font-semibold text-muted-foreground text-xs">התקבל</th>
+    <th className="px-4 py-3 text-right font-semibold text-muted-foreground text-xs">סטטוס</th>
+    <th className="px-4 py-3 text-right font-semibold text-muted-foreground text-xs">פעולות</th>
+  </tr>
+);
+
 export default function AbsenceRequests() {
-  const [filterStatus, setFilterStatus] = useState('all');
+  // null = pending view, 'אושר' / 'נדחה' = filtered view
+  const [activeTab, setActiveTab] = useState(null);
   const queryClient = useQueryClient();
 
   const { data: requests = [], isLoading } = useQuery({
@@ -173,17 +183,24 @@ export default function AbsenceRequests() {
     queryFn: () => base44.entities.Student.list('full_name', 1000),
   });
 
-  const filtered = useMemo(() => {
-    if (filterStatus === 'all') return requests;
-    return requests.filter(r => r.status === filterStatus);
-  }, [requests, filterStatus]);
-
   const counts = useMemo(() => ({
-    total: requests.length,
     pending: requests.filter(r => r.status === 'ממתין').length,
     approved: requests.filter(r => r.status === 'אושר').length,
     rejected: requests.filter(r => r.status === 'נדחה').length,
   }), [requests]);
+
+  const displayed = useMemo(() => {
+    if (activeTab === null) return requests.filter(r => r.status === 'ממתין');
+    return requests.filter(r => r.status === activeTab);
+  }, [requests, activeTab]);
+
+  const statCards = [
+    { label: 'ממתינות', value: counts.pending, color: 'text-warning', border: 'border-warning/40', bg: 'bg-warning/10', tab: null },
+    { label: 'אושרו', value: counts.approved, color: 'text-success', border: 'border-success/40', bg: 'bg-success/10', tab: 'אושר' },
+    { label: 'נדחו', value: counts.rejected, color: 'text-destructive', border: 'border-destructive/40', bg: 'bg-destructive/10', tab: 'נדחה' },
+  ];
+
+  const activeLabel = activeTab === null ? 'ממתינות' : activeTab === 'אושר' ? 'אושרו' : 'נדחו';
 
   return (
     <div className="p-8">
@@ -200,64 +217,52 @@ export default function AbsenceRequests() {
         </Button>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-4 gap-3 mb-6">
-        {[
-          { label: 'סה"כ', value: counts.total, color: 'text-foreground' },
-          { label: 'ממתינות', value: counts.pending, color: 'text-warning' },
-          { label: 'אושרו', value: counts.approved, color: 'text-success' },
-          { label: 'נדחו', value: counts.rejected, color: 'text-destructive' },
-        ].map(stat => (
-          <div key={stat.label} className="bg-card border border-border rounded-xl p-4 text-center">
-            <div className={`text-2xl font-bold ${stat.color}`}>{stat.value}</div>
-            <div className="text-xs text-muted-foreground mt-1">{stat.label}</div>
-          </div>
-        ))}
-      </div>
-
-      {/* Filter */}
-      <div className="flex items-center gap-3 mb-4">
-        <Select value={filterStatus} onValueChange={setFilterStatus}>
-          <SelectTrigger className="w-40 h-8 text-sm">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">כל הבקשות</SelectItem>
-            <SelectItem value="ממתין">ממתינות</SelectItem>
-            <SelectItem value="אושר">אושרו</SelectItem>
-            <SelectItem value="נדחה">נדחו</SelectItem>
-          </SelectContent>
-        </Select>
-        <span className="text-sm text-muted-foreground">{filtered.length} בקשות</span>
+      {/* Stat Cards — clickable tabs */}
+      <div className="grid grid-cols-3 gap-3 mb-6">
+        {statCards.map(stat => {
+          const isActive = activeTab === stat.tab;
+          return (
+            <button
+              key={stat.label}
+              onClick={() => setActiveTab(stat.tab)}
+              className={`rounded-xl p-4 text-center border-2 transition-all duration-150 ${
+                isActive
+                  ? `${stat.bg} ${stat.border} shadow-sm`
+                  : 'bg-card border-border hover:border-border/80 hover:bg-secondary/30'
+              }`}
+            >
+              <div className={`text-2xl font-bold ${stat.color}`}>{stat.value}</div>
+              <div className="text-xs text-muted-foreground mt-1">{stat.label}</div>
+            </button>
+          );
+        })}
       </div>
 
       {/* Table */}
+      <div className="flex items-center gap-2 mb-3">
+        <span className="text-sm font-semibold">{activeLabel}</span>
+        <span className="text-sm text-muted-foreground">— {displayed.length} בקשות</span>
+      </div>
+
       <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden">
         <table className="w-full text-sm">
           <thead className="bg-secondary/60 border-b border-border">
-            <tr>
-              <th className="px-4 py-3 text-right font-semibold text-muted-foreground text-xs">שם תלמיד</th>
-              <th className="px-4 py-3 text-right font-semibold text-muted-foreground text-xs">תאריך היעדרות</th>
-              <th className="px-4 py-3 text-right font-semibold text-muted-foreground text-xs">סיבה</th>
-              <th className="px-4 py-3 text-right font-semibold text-muted-foreground text-xs">התקבל</th>
-              <th className="px-4 py-3 text-right font-semibold text-muted-foreground text-xs">סטטוס</th>
-              <th className="px-4 py-3 text-right font-semibold text-muted-foreground text-xs">פעולות</th>
-            </tr>
+            {TABLE_HEADERS}
           </thead>
           <tbody>
             {isLoading ? (
               <tr>
                 <td colSpan={6} className="text-center py-12 text-muted-foreground">טוען...</td>
               </tr>
-            ) : filtered.length === 0 ? (
+            ) : displayed.length === 0 ? (
               <tr>
                 <td colSpan={6} className="text-center py-12 text-muted-foreground">
                   אין בקשות להצגה
                 </td>
               </tr>
             ) : (
-              filtered.map(req => (
-                <RequestRow key={req.id} request={req} students={students} onUpdate={() => {}} />
+              displayed.map(req => (
+                <RequestRow key={req.id} request={req} students={students} />
               ))
             )}
           </tbody>
