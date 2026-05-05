@@ -1,5 +1,7 @@
 import { Link, Outlet, useLocation } from 'react-router-dom';
 import { Building2, CalendarDays, ShieldCheck, GraduationCap, BarChart2, Truck, MessageSquare } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { base44 } from '@/api/base44Client';
 
 const navItems = [
   { to: '/', label: 'שיבוצים יומיים', icon: CalendarDays },
@@ -13,6 +15,13 @@ const navItems = [
 
 export default function Layout() {
   const location = useLocation();
+
+  const { data: pendingSMS = [] } = useQuery({
+    queryKey: ['incoming-sms-pending'],
+    queryFn: () => base44.entities.IncomingSMS.filter({ status: 'ממתין' }, '-created_date', 100),
+    refetchInterval: 60000,
+  });
+  const pendingCount = pendingSMS.length;
 
   return (
     <div className="flex min-h-screen bg-background font-heebo" dir="rtl">
@@ -36,7 +45,12 @@ export default function Layout() {
                 }`}
               >
                 <Icon size={18} />
-                {label}
+                <span className="flex-1">{label}</span>
+                {to === '/absence-requests' && pendingCount > 0 && (
+                  <span className="bg-destructive text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center shrink-0">
+                    {pendingCount > 9 ? '9+' : pendingCount}
+                  </span>
+                )}
               </Link>
             );
           })}

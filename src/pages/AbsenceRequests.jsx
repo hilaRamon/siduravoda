@@ -42,7 +42,7 @@ function RequestRow({ request, students, onUpdate }) {
     setShowDetail(false);
   };
 
-  const displayName = request.student_name || request.parsed_student_name || request.phone;
+  const displayName = request.student_name || request.parsed_student_name || '—';
 
   return (
     <>
@@ -52,7 +52,6 @@ function RequestRow({ request, students, onUpdate }) {
       >
         <td className="px-4 py-3 border-b border-border">
           <div className="font-medium text-sm">{displayName}</div>
-          <div className="text-xs text-muted-foreground">{request.phone}</div>
         </td>
         <td className="px-4 py-3 border-b border-border text-sm">
           {request.parsed_date
@@ -237,7 +236,7 @@ export default function AbsenceRequests() {
         <table className="w-full text-sm">
           <thead className="bg-secondary/60 border-b border-border">
             <tr>
-              <th className="px-4 py-3 text-right font-semibold text-muted-foreground text-xs">שם / טלפון</th>
+              <th className="px-4 py-3 text-right font-semibold text-muted-foreground text-xs">שם תלמיד</th>
               <th className="px-4 py-3 text-right font-semibold text-muted-foreground text-xs">תאריך היעדרות</th>
               <th className="px-4 py-3 text-right font-semibold text-muted-foreground text-xs">סיבה</th>
               <th className="px-4 py-3 text-right font-semibold text-muted-foreground text-xs">התקבל</th>
