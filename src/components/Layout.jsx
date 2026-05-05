@@ -1,5 +1,5 @@
 import { Link, Outlet, useLocation } from 'react-router-dom';
-import { Building2, CalendarDays, ShieldCheck, GraduationCap, BarChart2, Truck } from 'lucide-react';
+import { Building2, CalendarDays, ShieldCheck, GraduationCap, BarChart2, Truck, MessageSquare } from 'lucide-react';
 
 const navItems = [
   { to: '/', label: 'שיבוצים יומיים', icon: CalendarDays },
@@ -8,6 +8,7 @@ const navItems = [
   { to: '/roles', label: 'תפקידים', icon: ShieldCheck },
   { to: '/vehicles', label: 'רכבים', icon: Truck },
   { to: '/reports', label: 'דוחות', icon: BarChart2 },
+  { to: '/absence-requests', label: 'בקשות היעדרות', icon: MessageSquare },
 ];
 
 export default function Layout() {

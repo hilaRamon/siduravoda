@@ -14,6 +14,7 @@ import Roles from './pages/Roles';
 import Reports from './pages/Reports';
 import Vehicles from './pages/Vehicles';
 import PublicSchedule from './pages/PublicSchedule';
+import AbsenceRequests from './pages/AbsenceRequests';
 
 
 const AuthenticatedApp = () => {
@@ -46,6 +47,7 @@ const AuthenticatedApp = () => {
         <Route path="/roles" element={<Roles />} />
         <Route path="/vehicles" element={<Vehicles />} />
         <Route path="/reports" element={<Reports />} />
+        <Route path="/absence-requests" element={<AbsenceRequests />} />
       </Route>
       <Route path="/schedule" element={<PublicSchedule />} />
       <Route path="*" element={<PageNotFound />} />
