@@ -144,13 +144,19 @@ export default function LogisticsSidebar({ date, assignments }) {
     return map;
   }, [logisticsList]);
 
-  const SKIP_NAMES = ['לא עובד', 'לימודים', 'לא יצא'];
-  const shouldSkip = (name) => !name || SKIP_NAMES.some(kw => name.trim() === kw);
+  // Skip workplaces that represent non-work statuses — match by substring too (e.g. "תתת - לא עובד", "תתב - לימודים")
+  const SKIP_KEYWORDS = ['לא עובד', 'לימודים', 'לא יצא'];
+  const shouldSkip = (name) => !name || SKIP_KEYWORDS.some(kw => name.includes(kw));
 
   const activeWorkplaces = useMemo(() => {
-    // First deduplicate: keep only the last assignment per student (same logic as the main table)
+    // Deduplicate: keep only the most recently updated assignment per student (same logic as main table)
     const assignmentByStudent = {};
-    assignments.forEach(a => { assignmentByStudent[a.student_id] = a; });
+    assignments.forEach(a => {
+      const existing = assignmentByStudent[a.student_id];
+      if (!existing || (a.updated_date || a.created_date) > (existing.updated_date || existing.created_date)) {
+        assignmentByStudent[a.student_id] = a;
+      }
+    });
     const deduped = Object.values(assignmentByStudent);
 
     const map = {};
@@ -165,7 +171,9 @@ export default function LogisticsSidebar({ date, assignments }) {
   }, [assignments]);
 
   const handleSave = async (workplaceId, workplaceName, data) => {
-    const existing = logisticsList.find(l => l.workplace_id === workplaceId);
+    // Use the deduplicated logisticsMap (keyed by workplace_id) — never the raw list
+    // This prevents accidentally updating a logistics record from a different date
+    const existing = logisticsMap[workplaceId];
     if (existing) {
       await base44.entities.WorkplaceLogistics.update(existing.id, data);
     } else {
