@@ -442,12 +442,14 @@ export default function Assignments() {
       const DISTANCE_WORKPLACE_MAP = {
         'קרוב':             { id: '69fc693c78294d134467549a', name: 'קרוב' },
         'רחוק':             { id: '69fc69439c049b10ad96b7f1', name: 'רחוק' },
+        'תתת - לא עובד':   { id: '69e9eedac6dc0db454f4ea10', name: 'תתת - לא עובד' },
+        'אאא- לפני שיבוץ': { id: '69e9eedac6dc0db454f4ea10', name: 'תתת - לא עובד' },
       };
-      const FALLBACK_WORKPLACE = { id: '69e9eedac6dc0db454f4ea10', name: 'תתת - לא עובד' };
 
-      // Build student lookup map for Sunday distance assignments
+      // Fetch fresh student data to ensure distance_status is up-to-date
+      const freshStudents = await base44.entities.Student.list('-created_date', 2000);
       const studentById = {};
-      students.forEach(s => { studentById[s.id] = s; });
+      freshStudents.forEach(s => { studentById[s.id] = s; });
 
       // Fetch existing assignments on the target date
       const targetAssignments = await base44.entities.Assignment.filter({ date: cloneTargetDate }, '-created_date', 2000);
