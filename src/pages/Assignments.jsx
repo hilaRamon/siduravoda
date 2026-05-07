@@ -473,7 +473,9 @@ export default function Assignments() {
             seenOnTarget.add(a.student_id);
           }
         });
-      await Promise.all(duplicatesToDelete.map(id => base44.entities.Assignment.delete(id)));
+      for (let i = 0; i < duplicatesToDelete.length; i += 10) {
+        await Promise.all(duplicatesToDelete.slice(i, i + 10).map(id => base44.entities.Assignment.delete(id)));
+      }
 
       // Source: deduped assignments from current date (only real students, not guests)
       const sourceAssignments = Object.values(assignmentByStudent)
