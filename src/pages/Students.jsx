@@ -4,10 +4,11 @@ import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Plus, Search, Upload, Pencil, Trash2, UserCircle } from 'lucide-react';
+import { Plus, Search, Upload, Pencil, Trash2, UserCircle, Phone } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import StudentFormModal from '@/components/students/StudentFormModal';
 import ImportModal from '@/components/students/ImportModal';
+import ImportPhonesModal from '@/components/students/ImportPhonesModal';
 import ForbiddenWorkplacesCell from '@/components/students/ForbiddenWorkplacesCell';
 
 const FREE_DAY_COLORS = {
@@ -22,6 +23,7 @@ export default function Students() {
   const [search, setSearch] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [showImport, setShowImport] = useState(false);
+  const [showImportPhones, setShowImportPhones] = useState(false);
   const [editStudent, setEditStudent] = useState(null);
   const queryClient = useQueryClient();
 
@@ -79,6 +81,9 @@ export default function Students() {
           <p className="text-muted-foreground mt-1">{students.length} רשומות במערכת</p>
         </div>
         <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setShowImportPhones(true)}>
+            <Phone size={16} className="ml-2" /> ייבוא טלפונים
+          </Button>
           <Button variant="outline" onClick={() => setShowImport(true)}>
             <Upload size={16} className="ml-2" /> ייבוא מאקסל
           </Button>
@@ -202,6 +207,12 @@ export default function Students() {
       <ImportModal
         open={showImport}
         onClose={() => setShowImport(false)}
+        onImported={() => queryClient.invalidateQueries({ queryKey: ['students'] })}
+      />
+      <ImportPhonesModal
+        open={showImportPhones}
+        onClose={() => setShowImportPhones(false)}
+        students={students}
         onImported={() => queryClient.invalidateQueries({ queryKey: ['students'] })}
       />
     </div>
