@@ -149,7 +149,7 @@ export default function LogisticsSidebar({ date, assignments }) {
     return map;
   }, [logisticsList]);
 
-  // Build a set of workplace IDs that have farm_name === 'ללא חיוב'
+  // Only show workplaces marked as 'ללא חיוב' (No Charge) in the sidebar
   const noChargeWorkplaceIds = useMemo(() => {
     const s = new Set();
     workplaces.forEach(w => {
@@ -158,15 +158,8 @@ export default function LogisticsSidebar({ date, assignments }) {
     return s;
   }, [workplaces]);
 
-  // Skip workplaces that represent non-work statuses — match by substring too (e.g. "תתת - לא עובד", "תתב - לימודים")
-  const SKIP_KEYWORDS = ['לא עובד', 'לימודים', 'לא יצא'];
-  const shouldSkip = (name, id) =>
-    !name ||
-    SKIP_KEYWORDS.some(kw => name.includes(kw)) ||
-    noChargeWorkplaceIds.has(id);
-
   const activeWorkplaces = useMemo(() => {
-    // Deduplicate: keep only the most recently updated assignment per student (same logic as main table)
+    // Deduplicate: keep only the most recently updated assignment per student
     const assignmentByStudent = {};
     assignments.forEach(a => {
       const existing = assignmentByStudent[a.student_id];
@@ -177,15 +170,17 @@ export default function LogisticsSidebar({ date, assignments }) {
     const deduped = Object.values(assignmentByStudent);
 
     const map = {};
-    deduped.filter(a => !shouldSkip(a.workplace_name, a.workplace_id)).forEach(a => {
-      if (!map[a.workplace_id]) map[a.workplace_id] = { name: a.workplace_name, students: new Set() };
-      map[a.workplace_id].students.add(a.student_id);
-    });
+    deduped
+      .filter(a => a.workplace_id && noChargeWorkplaceIds.has(a.workplace_id))
+      .forEach(a => {
+        if (!map[a.workplace_id]) map[a.workplace_id] = { name: a.workplace_name, students: new Set() };
+        map[a.workplace_id].students.add(a.student_id);
+      });
     return Object.entries(map)
       .filter(([, v]) => v.students.size > 0)
       .sort(([, a], [, b]) => a.name.localeCompare(b.name, 'he'))
       .map(([id, v]) => ({ id, name: v.name, count: v.students.size }));
-  }, [assignments]);
+  }, [assignments, noChargeWorkplaceIds]);
 
   const handleSave = async (workplaceId, workplaceName, data) => {
     // Use the deduplicated logisticsMap (keyed by workplace_id) — never the raw list
