@@ -438,12 +438,12 @@ export default function Assignments() {
       const isSunday = targetDayOfWeek === 0;
 
       // Distance → workplace mapping for Sunday mode
-      // workplace name must exactly match student's distance_status value
+      // Each distance_status maps to a corresponding workplace with the same name
       const DISTANCE_WORKPLACE_MAP = {
         'קרוב':             { id: '69fc693c78294d134467549a', name: 'קרוב' },
         'רחוק':             { id: '69fc69439c049b10ad96b7f1', name: 'רחוק' },
         'תתת - לא עובד':   { id: '69e9eedac6dc0db454f4ea10', name: 'תתת - לא עובד' },
-        'אאא- לפני שיבוץ': { id: '69e9eedac6dc0db454f4ea10', name: 'תתת - לא עובד' },
+        'אאא- לפני שיבוץ': { id: '69e9eedac6dc0db454f4ea10', name: 'אאא- לפני שיבוץ' },
       };
 
       // Fetch fresh student data to ensure distance_status is up-to-date
