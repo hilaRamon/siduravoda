@@ -433,6 +433,22 @@ export default function Assignments() {
     if (!cloneTargetDate) return;
     setCloning(true);
     try {
+      // Check if target date is Sunday (day 0)
+      const targetDayOfWeek = new Date(cloneTargetDate + 'T12:00:00').getDay();
+      const isSunday = targetDayOfWeek === 0;
+
+      // Distance → workplace mapping for Sunday mode
+      // workplace name must exactly match student's distance_status value
+      const DISTANCE_WORKPLACE_MAP = {
+        'קרוב':             { id: '69fc693c78294d134467549a', name: 'קרוב' },
+        'רחוק':             { id: '69fc69439c049b10ad96b7f1', name: 'רחוק' },
+      };
+      const FALLBACK_WORKPLACE = { id: '69e9eedac6dc0db454f4ea10', name: 'תתת - לא עובד' };
+
+      // Build student lookup map for Sunday distance assignments
+      const studentById = {};
+      students.forEach(s => { studentById[s.id] = s; });
+
       // Fetch existing assignments on the target date
       const targetAssignments = await base44.entities.Assignment.filter({ date: cloneTargetDate }, '-created_date', 2000);
 
@@ -467,23 +483,40 @@ export default function Assignments() {
       const toCreate = [];
 
       for (const src of sourceAssignments) {
+        // Determine workplace for target
+        let targetWp;
+        if (isSunday) {
+          // Sunday: assign by student's distance_status
+          const student = studentById[src.student_id];
+          const distanceStatus = student?.distance_status || '';
+          targetWp = DISTANCE_WORKPLACE_MAP[distanceStatus] || FALLBACK_WORKPLACE;
+        } else {
+          // Regular day: copy workplace from source
+          targetWp = { id: src.workplace_id, name: src.workplace_name };
+        }
+
         const existing = targetByStudent[src.student_id];
         if (existing) {
-          // Update only workplace_id and workplace_name
           toUpdate.push({
             id: existing.id,
-            fullRecord: { workplace_id: src.workplace_id, workplace_name: src.workplace_name },
+            fullRecord: {
+              workplace_id: targetWp.id,
+              workplace_name: targetWp.name,
+              role: null,
+              bonus: null,
+            },
           });
         } else {
-          // Create new with only workplace — reset all other fields to defaults
           toCreate.push({
             date: cloneTargetDate,
             student_id: src.student_id,
             student_name: src.student_name,
-            workplace_id: src.workplace_id,
-            workplace_name: src.workplace_name,
+            workplace_id: targetWp.id,
+            workplace_name: targetWp.name,
             rate: 40,
             hours: 4.75,
+            role: null,
+            bonus: null,
           });
         }
       }
@@ -500,7 +533,8 @@ export default function Assignments() {
       queryClient.invalidateQueries({ queryKey: ['assignments'] });
       setShowCloneDialog(false);
       setCloneTargetDate('');
-      alert(`שוכפלו ${toCreate.length + toUpdate.length} שיבוצים לתאריך ${cloneTargetDate} (מקום עבודה בלבד)`);
+      const modeLabel = isSunday ? 'שיבוץ ראשון לפי מרחק' : 'מקום עבודה בלבד';
+      alert(`שוכפלו ${toCreate.length + toUpdate.length} שיבוצים לתאריך ${cloneTargetDate} (${modeLabel})`);
     } finally {
       setCloning(false);
     }
@@ -654,6 +688,11 @@ export default function Assignments() {
               onChange={e => setCloneTargetDate(e.target.value)}
               className="w-full border border-border rounded-lg px-3 py-2 text-sm bg-card focus:outline-none focus:ring-2 focus:ring-primary/30"
             />
+            {cloneTargetDate && new Date(cloneTargetDate + 'T12:00:00').getDay() === 0 && (
+              <div className="bg-primary/10 border border-primary/30 rounded-lg px-3 py-2 text-xs text-primary">
+                📅 יום ראשון — שיבוץ אוטומטי לפי <strong>סטטוס מרחק</strong> (קרוב / רחוק)
+              </div>
+            )}
             <div className="flex gap-2 justify-end pt-1">
               <Button variant="outline" onClick={() => setShowCloneDialog(false)}>ביטול</Button>
               <Button onClick={handleCloneDay} disabled={!cloneTargetDate || cloning}>
