@@ -132,11 +132,6 @@ export default function LogisticsSidebar({ date, assignments }) {
     queryFn: () => base44.entities.WorkplaceLogistics.filter({ date }),
   });
 
-  const { data: workplaces = [] } = useQuery({
-    queryKey: ['workplaces'],
-    queryFn: () => base44.entities.Workplace.list(),
-  });
-
   // De-duplicate: keep only the most recently updated record per workplace
   const logisticsMap = useMemo(() => {
     const map = {};
@@ -148,15 +143,6 @@ export default function LogisticsSidebar({ date, assignments }) {
     });
     return map;
   }, [logisticsList]);
-
-  // Only show workplaces marked as 'ללא חיוב' (No Charge) in the sidebar
-  const noChargeWorkplaceIds = useMemo(() => {
-    const s = new Set();
-    workplaces.forEach(w => {
-      if (w.farm_name === 'ללא חיוב') s.add(w.id);
-    });
-    return s;
-  }, [workplaces]);
 
   const activeWorkplaces = useMemo(() => {
     // Deduplicate: keep only the most recently updated assignment per student
@@ -171,7 +157,7 @@ export default function LogisticsSidebar({ date, assignments }) {
 
     const map = {};
     deduped
-      .filter(a => a.workplace_id && noChargeWorkplaceIds.has(a.workplace_id))
+      .filter(a => a.workplace_id && a.workplace_name)
       .forEach(a => {
         if (!map[a.workplace_id]) map[a.workplace_id] = { name: a.workplace_name, students: new Set() };
         map[a.workplace_id].students.add(a.student_id);
@@ -180,7 +166,7 @@ export default function LogisticsSidebar({ date, assignments }) {
       .filter(([, v]) => v.students.size > 0)
       .sort(([, a], [, b]) => a.name.localeCompare(b.name, 'he'))
       .map(([id, v]) => ({ id, name: v.name, count: v.students.size }));
-  }, [assignments, noChargeWorkplaceIds]);
+  }, [assignments]);
 
   const handleSave = async (workplaceId, workplaceName, data) => {
     // Use the deduplicated logisticsMap (keyed by workplace_id) — never the raw list
