@@ -432,78 +432,25 @@ export default function Assignments() {
   const handleCloneDay = async () => {
     if (!cloneTargetDate) return;
     setCloning(true);
-    try {
-      // Fetch existing assignments on the target date
-      const targetAssignments = await base44.entities.Assignment.filter({ date: cloneTargetDate }, '-created_date', 2000);
-
-      // Build a map: student_id -> existing assignment on target date
-      const targetByStudent = {};
-      targetAssignments.forEach(a => {
-        const existing = targetByStudent[a.student_id];
-        if (!existing || (a.updated_date || a.created_date) > (existing.updated_date || existing.created_date)) {
-          targetByStudent[a.student_id] = a;
-        }
-      });
-
-      // Delete duplicates on target date (keep only the most recent per student)
-      const duplicatesToDelete = [];
-      const seenOnTarget = new Set();
-      [...targetAssignments]
-        .sort((a, b) => ((b.updated_date || b.created_date) > (a.updated_date || a.created_date) ? 1 : -1))
-        .forEach(a => {
-          if (seenOnTarget.has(a.student_id)) {
-            duplicatesToDelete.push(a.id);
-          } else {
-            seenOnTarget.add(a.student_id);
-          }
-        });
-      await Promise.all(duplicatesToDelete.map(id => base44.entities.Assignment.delete(id)));
-
-      // Source: deduped assignments from current date (only real students, not guests)
-      const sourceAssignments = Object.values(assignmentByStudent)
-        .filter(a => !a.student_id?.startsWith('guest_'));
-
-      const toUpdate = [];
-      const toCreate = [];
-
-      for (const src of sourceAssignments) {
-        const existing = targetByStudent[src.student_id];
-        if (existing) {
-          // Update only workplace_id and workplace_name
-          toUpdate.push({
-            id: existing.id,
-            fullRecord: { workplace_id: src.workplace_id, workplace_name: src.workplace_name },
-          });
-        } else {
-          // Create new with only workplace — reset all other fields to defaults
-          toCreate.push({
-            date: cloneTargetDate,
-            student_id: src.student_id,
-            student_name: src.student_name,
-            workplace_id: src.workplace_id,
-            workplace_name: src.workplace_name,
-            rate: 40,
-            hours: 4.75,
-          });
-        }
-      }
-
-      // Process in chunks
-      const CHUNK = 40;
-      for (let i = 0; i < toUpdate.length; i += CHUNK) {
-        await base44.functions.invoke('bulkUpdateAssignments', { toCreate: [], toUpdate: toUpdate.slice(i, i + CHUNK) });
-      }
-      if (toCreate.length > 0) {
-        await base44.functions.invoke('bulkUpdateAssignments', { toCreate, toUpdate: [] });
-      }
-
-      queryClient.invalidateQueries({ queryKey: ['assignments'] });
-      setShowCloneDialog(false);
-      setCloneTargetDate('');
-      alert(`שוכפלו ${toCreate.length + toUpdate.length} שיבוצים לתאריך ${cloneTargetDate} (מקום עבודה בלבד)`);
-    } finally {
-      setCloning(false);
-    }
+    const activeStudentIds = new Set(students.filter(s => s.is_active !== false).map(s => s.id));
+    // Use assignmentByStudent (deduped, most recent wins) instead of raw assignments array
+    const toCreate = Object.values(assignmentByStudent)
+      .filter(a => activeStudentIds.has(a.student_id))
+      .map(a => ({
+        date: cloneTargetDate,
+        student_id: a.student_id,
+        student_name: a.student_name,
+        workplace_id: a.workplace_id,
+        workplace_name: a.workplace_name,
+        rate: a.rate ?? 40,
+        hours: a.hours ?? 4.75,
+      }));
+    await base44.entities.Assignment.bulkCreate(toCreate);
+    queryClient.invalidateQueries({ queryKey: ['assignments'] });
+    setCloning(false);
+    setShowCloneDialog(false);
+    setCloneTargetDate('');
+    alert(`שוכפלו ${toCreate.length} שיבוצים לתאריך ${cloneTargetDate}`);
   };
 
   const prevDay = () => setDate(format(subDays(new Date(date + 'T12:00:00'), 1), 'yyyy-MM-dd'));
