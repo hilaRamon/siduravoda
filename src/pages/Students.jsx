@@ -154,12 +154,15 @@ export default function Students() {
                         queryClient.invalidateQueries({ queryKey: ['students'] });
                       }}
                     >
-                      <SelectTrigger className="h-7 text-xs w-24 border-dashed">
+                      <SelectTrigger className="h-7 text-xs w-36 border-dashed">
                         <SelectValue placeholder="—" />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="קרוב">קרוב</SelectItem>
+                        <SelectItem value="בינוני">בינוני</SelectItem>
                         <SelectItem value="רחוק">רחוק</SelectItem>
+                        <SelectItem value="אאא- לפני שיבוץ">אאא- לפני שיבוץ</SelectItem>
+                        <SelectItem value="תתת - לא עובד">תתת - לא עובד</SelectItem>
                       </SelectContent>
                     </Select>
                   </td>
