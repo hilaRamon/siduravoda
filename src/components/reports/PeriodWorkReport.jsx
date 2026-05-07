@@ -2,10 +2,10 @@ import { useState, useMemo, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
-import { Download, Loader2, FileSpreadsheet } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Download, Loader2, FileSpreadsheet, ChevronsUpDown, X } from 'lucide-react';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { ChevronsUpDown } from 'lucide-react';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import * as XLSX from 'xlsx';
@@ -15,7 +15,7 @@ const SKIP_WORKPLACES = ['לא עובד', 'לימודים'];
 export default function PeriodWorkReport() {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
-  const [selectedWorkplace, setSelectedWorkplace] = useState('');
+  const [selectedWorkplaces, setSelectedWorkplaces] = useState([]);
   const [wpOpen, setWpOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [exportingXlsx, setExportingXlsx] = useState(false);
@@ -76,9 +76,9 @@ export default function PeriodWorkReport() {
     Object.values(byWorkplace).forEach(rows => rows.sort((a, b) => a.date.localeCompare(b.date)));
 
     return Object.entries(byWorkplace)
-      .filter(([wp]) => !selectedWorkplace || wp === selectedWorkplace)
+      .filter(([wp]) => selectedWorkplaces.length === 0 || selectedWorkplaces.includes(wp))
       .sort(([a], [b]) => a.localeCompare(b, 'he'));
-  }, [startDate, endDate, allAssignments, selectedWorkplace]);
+  }, [startDate, endDate, allAssignments, selectedWorkplaces]);
 
   const formatDate = (d) => { const [y, m, day] = d.split('-'); return `${day}/${m}/${y}`; };
 
@@ -155,29 +155,48 @@ export default function PeriodWorkReport() {
             className="border border-border rounded-lg px-3 py-2 text-sm bg-card focus:outline-none focus:ring-2 focus:ring-primary/30 h-9" />
         </div>
         <div>
-          <label className="text-xs text-muted-foreground block mb-1">מקום עבודה</label>
+          <label className="text-xs text-muted-foreground block mb-1">מקום עבודה (ניתן לבחור מרובים)</label>
           <Popover open={wpOpen} onOpenChange={setWpOpen}>
             <PopoverTrigger asChild>
-              <button className="h-9 w-52 border border-border rounded-md px-3 text-sm flex items-center justify-between bg-card hover:bg-secondary/40 transition-colors">
-                <span className={selectedWorkplace ? '' : 'text-muted-foreground'}>{selectedWorkplace || 'כל מקומות העבודה'}</span>
-                <ChevronsUpDown size={14} className="opacity-50" />
+              <button className="h-9 w-56 border border-border rounded-md px-3 text-sm flex items-center justify-between bg-card hover:bg-secondary/40 transition-colors">
+                <span className={`truncate ${selectedWorkplaces.length === 0 ? 'text-muted-foreground' : ''}`}>
+                  {selectedWorkplaces.length === 0 ? 'כל מקומות העבודה' : selectedWorkplaces.length === 1 ? selectedWorkplaces[0] : `${selectedWorkplaces.length} נבחרו`}
+                </span>
+                <ChevronsUpDown size={14} className="opacity-50 shrink-0 mr-1" />
               </button>
             </PopoverTrigger>
-            <PopoverContent className="w-52 p-0" align="start">
+            <PopoverContent className="w-64 p-0" align="start" dir="rtl">
               <Command>
                 <CommandInput placeholder="חיפוש מקום עבודה..." className="h-8 text-xs" />
                 <CommandList>
                   <CommandEmpty>לא נמצא</CommandEmpty>
                   <CommandGroup>
-                    <CommandItem value="__all__" onSelect={() => { setSelectedWorkplace(''); setWpOpen(false); }} className="text-xs text-muted-foreground">כל מקומות העבודה</CommandItem>
+                    <CommandItem value="__all__" onSelect={() => setSelectedWorkplaces([])} className="text-xs text-muted-foreground flex items-center gap-2">
+                      <Checkbox checked={selectedWorkplaces.length === 0} className="shrink-0" />
+                      כל מקומות העבודה
+                    </CommandItem>
                     {workplaceNames.map(w => (
-                      <CommandItem key={w} value={w} onSelect={() => { setSelectedWorkplace(w); setWpOpen(false); }} className="text-xs">{w}</CommandItem>
+                      <CommandItem key={w} value={w} onSelect={() => setSelectedWorkplaces(prev => prev.includes(w) ? prev.filter(x => x !== w) : [...prev, w])} className="text-xs flex items-center gap-2">
+                        <Checkbox checked={selectedWorkplaces.includes(w)} className="shrink-0" />
+                        {w}
+                      </CommandItem>
                     ))}
                   </CommandGroup>
                 </CommandList>
               </Command>
             </PopoverContent>
           </Popover>
+          {selectedWorkplaces.length > 0 && (
+            <div className="flex flex-wrap gap-1 mt-1">
+              {selectedWorkplaces.map(w => (
+                <span key={w} className="flex items-center gap-1 bg-primary/10 text-primary text-xs px-2 py-0.5 rounded-full">
+                  {w}
+                  <button onClick={() => setSelectedWorkplaces(prev => prev.filter(x => x !== w))} className="hover:text-destructive"><X size={10} /></button>
+                </span>
+              ))}
+              <button onClick={() => setSelectedWorkplaces([])} className="text-xs text-muted-foreground underline px-1">נקה</button>
+            </div>
+          )}
         </div>
         {hasData && (
           <>
