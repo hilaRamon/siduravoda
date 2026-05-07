@@ -675,7 +675,7 @@ export default function Assignments() {
       </Dialog>
 
       {/* Clone Dialog */}
-      <Dialog open={showCloneDialog} onOpenChange={setShowCloneDialog}>
+      <Dialog open={showCloneDialog} onOpenChange={(v) => { setShowCloneDialog(v); if (!v) setCloning(false); }}>
         <DialogContent className="max-w-sm" dir="rtl">
           <DialogHeader>
             <DialogTitle>שכפול שיבוצים</DialogTitle>
