@@ -491,7 +491,12 @@ export default function Assignments() {
           // Sunday: assign by student's distance_status
           const student = studentById[src.student_id];
           const distanceStatus = student?.distance_status || '';
-          targetWp = DISTANCE_WORKPLACE_MAP[distanceStatus] || FALLBACK_WORKPLACE;
+          if (DISTANCE_WORKPLACE_MAP[distanceStatus]) {
+            targetWp = DISTANCE_WORKPLACE_MAP[distanceStatus];
+          } else {
+            // No distance_status set — keep original workplace from source day
+            targetWp = { id: src.workplace_id, name: src.workplace_name };
+          }
         } else {
           // Regular day: copy workplace from source
           targetWp = { id: src.workplace_id, name: src.workplace_name };
