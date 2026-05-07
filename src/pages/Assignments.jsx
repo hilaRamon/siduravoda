@@ -542,13 +542,16 @@ export default function Assignments() {
         await base44.functions.invoke('bulkUpdateAssignments', { toCreate, toUpdate: [] });
       }
 
+      const totalCloned = toCreate.length + toUpdate.length;
       queryClient.invalidateQueries({ queryKey: ['assignments'] });
-      setShowCloneDialog(false);
-      setCloneTargetDate('');
       const modeLabel = isSunday ? 'שיבוץ ראשון לפי מרחק' : 'מקום עבודה בלבד';
-      alert(`שוכפלו ${toCreate.length + toUpdate.length} שיבוצים לתאריך ${cloneTargetDate} (${modeLabel})`);
+      alert(`✅ הושלם! שוכפלו ${totalCloned} שיבוצים לתאריך ${cloneTargetDate} (${modeLabel})`);
+    } catch (error) {
+      alert(`❌ שגיאה בשכפול: ${error.message || 'נסה שוב'}`);
     } finally {
       setCloning(false);
+      setShowCloneDialog(false);
+      setCloneTargetDate('');
     }
   };
 
