@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const FREE_DAYS = ['א', 'ב', 'ג', 'ד', 'ה'];
-const DISTANCES = ['קרוב', 'בינוני', 'רחוק', 'אאא- לפני שיבוץ', 'תתת - לא עובד'];
+const DISTANCES = ['קרוב', 'רחוק', 'אאא- לפני שיבוץ', 'תתת - לא עובד'];
 
 export default function StudentFormModal({ open, onClose, onSave, student }) {
   const [form, setForm] = useState({
