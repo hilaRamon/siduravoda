@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Plus, Search, Upload, Pencil, Trash2, UserCircle } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import StudentFormModal from '@/components/students/StudentFormModal';
 import ImportModal from '@/components/students/ImportModal';
 import ForbiddenWorkplacesCell from '@/components/students/ForbiddenWorkplacesCell';
@@ -145,7 +146,23 @@ export default function Students() {
                       </span>
                     ) : '—'}
                   </td>
-                  <td className="px-5 py-3 text-sm text-muted-foreground">{s.distance_status || '—'}</td>
+                  <td className="px-5 py-3">
+                    <Select
+                      value={s.distance_status || ''}
+                      onValueChange={async (val) => {
+                        await base44.entities.Student.update(s.id, { distance_status: val || null });
+                        queryClient.invalidateQueries({ queryKey: ['students'] });
+                      }}
+                    >
+                      <SelectTrigger className="h-7 text-xs w-24 border-dashed">
+                        <SelectValue placeholder="—" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="קרוב">קרוב</SelectItem>
+                        <SelectItem value="רחוק">רחוק</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </td>
                   <ForbiddenWorkplacesCell student={s} workplaces={workplaces} onSave={() => queryClient.invalidateQueries({ queryKey: ['students'] })} />
                   <td className="px-5 py-3 text-center">
                     <Checkbox
