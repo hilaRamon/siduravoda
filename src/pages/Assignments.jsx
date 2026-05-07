@@ -522,9 +522,9 @@ export default function Assignments() {
           </DialogHeader>
           <div className="space-y-3 mt-2">
             <p className="text-xs text-muted-foreground">בחר מחזורים — כל תלמידי המחזור יסומנו בטבלה.</p>
-            <div className="space-y-2">
+            <div className="grid grid-cols-2 gap-1">
               {cohorts.map(c => (
-                <label key={c} className="flex items-center gap-3 cursor-pointer hover:bg-secondary/30 rounded-lg px-3 py-2 transition-colors">
+                <label key={c} className="flex items-center gap-2 cursor-pointer hover:bg-secondary/30 rounded-lg px-3 py-2 transition-colors">
                   <Checkbox
                     checked={cohortDialogSelected.includes(c)}
                     onCheckedChange={(checked) => {
@@ -533,7 +533,7 @@ export default function Assignments() {
                       );
                     }}
                   />
-                  <span className="text-sm font-medium">{c}</span>
+                  <span className="text-sm font-medium truncate">{c}</span>
                 </label>
               ))}
             </div>
