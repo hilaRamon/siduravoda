@@ -438,13 +438,14 @@ export default function Assignments() {
       const isSunday = targetDayOfWeek === 0;
 
       // Distance → workplace mapping for Sunday mode
-      // Each distance_status maps to a corresponding workplace with the same name
-      const DISTANCE_WORKPLACE_MAP = {
-        'קרוב':             { id: '69fc693c78294d134467549a', name: 'קרוב' },
-        'רחוק':             { id: '69fc69439c049b10ad96b7f1', name: 'רחוק' },
-        'תתת - לא עובד':   { id: '69e9eedac6dc0db454f4ea10', name: 'תתת - לא עובד' },
-        'אאא- לפני שיבוץ': { id: '69e9eedac6dc0db454f4ea10', name: 'אאא- לפני שיבוץ' },
-      };
+      // Build map dynamically from actual workplaces to avoid hardcoded IDs
+      const DISTANCE_WORKPLACE_MAP = {};
+      ['קרוב', 'רחוק', 'תתת - לא עובד', 'אאא- לפני שיבוץ'].forEach(distStatus => {
+        const wp = workplaces.find(w => w.name === distStatus);
+        if (wp) {
+          DISTANCE_WORKPLACE_MAP[distStatus] = { id: wp.id, name: wp.name };
+        }
+      });
 
       // Fetch fresh student data to ensure distance_status is up-to-date
       const freshStudents = await base44.entities.Student.list('-created_date', 2000);
@@ -492,11 +493,13 @@ export default function Assignments() {
         if (isSunday) {
           // Sunday: assign by student's distance_status
           const student = studentById[src.student_id];
-          const distanceStatus = student?.distance_status || '';
-          if (DISTANCE_WORKPLACE_MAP[distanceStatus]) {
+          const distanceStatus = student?.distance_status;
+          
+          if (distanceStatus && DISTANCE_WORKPLACE_MAP[distanceStatus]) {
+            // Use the mapped workplace for this distance_status
             targetWp = DISTANCE_WORKPLACE_MAP[distanceStatus];
           } else {
-            // No distance_status set — keep original workplace from source day
+            // No valid distance_status — keep original workplace from source day
             targetWp = { id: src.workplace_id, name: src.workplace_name };
           }
         } else {
