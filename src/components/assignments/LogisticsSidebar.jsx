@@ -132,6 +132,11 @@ export default function LogisticsSidebar({ date, assignments }) {
     queryFn: () => base44.entities.WorkplaceLogistics.filter({ date }),
   });
 
+  const { data: workplaces = [] } = useQuery({
+    queryKey: ['workplaces'],
+    queryFn: () => base44.entities.Workplace.list(),
+  });
+
   // De-duplicate: keep only the most recently updated record per workplace
   const logisticsMap = useMemo(() => {
     const map = {};
@@ -144,9 +149,21 @@ export default function LogisticsSidebar({ date, assignments }) {
     return map;
   }, [logisticsList]);
 
+  // Build a set of workplace IDs that have farm_name === 'ללא חיוב'
+  const noChargeWorkplaceIds = useMemo(() => {
+    const s = new Set();
+    workplaces.forEach(w => {
+      if (w.farm_name === 'ללא חיוב') s.add(w.id);
+    });
+    return s;
+  }, [workplaces]);
+
   // Skip workplaces that represent non-work statuses — match by substring too (e.g. "תתת - לא עובד", "תתב - לימודים")
   const SKIP_KEYWORDS = ['לא עובד', 'לימודים', 'לא יצא'];
-  const shouldSkip = (name) => !name || SKIP_KEYWORDS.some(kw => name.includes(kw));
+  const shouldSkip = (name, id) =>
+    !name ||
+    SKIP_KEYWORDS.some(kw => name.includes(kw)) ||
+    noChargeWorkplaceIds.has(id);
 
   const activeWorkplaces = useMemo(() => {
     // Deduplicate: keep only the most recently updated assignment per student (same logic as main table)
@@ -160,7 +177,7 @@ export default function LogisticsSidebar({ date, assignments }) {
     const deduped = Object.values(assignmentByStudent);
 
     const map = {};
-    deduped.filter(a => !shouldSkip(a.workplace_name)).forEach(a => {
+    deduped.filter(a => !shouldSkip(a.workplace_name, a.workplace_id)).forEach(a => {
       if (!map[a.workplace_id]) map[a.workplace_id] = { name: a.workplace_name, students: new Set() };
       map[a.workplace_id].students.add(a.student_id);
     });
