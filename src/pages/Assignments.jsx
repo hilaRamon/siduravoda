@@ -178,6 +178,8 @@ export default function Assignments() {
 
   const [showAddGuestDialog, setShowAddGuestDialog] = useState(false);
   const [guestName, setGuestName] = useState('');
+  const [showCohortSelectDialog, setShowCohortSelectDialog] = useState(false);
+  const [cohortDialogSelected, setCohortDialogSelected] = useState([]);
 
   const queryClient = useQueryClient();
 
@@ -464,8 +466,11 @@ export default function Assignments() {
             {new Set(assignments.filter(a => a.workplace_name && !['לא עובד','לימודים','לא יצא'].some(kw => a.workplace_name.trim() === kw)).map(a => a.student_id)).size} משובצים מתוך {students.filter(s => s.is_active !== false && (!s.created_date || s.created_date.slice(0, 10) <= date)).length} תלמידים
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <DailyReportPDFButton date={date} assignments={assignments} />
+          <Button variant="outline" onClick={() => { setCohortDialogSelected([]); setShowCohortSelectDialog(true); }}>
+            בחירה לפי מחזור
+          </Button>
           <Button variant="outline" onClick={() => setShowAddGuestDialog(true)}>
             <UserPlus size={16} className="ml-2" /> הוסף תלמיד יומי
           </Button>
@@ -508,6 +513,51 @@ export default function Assignments() {
           </Button>
         </div>
       )}
+
+      {/* Cohort Select Dialog */}
+      <Dialog open={showCohortSelectDialog} onOpenChange={setShowCohortSelectDialog}>
+        <DialogContent className="max-w-sm" dir="rtl">
+          <DialogHeader>
+            <DialogTitle>בחירה לפי מחזור</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 mt-2">
+            <p className="text-xs text-muted-foreground">בחר מחזורים — כל תלמידי המחזור יסומנו בטבלה.</p>
+            <div className="space-y-2">
+              {cohorts.map(c => (
+                <label key={c} className="flex items-center gap-3 cursor-pointer hover:bg-secondary/30 rounded-lg px-3 py-2 transition-colors">
+                  <Checkbox
+                    checked={cohortDialogSelected.includes(c)}
+                    onCheckedChange={(checked) => {
+                      setCohortDialogSelected(prev =>
+                        checked ? [...prev, c] : prev.filter(x => x !== c)
+                      );
+                    }}
+                  />
+                  <span className="text-sm font-medium">{c}</span>
+                </label>
+              ))}
+            </div>
+            <div className="flex gap-2 justify-end pt-2">
+              <Button variant="outline" onClick={() => setShowCohortSelectDialog(false)}>ביטול</Button>
+              <Button
+                disabled={cohortDialogSelected.length === 0}
+                onClick={() => {
+                  const ids = new Set();
+                  filteredStudents.forEach(s => {
+                    if (cohortDialogSelected.includes(s.cohort)) {
+                      ids.add(assignmentByStudent[s.id]?.id || s.id);
+                    }
+                  });
+                  setSelectedIds(ids);
+                  setShowCohortSelectDialog(false);
+                }}
+              >
+                אשר ({cohortDialogSelected.length > 0 ? filteredStudents.filter(s => cohortDialogSelected.includes(s.cohort)).length : 0} תלמידים)
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Add Guest Dialog */}
       <Dialog open={showAddGuestDialog} onOpenChange={setShowAddGuestDialog}>

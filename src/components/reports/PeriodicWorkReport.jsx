@@ -5,7 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { ChevronsUpDown, Download, Loader2, FileSpreadsheet } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { ChevronsUpDown, Download, Loader2, FileSpreadsheet, X } from 'lucide-react';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import * as XLSX from 'xlsx';
@@ -27,7 +28,7 @@ export default function PeriodicWorkReport() {
   const [year, setYear] = useState('2026');
   const [exporting, setExporting] = useState(false);
   const [exportingXlsx, setExportingXlsx] = useState(false);
-  const [selectedFarm, setSelectedFarm] = useState('all');
+  const [selectedFarms, setSelectedFarms] = useState([]); // multi-select
   const [farmOpen, setFarmOpen] = useState(false);
   const reportRef = useRef(null);
 
@@ -47,21 +48,24 @@ export default function PeriodicWorkReport() {
     queryFn: () => base44.entities.Assignment.list(),
   });
 
-  // Build workplace -> farm_name lookup
   const workplaceFarmMap = useMemo(() => {
     const map = {};
     workplaces.forEach(w => { map[w.id] = w.farm_name || ''; });
     return map;
   }, [workplaces]);
 
-  // Group by farm -> rows
+  const toggleFarm = (farm) => {
+    setSelectedFarms(prev =>
+      prev.includes(farm) ? prev.filter(f => f !== farm) : [...prev, farm]
+    );
+  };
+
   const reportByFarm = useMemo(() => {
     const prefix = `${year}-${month}`;
     const filtered = allAssignments.filter(a =>
       a.date?.startsWith(prefix) && !SKIP_WORKPLACES.includes(a.workplace_name)
     );
 
-    // Group by date + workplace
     const grouped = {};
     filtered.forEach(a => {
       const farmName = workplaceFarmMap[a.workplace_id] || '';
@@ -76,7 +80,6 @@ export default function PeriodicWorkReport() {
       grouped[key].students.push(a);
     });
 
-    // Collect rows and group by farm
     const byFarm = {};
     Object.values(grouped).forEach(g => {
       const totalHours = g.students.reduce((s, a) => s + (a.hours || 0), 0);
@@ -86,7 +89,6 @@ export default function PeriodicWorkReport() {
         date: g.date,
         workplaceName: g.workplaceName,
         rate,
-        bonus: 0,
         studentCount: g.students.length,
         totalHours: Math.round(totalHours * 10) / 10,
         avgHours: Math.round(avgHours * 10) / 10,
@@ -97,18 +99,16 @@ export default function PeriodicWorkReport() {
       byFarm[fn].push(row);
     });
 
-    // Sort each farm's rows by workplace name then date
     Object.values(byFarm).forEach(rows => rows.sort((a, b) => {
       const wpCmp = (a.workplaceName || '').localeCompare(b.workplaceName || '', 'he');
       if (wpCmp !== 0) return wpCmp;
       return a.date.localeCompare(b.date);
     }));
 
-    // Return sorted by farm name, filtered by selectedFarm if set
     return Object.entries(byFarm)
-      .filter(([farm]) => selectedFarm === 'all' || farm === selectedFarm)
+      .filter(([farm]) => selectedFarms.length === 0 || selectedFarms.includes(farm))
       .sort(([a], [b]) => a.localeCompare(b, 'he'));
-  }, [month, year, allAssignments, workplaceFarmMap, selectedFarm]);
+  }, [month, year, allAssignments, workplaceFarmMap, selectedFarms]);
 
   const formatDate = (d) => {
     const [y, m, day] = d.split('-');
@@ -118,7 +118,6 @@ export default function PeriodicWorkReport() {
   const handleExportPDF = async () => {
     setExporting(true);
     await new Promise(r => setTimeout(r, 100));
-
     const el = reportRef.current;
     const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
     const pageW = pdf.internal.pageSize.getWidth();
@@ -129,12 +128,10 @@ export default function PeriodicWorkReport() {
 
     const sections = Array.from(el.children);
     let firstPage = true;
-
     for (const section of sections) {
       const canvas = await html2canvas(section, { scale: 1.5, useCORS: true, backgroundColor: '#ffffff' });
       const pxPerMM = canvas.width / printW;
       const pageHeightPx = maxImgH * pxPerMM;
-
       let srcY = 0;
       while (srcY < canvas.height) {
         const sliceH = Math.min(pageHeightPx, canvas.height - srcY);
@@ -148,7 +145,6 @@ export default function PeriodicWorkReport() {
         firstPage = false;
       }
     }
-
     pdf.save(`דוח_עבודה_תקופתי_${month}_${year}.pdf`);
     setExporting(false);
   };
@@ -176,6 +172,11 @@ export default function PeriodicWorkReport() {
 
   const monthLabel = MONTHS.find(m => m.value === month)?.label || '';
   const hasData = reportByFarm.length > 0;
+  const farmLabel = selectedFarms.length === 0
+    ? 'כל המשקים'
+    : selectedFarms.length === 1
+      ? selectedFarms[0]
+      : `${selectedFarms.length} משקים נבחרו`;
 
   return (
     <div className="space-y-4">
@@ -199,29 +200,55 @@ export default function PeriodicWorkReport() {
           </Select>
         </div>
         <div>
-          <label className="text-xs text-muted-foreground block mb-1">משק</label>
+          <label className="text-xs text-muted-foreground block mb-1">משק (ניתן לבחור מרובים)</label>
           <Popover open={farmOpen} onOpenChange={setFarmOpen}>
             <PopoverTrigger asChild>
-              <button className="h-9 w-44 border border-border rounded-md px-3 text-sm flex items-center justify-between bg-card hover:bg-secondary/40 transition-colors">
-                <span className={selectedFarm === 'all' ? 'text-muted-foreground' : ''}>{selectedFarm === 'all' ? 'כל המשקים' : selectedFarm}</span>
-                <ChevronsUpDown size={14} className="opacity-50" />
+              <button className="h-9 w-56 border border-border rounded-md px-3 text-sm flex items-center justify-between bg-card hover:bg-secondary/40 transition-colors">
+                <span className={selectedFarms.length === 0 ? 'text-muted-foreground truncate' : 'truncate'}>{farmLabel}</span>
+                <ChevronsUpDown size={14} className="opacity-50 shrink-0 mr-1" />
               </button>
             </PopoverTrigger>
-            <PopoverContent className="w-44 p-0" align="start">
+            <PopoverContent className="w-64 p-0" align="start" dir="rtl">
               <Command>
                 <CommandInput placeholder="חיפוש משק..." className="h-8 text-xs" />
                 <CommandList>
                   <CommandEmpty>לא נמצא</CommandEmpty>
                   <CommandGroup>
-                    <CommandItem value="all" onSelect={() => { setSelectedFarm('all'); setFarmOpen(false); }} className="text-xs text-muted-foreground">כל המשקים</CommandItem>
+                    <CommandItem
+                      value="__all__"
+                      onSelect={() => setSelectedFarms([])}
+                      className="text-xs text-muted-foreground flex items-center gap-2"
+                    >
+                      <Checkbox checked={selectedFarms.length === 0} className="shrink-0" />
+                      כל המשקים
+                    </CommandItem>
                     {farmNames.map(f => (
-                      <CommandItem key={f} value={f} onSelect={() => { setSelectedFarm(f); setFarmOpen(false); }} className="text-xs">{f}</CommandItem>
+                      <CommandItem
+                        key={f}
+                        value={f}
+                        onSelect={() => toggleFarm(f)}
+                        className="text-xs flex items-center gap-2"
+                      >
+                        <Checkbox checked={selectedFarms.includes(f)} className="shrink-0" />
+                        {f}
+                      </CommandItem>
                     ))}
                   </CommandGroup>
                 </CommandList>
               </Command>
             </PopoverContent>
           </Popover>
+          {selectedFarms.length > 0 && (
+            <div className="flex flex-wrap gap-1 mt-1">
+              {selectedFarms.map(f => (
+                <span key={f} className="flex items-center gap-1 bg-primary/10 text-primary text-xs px-2 py-0.5 rounded-full">
+                  {f}
+                  <button onClick={() => toggleFarm(f)} className="hover:text-destructive"><X size={10} /></button>
+                </span>
+              ))}
+              <button onClick={() => setSelectedFarms([])} className="text-xs text-muted-foreground underline px-1">נקה</button>
+            </div>
+          )}
         </div>
         {hasData && (
           <>

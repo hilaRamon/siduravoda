@@ -81,7 +81,16 @@ export default function StudentWorkReport() {
   };
 
   const reportData = useMemo(() => {
-    const filtered = allAssignments.filter(a =>
+    // Deduplicate by (student_id, date) — a student can only work one day per date
+    const seen = new Set();
+    const deduped = allAssignments.filter(a => {
+      const key = `${a.student_id}__${a.date}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+
+    const filtered = deduped.filter(a =>
       !SKIP_WORKPLACES.includes(a.workplace_name) &&
       a.date >= fromDate &&
       a.date <= toDate &&
