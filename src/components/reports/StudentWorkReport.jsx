@@ -275,18 +275,14 @@ export default function StudentWorkReport() {
               {reportData.map((student, si) =>
                 student.workplaces.map(([wpName, days], wi) => (
                   <tr key={`${si}-${wi}`} className={si % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                    {wi === 0 && (
-                      <td rowSpan={student.workplaces.length} className="border border-gray-300 px-3 py-2 font-medium align-top">
-                        {student.name}
-                      </td>
-                    )}
+                    <td className="border border-gray-300 px-3 py-2 font-medium">
+                      {wi === 0 ? student.name : ''}
+                    </td>
                     <td className="border border-gray-300 px-3 py-2">{wpName}</td>
                     <td className="border border-gray-300 px-3 py-2 text-center">{days}</td>
-                    {wi === 0 && (
-                      <td rowSpan={student.workplaces.length} className="border border-gray-300 px-3 py-2 text-center font-bold align-middle">
-                        {student.totalDays}
-                      </td>
-                    )}
+                    <td className="border border-gray-300 px-3 py-2 text-center font-bold">
+                      {wi === 0 ? student.totalDays : ''}
+                    </td>
                   </tr>
                 ))
               )}
