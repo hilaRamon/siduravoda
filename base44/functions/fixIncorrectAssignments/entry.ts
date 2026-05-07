@@ -26,9 +26,18 @@ Deno.serve(async (req) => {
 
     // Find issues: distance_status "אאא- לפני שיבוץ" but assigned to "תתת - לא עובד"
     const toFix = [];
+    const allAssignments = []; // For debugging
     assignments.forEach(a => {
       const student = studentById[a.student_id];
-      if (!student || student.distance_status !== 'אאא- לפני שיבוץ') return;
+      if (!student) return;
+      
+      allAssignments.push({
+        studentName: a.student_name,
+        distanceStatus: student.distance_status,
+        assignedWorkplace: a.workplace_name,
+      });
+      
+      if (student.distance_status !== 'אאא- לפני שיבוץ') return;
       if (a.workplace_name === 'תתת - לא עובד') {
         toFix.push({
           id: a.id,
@@ -59,6 +68,8 @@ Deno.serve(async (req) => {
       found: toFix.length,
       fixed: toFix.length,
       details: toFix,
+      allAssignments: allAssignments,
+      boazFound: allAssignments.filter(a => a.studentName.includes('ליפניק') || a.studentName.includes('בועז')),
     });
   } catch (error) {
     return Response.json({ error: error.message }, { status: 500 });
