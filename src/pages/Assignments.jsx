@@ -204,7 +204,13 @@ export default function Assignments() {
 
   const assignmentByStudent = useMemo(() => {
     const map = {};
-    assignments.forEach(a => { map[a.student_id] = a; });
+    assignments.forEach(a => {
+      const existing = map[a.student_id];
+      // Keep the most recently updated record to avoid stale duplicates overwriting fresh data
+      if (!existing || (a.updated_date || a.created_date) > (existing.updated_date || existing.created_date)) {
+        map[a.student_id] = a;
+      }
+    });
     return map;
   }, [assignments]);
 
@@ -425,7 +431,8 @@ export default function Assignments() {
     if (!cloneTargetDate) return;
     setCloning(true);
     const activeStudentIds = new Set(students.filter(s => s.is_active !== false).map(s => s.id));
-    const toCreate = assignments
+    // Use assignmentByStudent (deduped, most recent wins) instead of raw assignments array
+    const toCreate = Object.values(assignmentByStudent)
       .filter(a => activeStudentIds.has(a.student_id))
       .map(a => ({
         date: cloneTargetDate,
