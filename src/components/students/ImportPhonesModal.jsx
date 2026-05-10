@@ -39,9 +39,9 @@ export default function ImportPhonesModal({ open, onClose, students, onImported 
       let phoneCol = -1;
 
       for (let i = 0; i < Math.min(data.length, 10); i++) {
-        const row = data[i].map(c => String(c || '').toLowerCase());
-        const ni = row.findIndex(c => c.includes('שם') || c.includes('name'));
-        const pi = row.findIndex(c => c.includes('טלפון') || c.includes('phone') || c.includes('נייד') || c.includes('mobile'));
+        const row = (data[i] || []).map(c => String(c ?? '').toLowerCase());
+        const ni = row.findIndex(c => c && (c.includes('שם') || c.includes('name')));
+        const pi = row.findIndex(c => c && (c.includes('טלפון') || c.includes('phone') || c.includes('נייד') || c.includes('mobile')));
         if (ni !== -1 && pi !== -1) {
           headerIdx = i;
           nameCol = ni;
