@@ -85,24 +85,24 @@ export default function TimeReportsAdmin() {
         </div>
       ) : (
         <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden">
-          <table className="w-full text-sm">
+          <table className="w-full text-base">
             <thead className="bg-secondary/60 border-b border-border">
               <tr>
-                <th className="text-right px-4 py-3 font-semibold text-muted-foreground">שם תלמיד</th>
-                <th className="text-right px-4 py-3 font-semibold text-muted-foreground">מקום עבודה</th>
-                <th className="text-right px-4 py-3 font-semibold text-muted-foreground">כניסה</th>
-                <th className="text-right px-4 py-3 font-semibold text-muted-foreground">יציאה</th>
-                <th className="text-right px-4 py-3 font-semibold text-muted-foreground">סטטוס</th>
+                <th className="text-right px-4 py-3 text-base font-semibold text-muted-foreground">שם תלמיד</th>
+                <th className="text-right px-4 py-3 text-base font-semibold text-muted-foreground">מקום עבודה</th>
+                <th className="text-right px-4 py-3 text-base font-semibold text-muted-foreground">כניסה</th>
+                <th className="text-right px-4 py-3 text-base font-semibold text-muted-foreground">יציאה</th>
+                <th className="text-right px-4 py-3 text-base font-semibold text-muted-foreground">סטטוס</th>
                 <th className="px-4 py-3"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
               {changedReports.map(r => (
                 <tr key={r.id} className="hover:bg-secondary/20 transition-colors">
-                  <td className="px-4 py-3 font-medium">{r.student_name}</td>
-                  <td className="px-4 py-3 text-muted-foreground">{r.workplace_name}</td>
-                  <td className="px-4 py-3 font-mono text-sm">{r.start_time || '—'}</td>
-                  <td className="px-4 py-3 font-mono text-sm">{r.end_time || '—'}</td>
+                  <td className="px-4 py-3 font-medium text-base">{r.student_name}</td>
+                  <td className="px-4 py-3 text-muted-foreground text-base">{r.workplace_name}</td>
+                  <td className="px-4 py-3 font-mono text-base">{r.start_time || '—'}</td>
+                  <td className="px-4 py-3 font-mono text-base">{r.end_time || '—'}</td>
                   <td className="px-4 py-3">
                     <span className={`text-xs px-2 py-1 rounded-full font-medium ${STATUS_STYLES[r.status] || ''}`}>
                       {r.status}
