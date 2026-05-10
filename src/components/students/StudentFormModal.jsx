@@ -11,6 +11,7 @@ const DISTANCES = ['קרוב', 'רחוק', 'אאא- לפני שיבוץ', 'תת�
 export default function StudentFormModal({ open, onClose, onSave, student }) {
   const [form, setForm] = useState({
     full_name: '',
+    phone: '',
     cohort: '',
     free_day: '',
     distance_status: '',
@@ -20,12 +21,13 @@ export default function StudentFormModal({ open, onClose, onSave, student }) {
     if (student) {
       setForm({
         full_name: student.full_name || '',
+        phone: student.phone || '',
         cohort: student.cohort || '',
         free_day: student.free_day || '',
         distance_status: student.distance_status || '',
       });
     } else {
-      setForm({ full_name: '', cohort: '', free_day: '', distance_status: '' });
+      setForm({ full_name: '', phone: '', cohort: '', free_day: '', distance_status: '' });
     }
   }, [student, open]);
 
@@ -49,6 +51,16 @@ export default function StudentFormModal({ open, onClose, onSave, student }) {
               placeholder="שם מלא"
               required
               className="mt-1"
+            />
+          </div>
+          <div>
+            <Label>טלפון</Label>
+            <Input
+              value={form.phone}
+              onChange={e => setForm(p => ({ ...p, phone: e.target.value }))}
+              placeholder="050-0000000"
+              className="mt-1"
+              type="tel"
             />
           </div>
           <div className="grid grid-cols-2 gap-3">

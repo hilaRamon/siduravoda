@@ -132,6 +132,7 @@ export default function Students() {
               <tr>
                 <th className="text-right px-5 py-3 text-sm font-semibold text-muted-foreground">שם מלא</th>
                 <th className="text-right px-5 py-3 text-sm font-semibold text-muted-foreground">מחזור</th>
+                <th className="text-right px-5 py-3 text-sm font-semibold text-muted-foreground">טלפון</th>
                 <th className="text-right px-5 py-3 text-sm font-semibold text-muted-foreground">יום חופש</th>
                 <th className="text-right px-5 py-3 text-sm font-semibold text-muted-foreground">מרחק</th>
                 <th className="text-right px-5 py-3 text-sm font-semibold text-muted-foreground">מקומות אסורים</th>
@@ -144,6 +145,7 @@ export default function Students() {
                 <tr key={s.id} className={`transition-colors ${s.is_active === false ? 'opacity-50 bg-secondary/20' : 'hover:bg-secondary/30'}`}>
                   <td className="px-5 py-3 font-medium">{s.full_name}</td>
                   <td className="px-5 py-3 text-muted-foreground text-sm">{s.cohort || '—'}</td>
+                  <td className="px-5 py-3 text-muted-foreground text-sm">{s.phone || '—'}</td>
                   <td className="px-5 py-3">
                     {s.free_day ? (
                       <span className={`text-xs px-2 py-1 rounded-full font-medium ${FREE_DAY_COLORS[s.free_day] || 'bg-secondary text-secondary-foreground'}`}>
