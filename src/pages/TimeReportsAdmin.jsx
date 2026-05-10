@@ -21,14 +21,21 @@ export default function TimeReportsAdmin() {
     queryFn: () => base44.entities.TimeReport.filter({ date: selectedDate }, 'student_name', 500),
   });
 
+  // Only show reports where times differ from the defaults (i.e. the user actually changed something)
+  const DEFAULT_START = '07:00';
+  const DEFAULT_END = '11:45';
+  const changedReports = reports.filter(r =>
+    r.start_time !== DEFAULT_START || r.end_time !== DEFAULT_END
+  );
+
   const handleStatus = async (report, status) => {
     await base44.entities.TimeReport.update(report.id, { status });
     queryClient.invalidateQueries({ queryKey: ['time-reports', selectedDate] });
   };
 
-  const approved = reports.filter(r => r.status === 'אושר').length;
-  const pending = reports.filter(r => r.status === 'ממתין').length;
-  const rejected = reports.filter(r => r.status === 'נדחה').length;
+  const approved = changedReports.filter(r => r.status === 'אושר').length;
+  const pending = changedReports.filter(r => r.status === 'ממתין').length;
+  const rejected = changedReports.filter(r => r.status === 'נדחה').length;
 
   return (
     <div className="p-8">
@@ -71,10 +78,10 @@ export default function TimeReportsAdmin() {
         <div className="space-y-3">
           {[1,2,3,4].map(i => <div key={i} className="h-16 bg-secondary rounded-xl animate-pulse" />)}
         </div>
-      ) : reports.length === 0 ? (
+      ) : changedReports.length === 0 ? (
         <div className="text-center py-16 text-muted-foreground">
           <Clock size={48} className="mx-auto mb-3 opacity-30" />
-          <p>אין דיווחים לתאריך זה</p>
+          <p>{reports.length > 0 ? 'אין שינויים מהברירת מחדל לתאריך זה' : 'אין דיווחים לתאריך זה'}</p>
         </div>
       ) : (
         <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden">
@@ -90,7 +97,7 @@ export default function TimeReportsAdmin() {
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {reports.map(r => (
+              {changedReports.map(r => (
                 <tr key={r.id} className="hover:bg-secondary/20 transition-colors">
                   <td className="px-4 py-3 font-medium">{r.student_name}</td>
                   <td className="px-4 py-3 text-muted-foreground">{r.workplace_name}</td>
