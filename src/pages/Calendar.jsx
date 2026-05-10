@@ -129,17 +129,17 @@ function DayColumn({ day, farmerRequests, absences, workplaces }) {
     <div className={`flex-1 min-w-0 bg-card rounded-xl border ${isToday ? 'border-primary shadow-sm' : 'border-border'} p-3 space-y-3`}>
       {/* Header */}
       <div className={`text-center pb-2 border-b border-border`}>
-        <div className={`text-xs font-semibold ${isToday ? 'text-primary' : 'text-muted-foreground'}`}>
+        <div className={`text-sm font-semibold ${isToday ? 'text-primary' : 'text-muted-foreground'}`}>
           {DAY_NAMES[day.getDay()]}
         </div>
-        <div className={`text-sm font-bold mt-0.5 ${isToday ? 'text-primary' : ''}`}>
+        <div className={`text-base font-bold mt-0.5 ${isToday ? 'text-primary' : ''}`}>
           {day.toLocaleDateString('he-IL', { day: 'numeric', month: 'numeric' })}
         </div>
       </div>
 
       {/* Farmers section */}
       <div>
-        <div className="text-xs font-semibold text-foreground mb-1">🌾 חקלאים</div>
+        <div className="text-sm font-semibold text-foreground mb-1">🌾 חקלאים</div>
         {dayFarmerRequests.length === 0 ? (
           <p className="text-xs text-muted-foreground">אין דרישות</p>
         ) : (
@@ -167,7 +167,7 @@ function DayColumn({ day, farmerRequests, absences, workplaces }) {
 
       {/* Absences section */}
       <div>
-        <div className="text-xs font-semibold text-foreground mb-1">🚫 היעדרויות</div>
+        <div className="text-sm font-semibold text-foreground mb-1">🚫 היעדרויות</div>
         {dayAbsences.length === 0 ? (
           <p className="text-xs text-muted-foreground">אין היעדרויות</p>
         ) : (
