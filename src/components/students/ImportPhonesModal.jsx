@@ -28,7 +28,8 @@ export default function ImportPhonesModal({ open, onClose, students, onImported 
     if (!file) return;
     const reader = new FileReader();
     reader.onload = (ev) => {
-      const wb = XLSX.read(ev.target.result, { type: 'binary' });
+      const isCSV = file.name.endsWith('.csv');
+      const wb = XLSX.read(ev.target.result, { type: isCSV ? 'string' : 'binary' });
       const ws = wb.Sheets[wb.SheetNames[0]];
       const data = XLSX.utils.sheet_to_json(ws, { header: 1 });
 
@@ -74,7 +75,11 @@ export default function ImportPhonesModal({ open, onClose, students, onImported 
       setRows(parsed);
       setStep('preview');
     };
-    reader.readAsBinaryString(file);
+    if (file.name.endsWith('.csv')) {
+      reader.readAsText(file, 'UTF-8');
+    } else {
+      reader.readAsBinaryString(file);
+    }
   };
 
   const handleImport = async () => {
@@ -105,14 +110,14 @@ export default function ImportPhonesModal({ open, onClose, students, onImported 
       <DialogContent className="max-w-lg" dir="rtl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Phone size={18} /> ייבוא מספרי טלפון מאקסל
+            <Phone size={18} /> ייבוא מספרי טלפון מאקסל / CSV
           </DialogTitle>
         </DialogHeader>
 
         {step === 'upload' && (
           <div className="space-y-4 mt-2">
             <p className="text-sm text-muted-foreground">
-              העלה קובץ אקסל עם עמודות שם תלמיד וטלפון. המערכת תתאים לפי שם ותעדכן את מספר הטלפון לתלמידים הקיימים בלבד.
+              העלה קובץ אקסל או CSV עם עמודות שם תלמיד וטלפון. המערכת תתאים לפי שם ותעדכן את מספר הטלפון לתלמידים הקיימים בלבד.
             </p>
             <div
               className="border-2 border-dashed border-border rounded-xl p-8 text-center cursor-pointer hover:bg-secondary/20 transition-colors"
@@ -120,9 +125,9 @@ export default function ImportPhonesModal({ open, onClose, students, onImported 
             >
               <Upload size={32} className="mx-auto mb-2 text-muted-foreground" />
               <p className="text-sm font-medium">לחץ לבחירת קובץ</p>
-              <p className="text-xs text-muted-foreground mt-1">.xlsx, .xls</p>
+              <p className="text-xs text-muted-foreground mt-1">.xlsx, .xls, .csv</p>
             </div>
-            <input ref={fileRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleFile} />
+            <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleFile} />
             <div className="flex justify-end">
               <Button variant="outline" onClick={handleClose}>ביטול</Button>
             </div>
