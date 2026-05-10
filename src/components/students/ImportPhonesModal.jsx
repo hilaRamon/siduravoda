@@ -136,7 +136,8 @@ export default function ImportPhonesModal({ open, onClose, students, onImported 
         if (!name || !phone) continue;
 
         const matchedStudent = findBestMatch(name, students);
-        parsed.push({ name, phone, matchedStudent, status: matchedStudent ? 'matched' : 'not_found' });
+        const hasPhone = matchedStudent && matchedStudent.phone && matchedStudent.phone.trim() !== '';
+        parsed.push({ name, phone, matchedStudent, status: matchedStudent ? (hasPhone ? 'has_phone' : 'matched') : 'not_found' });
       }
 
       setRows(parsed);
@@ -164,22 +165,26 @@ export default function ImportPhonesModal({ open, onClose, students, onImported 
   const handleImport = async () => {
     setImporting(true);
     let updated = 0;
+    let skipped = 0;
     let notFound = 0;
     for (const row of rows) {
-      if (row.matchedStudent) {
+      if (row.status === 'matched') {
         await base44.entities.Student.update(row.matchedStudent.id, { phone: row.phone });
         updated++;
+      } else if (row.status === 'has_phone') {
+        skipped++;
       } else {
         notFound++;
       }
     }
-    setResults({ updated, notFound });
+    setResults({ updated, skipped, notFound });
     setStep('done');
     setImporting(false);
     onImported();
   };
 
   const matched = rows.filter(r => r.status === 'matched');
+  const hasPhone = rows.filter(r => r.status === 'has_phone');
   const notFound = rows.filter(r => r.status === 'not_found');
 
   return (
@@ -213,14 +218,15 @@ export default function ImportPhonesModal({ open, onClose, students, onImported 
 
         {step === 'preview' && (
           <div className="space-y-4 mt-2">
-            <div className="flex gap-4 text-sm">
-              <span className="text-green-600 font-medium">✓ {matched.length} תלמידים זוהו</span>
-              {notFound.length > 0 && <span className="text-red-500 font-medium">✗ {notFound.length} לא נמצאו — ניתן להתאים ידנית</span>}
+            <div className="flex gap-2 flex-wrap text-sm">
+              <span className="text-green-600 font-medium">✓ {matched.length} יעודכנו</span>
+              {hasPhone.length > 0 && <span className="text-muted-foreground font-medium">⏭ {hasPhone.length} כבר יש להם טלפון</span>}
+              {notFound.length > 0 && <span className="text-red-500 font-medium">✗ {notFound.length} לא נמצאו</span>}
             </div>
 
             <div className="max-h-72 overflow-y-auto border border-border rounded-lg divide-y divide-border text-sm">
               {rows.map((r, i) => (
-                <div key={i} className={`flex items-center gap-2 px-3 py-2 ${r.status === 'not_found' ? 'bg-red-50' : 'bg-green-50/40'}`}>
+                <div key={i} className={`flex items-center gap-2 px-3 py-2 ${r.status === 'not_found' ? 'bg-red-50' : r.status === 'has_phone' ? 'bg-gray-50' : 'bg-green-50/40'}`}>
                   <span className="font-medium flex-1 truncate">{r.name}</span>
                   <span className="text-muted-foreground font-mono text-xs shrink-0">{r.phone}</span>
                   {r.status === 'matched' ? (
@@ -230,6 +236,8 @@ export default function ImportPhonesModal({ open, onClose, students, onImported 
                         <X size={12} />
                       </button>
                     </div>
+                  ) : r.status === 'has_phone' ? (
+                    <span className="text-xs text-muted-foreground shrink-0">כבר קיים טלפון</span>
                   ) : (
                     <div className="shrink-0">
                       <ManualMatchPopover students={students} onSelect={(s) => handleManualMatch(i, s)} />
@@ -253,7 +261,7 @@ export default function ImportPhonesModal({ open, onClose, students, onImported 
             <div className="text-4xl">✅</div>
             <p className="font-semibold">הייבוא הושלם</p>
             <p className="text-sm text-muted-foreground">
-              עודכנו {results.updated} תלמידים.{results.notFound > 0 ? ` ${results.notFound} לא נמצאו ולא עודכנו.` : ''}
+              עודכנו {results.updated} תלמידים.{results.skipped > 0 ? ` ${results.skipped} דולגו (כבר יש להם טלפון).` : ''}{results.notFound > 0 ? ` ${results.notFound} לא נמצאו.` : ''}
             </p>
             <Button onClick={handleClose} className="w-full">סגור</Button>
           </div>
