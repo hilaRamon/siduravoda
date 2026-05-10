@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
@@ -20,7 +21,7 @@ const STATUS_ICONS = {
   'נדחה': <X size={12} />,
 };
 
-function RequestRow({ request, students }) {
+function RequestRow({ request, students, selected, onToggleSelect }) {
   const [showDetail, setShowDetail] = useState(false);
   const [notes, setNotes] = useState(request.notes || '');
   const [linkedStudent, setLinkedStudent] = useState(request.student_id || '');
@@ -29,6 +30,7 @@ function RequestRow({ request, students }) {
   const handleStatusChange = async (status) => {
     await base44.entities.IncomingSMS.update(request.id, { status });
     queryClient.invalidateQueries({ queryKey: ['incoming-sms'] });
+    queryClient.invalidateQueries({ queryKey: ['incoming-sms-pending'] });
   };
 
   const handleSaveDetail = async () => {
@@ -46,23 +48,23 @@ function RequestRow({ request, students }) {
 
   return (
     <>
-      <tr
-        className="hover:bg-secondary/20 cursor-pointer transition-colors"
-        onClick={() => setShowDetail(true)}
-      >
-        <td className="px-4 py-3 border-b border-border">
+      <tr className={`hover:bg-secondary/20 transition-colors ${selected ? 'bg-primary/5' : ''}`}>
+        <td className="px-3 py-3 border-b border-border" onClick={e => e.stopPropagation()}>
+          <Checkbox checked={selected} onCheckedChange={() => onToggleSelect(request.id)} />
+        </td>
+        <td className="px-4 py-3 border-b border-border cursor-pointer" onClick={() => setShowDetail(true)}>
           <div className="font-medium text-sm">{displayName}</div>
         </td>
-        <td className="px-4 py-3 border-b border-border text-sm">
+        <td className="px-4 py-3 border-b border-border text-sm cursor-pointer" onClick={() => setShowDetail(true)}>
           {request.parsed_date
             ? new Date(request.parsed_date + 'T12:00:00').toLocaleDateString('he-IL', { weekday: 'short', day: 'numeric', month: 'numeric', year: '2-digit' })
             : <span className="text-muted-foreground text-xs">לא זוהה</span>
           }
         </td>
-        <td className="px-4 py-3 border-b border-border text-sm max-w-xs">
+        <td className="px-4 py-3 border-b border-border text-sm max-w-xs cursor-pointer" onClick={() => setShowDetail(true)}>
           <div className="truncate">{request.parsed_reason || <span className="text-muted-foreground text-xs">—</span>}</div>
         </td>
-        <td className="px-4 py-3 border-b border-border text-xs text-muted-foreground">
+        <td className="px-4 py-3 border-b border-border text-xs text-muted-foreground cursor-pointer" onClick={() => setShowDetail(true)}>
           {request.sms_date || new Date(request.created_date).toLocaleString('he-IL')}
         </td>
         <td className="px-4 py-3 border-b border-border" onClick={e => e.stopPropagation()}>
@@ -157,20 +159,10 @@ function RequestRow({ request, students }) {
   );
 }
 
-const TABLE_HEADERS = (
-  <tr>
-    <th className="px-4 py-3 text-right font-semibold text-muted-foreground text-xs">שם תלמיד</th>
-    <th className="px-4 py-3 text-right font-semibold text-muted-foreground text-xs">תאריך היעדרות</th>
-    <th className="px-4 py-3 text-right font-semibold text-muted-foreground text-xs">סיבה</th>
-    <th className="px-4 py-3 text-right font-semibold text-muted-foreground text-xs">התקבל</th>
-    <th className="px-4 py-3 text-right font-semibold text-muted-foreground text-xs">סטטוס</th>
-    <th className="px-4 py-3 text-right font-semibold text-muted-foreground text-xs">פעולות</th>
-  </tr>
-);
-
 export default function AbsenceRequests() {
-  // null = pending view, 'אושר' / 'נדחה' = filtered view
   const [activeTab, setActiveTab] = useState(null);
+  const [selectedIds, setSelectedIds] = useState(new Set());
+  const [bulkProcessing, setBulkProcessing] = useState(false);
   const queryClient = useQueryClient();
 
   const { data: requests = [], isLoading } = useQuery({
@@ -193,6 +185,38 @@ export default function AbsenceRequests() {
     if (activeTab === null) return requests.filter(r => r.status === 'ממתין');
     return requests.filter(r => r.status === activeTab);
   }, [requests, activeTab]);
+
+  const allSelected = displayed.length > 0 && displayed.every(r => selectedIds.has(r.id));
+
+  const toggleSelectAll = () => {
+    if (allSelected) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(displayed.map(r => r.id)));
+    }
+  };
+
+  const toggleSelect = (id) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const handleBulkStatus = async (status) => {
+    setBulkProcessing(true);
+    try {
+      const ids = [...selectedIds];
+      await Promise.all(ids.map(id => base44.entities.IncomingSMS.update(id, { status })));
+      queryClient.invalidateQueries({ queryKey: ['incoming-sms'] });
+      queryClient.invalidateQueries({ queryKey: ['incoming-sms-pending'] });
+      setSelectedIds(new Set());
+    } finally {
+      setBulkProcessing(false);
+    }
+  };
 
   const statCards = [
     { label: 'ממתינות', value: counts.pending, color: 'text-warning', border: 'border-warning/40', bg: 'bg-warning/10', tab: null },
@@ -217,14 +241,14 @@ export default function AbsenceRequests() {
         </Button>
       </div>
 
-      {/* Stat Cards — clickable tabs */}
+      {/* Stat Cards */}
       <div className="grid grid-cols-3 gap-3 mb-6">
         {statCards.map(stat => {
           const isActive = activeTab === stat.tab;
           return (
             <button
               key={stat.label}
-              onClick={() => setActiveTab(stat.tab)}
+              onClick={() => { setActiveTab(stat.tab); setSelectedIds(new Set()); }}
               className={`rounded-xl p-4 text-center border-2 transition-all duration-150 ${
                 isActive
                   ? `${stat.bg} ${stat.border} shadow-sm`
@@ -238,31 +262,66 @@ export default function AbsenceRequests() {
         })}
       </div>
 
-      {/* Table */}
-      <div className="flex items-center gap-2 mb-3">
-        <span className="text-sm font-semibold">{activeLabel}</span>
-        <span className="text-sm text-muted-foreground">— {displayed.length} בקשות</span>
+      {/* Table header + bulk actions */}
+      <div className="flex items-center justify-between gap-2 mb-3">
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-semibold">{activeLabel}</span>
+          <span className="text-sm text-muted-foreground">— {displayed.length} בקשות</span>
+        </div>
+        {selectedIds.size > 0 && (
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-primary font-medium">{selectedIds.size} נבחרו</span>
+            <Button size="sm" className="h-8 gap-1 bg-success hover:bg-success/90 text-white"
+              onClick={() => handleBulkStatus('אושר')} disabled={bulkProcessing}>
+              <Check size={13} /> אשר הכל
+            </Button>
+            <Button size="sm" variant="destructive" className="h-8 gap-1"
+              onClick={() => handleBulkStatus('נדחה')} disabled={bulkProcessing}>
+              <X size={13} /> דחה הכל
+            </Button>
+            <Button size="sm" variant="ghost" className="h-8 text-muted-foreground"
+              onClick={() => setSelectedIds(new Set())}>
+              ביטול
+            </Button>
+          </div>
+        )}
       </div>
 
       <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden">
         <table className="w-full text-sm">
           <thead className="bg-secondary/60 border-b border-border">
-            {TABLE_HEADERS}
+            <tr>
+              <th className="px-3 py-3 w-10">
+                <Checkbox checked={allSelected} onCheckedChange={toggleSelectAll} />
+              </th>
+              <th className="px-4 py-3 text-right font-semibold text-muted-foreground text-xs">שם תלמיד</th>
+              <th className="px-4 py-3 text-right font-semibold text-muted-foreground text-xs">תאריך היעדרות</th>
+              <th className="px-4 py-3 text-right font-semibold text-muted-foreground text-xs">סיבה</th>
+              <th className="px-4 py-3 text-right font-semibold text-muted-foreground text-xs">התקבל</th>
+              <th className="px-4 py-3 text-right font-semibold text-muted-foreground text-xs">סטטוס</th>
+              <th className="px-4 py-3 text-right font-semibold text-muted-foreground text-xs">פעולות</th>
+            </tr>
           </thead>
           <tbody>
             {isLoading ? (
               <tr>
-                <td colSpan={6} className="text-center py-12 text-muted-foreground">טוען...</td>
+                <td colSpan={7} className="text-center py-12 text-muted-foreground">טוען...</td>
               </tr>
             ) : displayed.length === 0 ? (
               <tr>
-                <td colSpan={6} className="text-center py-12 text-muted-foreground">
+                <td colSpan={7} className="text-center py-12 text-muted-foreground">
                   אין בקשות להצגה
                 </td>
               </tr>
             ) : (
               displayed.map(req => (
-                <RequestRow key={req.id} request={req} students={students} />
+                <RequestRow
+                  key={req.id}
+                  request={req}
+                  students={students}
+                  selected={selectedIds.has(req.id)}
+                  onToggleSelect={toggleSelect}
+                />
               ))
             )}
           </tbody>
