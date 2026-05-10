@@ -148,7 +148,7 @@ export default function ImportModal({ open, onClose, onImported }) {
     <Dialog open={open} onOpenChange={() => { reset(); onClose(); }}>
       <DialogContent className="max-w-2xl" dir="rtl">
         <DialogHeader>
-          <DialogTitle>ייבוא סטודנטים מקובץ Excel</DialogTitle>
+          <DialogTitle>ייבוא תלמידים מקובץ Excel</DialogTitle>
         </DialogHeader>
 
         {step === 'upload' && (
@@ -245,7 +245,7 @@ export default function ImportModal({ open, onClose, onImported }) {
               </div>
             )}
             <p className="text-sm text-muted-foreground">
-              {errors.length > 0 ? 'ניתן להמשיך בכל זאת — שורות עם שגיאות ידולגו.' : `יובאו ${rows.length} סטודנטים. סטודנטים קיימים יעודכנו.`}
+              {errors.length > 0 ? 'ניתן להמשיך בכל זאת — שורות עם שגיאות ידולגו.' : `יובאו ${rows.length} תלמידים. תלמידים קיימים יעודכנו.`}
             </p>
             <div className="flex gap-2 justify-end pt-2">
               <Button variant="outline" onClick={() => setStep('map')}>חזרה</Button>
@@ -260,7 +260,7 @@ export default function ImportModal({ open, onClose, onImported }) {
           <div className="py-8 text-center">
             <CheckCircle2 className="mx-auto mb-3 text-success" size={48} />
             <p className="text-lg font-semibold">הייבוא הושלם בהצלחה!</p>
-            <p className="text-muted-foreground mt-1">יובאו {importCount} סטודנטים</p>
+            <p className="text-muted-foreground mt-1">יובאו {importCount} תלמידים</p>
             <Button className="mt-6" onClick={() => { reset(); onClose(); }}>סגור</Button>
           </div>
         )}

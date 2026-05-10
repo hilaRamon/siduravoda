@@ -40,7 +40,7 @@ export default function StudentFormModal({ open, onClose, onSave, student }) {
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-md" dir="rtl">
         <DialogHeader>
-          <DialogTitle>{student ? 'עריכת סטודנט' : 'הוספת סטודנט חדש'}</DialogTitle>
+          <DialogTitle>{student ? 'עריכת תלמיד' : 'הוספת תלמיד חדש'}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4 mt-2">
           <div>
@@ -54,11 +54,11 @@ export default function StudentFormModal({ open, onClose, onSave, student }) {
             />
           </div>
           <div>
-            <Label>טלפון</Label>
+            <Label>טלפון (במקום 0 בתחילה יש לרשום 972)</Label>
             <Input
               value={form.phone}
               onChange={e => setForm(p => ({ ...p, phone: e.target.value }))}
-              placeholder="050-0000000"
+              placeholder="9725X-XXXXXXX"
               className="mt-1"
               type="tel"
             />
@@ -102,7 +102,7 @@ export default function StudentFormModal({ open, onClose, onSave, student }) {
           </div>
           <div className="flex gap-2 justify-end pt-2">
             <Button type="button" variant="outline" onClick={onClose}>ביטול</Button>
-            <Button type="submit">{student ? 'שמור שינויים' : 'הוסף סטודנט'}</Button>
+            <Button type="submit">{student ? 'שמור שינויים' : 'הוסף תלמיד'}</Button>
           </div>
         </form>
       </DialogContent>
