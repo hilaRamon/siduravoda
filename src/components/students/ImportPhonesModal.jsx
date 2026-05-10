@@ -2,12 +2,90 @@ import { useState, useRef } from 'react';
 import * as XLSX from 'xlsx';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Upload, Phone } from 'lucide-react';
+import { Upload, Phone, X } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+
+// Normalize name for fuzzy matching: remove extra spaces, normalize chars
+function normalizeName(name) {
+  return String(name || '')
+    .trim()
+    .replace(/\s+/g, ' ')
+    .replace(/[״"]/g, '"')
+    .replace(/[׳']/g, "'")
+    .toLowerCase();
+}
+
+function findBestMatch(name, students) {
+  const norm = normalizeName(name);
+  if (!norm) return null;
+
+  // 1. Exact match
+  let m = students.find(s => normalizeName(s.full_name) === norm);
+  if (m) return m;
+
+  // 2. Exact match ignoring case/spaces on both sides
+  m = students.find(s => normalizeName(s.full_name).replace(/\s/g, '') === norm.replace(/\s/g, ''));
+  if (m) return m;
+
+  // 3. One side fully contains the other (must be >3 chars to avoid false positives)
+  if (norm.length > 3) {
+    m = students.find(s => {
+      const sn = normalizeName(s.full_name);
+      return sn.length > 3 && (sn.includes(norm) || norm.includes(sn));
+    });
+    if (m) return m;
+  }
+
+  return null;
+}
+
+function ManualMatchPopover({ students, onSelect }) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState('');
+
+  const filtered = students.filter(s =>
+    !search || s.full_name?.includes(search)
+  ).slice(0, 50);
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button className="text-xs underline text-primary hover:opacity-70">התאם ידנית</button>
+      </PopoverTrigger>
+      <PopoverContent className="w-64 p-0" align="start" dir="rtl">
+        <Command shouldFilter={false}>
+          <CommandInput
+            placeholder="חיפוש תלמיד..."
+            className="h-8 text-xs"
+            value={search}
+            onValueChange={setSearch}
+          />
+          <CommandList>
+            <CommandEmpty>לא נמצא</CommandEmpty>
+            <CommandGroup>
+              {filtered.map(s => (
+                <CommandItem
+                  key={s.id}
+                  value={s.full_name}
+                  onSelect={() => { onSelect(s); setOpen(false); setSearch(''); }}
+                  className="text-xs cursor-pointer"
+                >
+                  {s.full_name}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
 
 export default function ImportPhonesModal({ open, onClose, students, onImported }) {
-  const [step, setStep] = useState('upload'); // upload | preview | done
-  const [rows, setRows] = useState([]); // { name, phone, matchedStudent, status }
+  const [step, setStep] = useState('upload');
+  const [rows, setRows] = useState([]);
   const [importing, setImporting] = useState(false);
   const [results, setResults] = useState({ updated: 0, notFound: 0 });
   const fileRef = useRef();
@@ -16,12 +94,10 @@ export default function ImportPhonesModal({ open, onClose, students, onImported 
     setStep('upload');
     setRows([]);
     setResults({ updated: 0, notFound: 0 });
+    if (fileRef.current) fileRef.current.value = '';
   };
 
-  const handleClose = () => {
-    reset();
-    onClose();
-  };
+  const handleClose = () => { reset(); onClose(); };
 
   const handleFile = (e) => {
     const file = e.target.files[0];
@@ -33,7 +109,6 @@ export default function ImportPhonesModal({ open, onClose, students, onImported 
       const ws = wb.Sheets[wb.SheetNames[0]];
       const data = XLSX.utils.sheet_to_json(ws, { header: 1 });
 
-      // Find header row — look for a row that has both name-like and phone-like columns
       let headerIdx = 0;
       let nameCol = -1;
       let phoneCol = -1;
@@ -50,25 +125,17 @@ export default function ImportPhonesModal({ open, onClose, students, onImported 
         }
       }
 
-      // If no headers found, assume first col = name, second col = phone
-      if (nameCol === -1) {
-        nameCol = 0;
-        phoneCol = 1;
-        headerIdx = 0;
-      }
+      if (nameCol === -1) { nameCol = 0; phoneCol = 1; headerIdx = 0; }
 
       const parsed = [];
       for (let i = headerIdx + 1; i < data.length; i++) {
         const row = data[i];
-        const name = String(row[nameCol] || '').trim();
-        const phone = String(row[phoneCol] || '').trim().replace(/[-\s]/g, '');
+        if (!row) continue;
+        const name = String(row[nameCol] ?? '').trim();
+        const phone = String(row[phoneCol] ?? '').trim().replace(/[-\s]/g, '');
         if (!name || !phone) continue;
 
-        // Try to match student by name (exact or contains)
-        const matchedStudent =
-          students.find(s => s.full_name === name) ||
-          students.find(s => s.full_name?.includes(name) || name.includes(s.full_name));
-
+        const matchedStudent = findBestMatch(name, students);
         parsed.push({ name, phone, matchedStudent, status: matchedStudent ? 'matched' : 'not_found' });
       }
 
@@ -82,11 +149,22 @@ export default function ImportPhonesModal({ open, onClose, students, onImported 
     }
   };
 
+  const handleManualMatch = (rowIdx, student) => {
+    setRows(prev => prev.map((r, i) =>
+      i === rowIdx ? { ...r, matchedStudent: student, status: 'matched' } : r
+    ));
+  };
+
+  const handleRemoveMatch = (rowIdx) => {
+    setRows(prev => prev.map((r, i) =>
+      i === rowIdx ? { ...r, matchedStudent: null, status: 'not_found' } : r
+    ));
+  };
+
   const handleImport = async () => {
     setImporting(true);
     let updated = 0;
     let notFound = 0;
-
     for (const row of rows) {
       if (row.matchedStudent) {
         await base44.entities.Student.update(row.matchedStudent.id, { phone: row.phone });
@@ -95,7 +173,6 @@ export default function ImportPhonesModal({ open, onClose, students, onImported 
         notFound++;
       }
     }
-
     setResults({ updated, notFound });
     setStep('done');
     setImporting(false);
@@ -138,15 +215,26 @@ export default function ImportPhonesModal({ open, onClose, students, onImported 
           <div className="space-y-4 mt-2">
             <div className="flex gap-4 text-sm">
               <span className="text-green-600 font-medium">✓ {matched.length} תלמידים זוהו</span>
-              {notFound.length > 0 && <span className="text-red-500 font-medium">✗ {notFound.length} לא נמצאו</span>}
+              {notFound.length > 0 && <span className="text-red-500 font-medium">✗ {notFound.length} לא נמצאו — ניתן להתאים ידנית</span>}
             </div>
 
-            <div className="max-h-64 overflow-y-auto border border-border rounded-lg divide-y divide-border">
+            <div className="max-h-72 overflow-y-auto border border-border rounded-lg divide-y divide-border text-sm">
               {rows.map((r, i) => (
-                <div key={i} className={`flex items-center justify-between px-3 py-2 text-sm ${r.status === 'not_found' ? 'bg-red-50 text-red-700' : 'bg-green-50/50'}`}>
-                  <span className="font-medium">{r.name}</span>
-                  <span className="text-muted-foreground font-mono text-xs">{r.phone}</span>
-                  <span className="text-xs">{r.status === 'matched' ? `→ ${r.matchedStudent.full_name}` : 'לא נמצא'}</span>
+                <div key={i} className={`flex items-center gap-2 px-3 py-2 ${r.status === 'not_found' ? 'bg-red-50' : 'bg-green-50/40'}`}>
+                  <span className="font-medium flex-1 truncate">{r.name}</span>
+                  <span className="text-muted-foreground font-mono text-xs shrink-0">{r.phone}</span>
+                  {r.status === 'matched' ? (
+                    <div className="flex items-center gap-1 shrink-0">
+                      <span className="text-xs text-green-700 truncate max-w-[100px]">→ {r.matchedStudent.full_name}</span>
+                      <button onClick={() => handleRemoveMatch(i)} className="text-muted-foreground hover:text-destructive">
+                        <X size={12} />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="shrink-0">
+                      <ManualMatchPopover students={students} onSelect={(s) => handleManualMatch(i, s)} />
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -164,7 +252,9 @@ export default function ImportPhonesModal({ open, onClose, students, onImported 
           <div className="space-y-4 mt-2 text-center">
             <div className="text-4xl">✅</div>
             <p className="font-semibold">הייבוא הושלם</p>
-            <p className="text-sm text-muted-foreground">עודכנו {results.updated} תלמידים. {results.notFound > 0 ? `${results.notFound} לא נמצאו ולא עודכנו.` : ''}</p>
+            <p className="text-sm text-muted-foreground">
+              עודכנו {results.updated} תלמידים.{results.notFound > 0 ? ` ${results.notFound} לא נמצאו ולא עודכנו.` : ''}
+            </p>
             <Button onClick={handleClose} className="w-full">סגור</Button>
           </div>
         )}
