@@ -24,9 +24,9 @@ export default function TimeReportsAdmin() {
   // Only show reports where times differ from the defaults (i.e. the user actually changed something)
   const DEFAULT_START = '07:00';
   const DEFAULT_END = '11:45';
-  const changedReports = reports.filter(r =>
-    r.start_time !== DEFAULT_START || r.end_time !== DEFAULT_END
-  );
+  const changedReports = reports
+    .filter(r => r.start_time !== DEFAULT_START || r.end_time !== DEFAULT_END)
+    .sort((a, b) => (a.workplace_name || '').localeCompare(b.workplace_name || '', 'he'));
 
   const handleStatus = async (report, status) => {
     await base44.entities.TimeReport.update(report.id, { status });
