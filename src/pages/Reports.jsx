@@ -8,6 +8,7 @@ import PeriodicWorkReport from '@/components/reports/PeriodicWorkReport';
 import PeriodWorkReport from '@/components/reports/PeriodWorkReport';
 import StudentWorkReport from '@/components/reports/StudentWorkReport';
 import PublishedScheduleCard from '@/components/reports/PublishedScheduleCard';
+import TimeReportingLink from '@/components/reports/TimeReportingLink';
 import BackupExport from '@/components/reports/BackupExport';
 import BackupEmailSettings from '@/components/reports/BackupEmailSettings';
 import ImportAssignments from '@/components/reports/ImportAssignments';
@@ -221,6 +222,9 @@ export default function Reports() {
 
         {/* Published Schedule Link */}
         <PublishedScheduleCard />
+
+        {/* Time Reporting Link */}
+        <TimeReportingLink />
 
         {/* Backup Export */}
         <BackupExport />

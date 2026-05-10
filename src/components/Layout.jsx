@@ -1,5 +1,5 @@
 import { Link, Outlet, useLocation } from 'react-router-dom';
-import { Building2, CalendarDays, ShieldCheck, GraduationCap, BarChart2, Truck, MessageSquare, BookOpen } from 'lucide-react';
+import { Building2, CalendarDays, ShieldCheck, GraduationCap, BarChart2, Truck, MessageSquare, BookOpen, ClipboardCheck } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 
@@ -12,6 +12,7 @@ const navItems = [
   { to: '/vehicles', label: 'רכבים', icon: Truck },
   { to: '/reports', label: 'דוחות', icon: BarChart2 },
   { to: '/absence-requests', label: 'בקשות היעדרות', icon: MessageSquare },
+  { to: '/time-reports', label: 'עדכון זמנים', icon: ClipboardCheck },
 ];
 
 export default function Layout() {
@@ -30,7 +31,7 @@ export default function Layout() {
       <aside className="sidebar-bg w-64 flex-shrink-0 flex flex-col shadow-xl">
         <div className="px-6 py-7 border-b border-white/10">
           <h1 className="text-white text-xl font-bold tracking-wide">מערכת שיבוצים</h1>
-          <p className="text-white/50 text-xs mt-1">ניהול סטודנטים ומקומות עבודה</p>
+          <p className="text-white/50 text-xs mt-1">ניהול תלמידים ומקומות עבודה</p>
         </div>
         <nav className="flex-1 px-3 py-6 space-y-1">
           {navItems.map(({ to, label, icon: Icon }) => {
