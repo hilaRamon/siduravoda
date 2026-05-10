@@ -1,10 +1,11 @@
 import { Link, Outlet, useLocation } from 'react-router-dom';
-import { Building2, CalendarDays, ShieldCheck, GraduationCap, BarChart2, Truck, MessageSquare } from 'lucide-react';
+import { Building2, CalendarDays, ShieldCheck, GraduationCap, BarChart2, Truck, MessageSquare, BookOpen } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 
 const navItems = [
   { to: '/', label: 'שיבוצים יומיים', icon: CalendarDays },
+  { to: '/calendar', label: 'יומן', icon: BookOpen },
   { to: '/students', label: 'תלמידים וצוות', icon: GraduationCap },
   { to: '/workplaces', label: 'מקומות עבודה', icon: Building2 },
   { to: '/roles', label: 'תפקידים', icon: ShieldCheck },
