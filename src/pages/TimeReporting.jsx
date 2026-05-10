@@ -32,7 +32,7 @@ function TimeInput({ value, onChange }) {
 }
 
 function WorkplaceGroup({ workplace, students, times, overrides, onGroupTimeChange, onOverrideChange }) {
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(true);
   const groupStart = times[workplace.id]?.start ?? DEFAULT_START;
   const groupEnd = times[workplace.id]?.end ?? DEFAULT_END;
   const duration = calcDuration(groupStart, groupEnd);
