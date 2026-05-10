@@ -25,6 +25,13 @@ export default function Layout() {
   });
   const pendingCount = pendingSMS.length;
 
+  const { data: pendingTimeReports = [] } = useQuery({
+    queryKey: ['time-reports-pending'],
+    queryFn: () => base44.entities.TimeReport.filter({ status: 'ממתין' }, '-created_date', 100),
+    refetchInterval: 60000,
+  });
+  const pendingTimeReportsCount = pendingTimeReports.length;
+
   return (
     <div className="flex min-h-screen bg-background font-heebo" dir="rtl">
       {/* Sidebar */}
@@ -51,6 +58,11 @@ export default function Layout() {
                 {to === '/absence-requests' && pendingCount > 0 && (
                   <span className="bg-destructive text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center shrink-0">
                     {pendingCount > 9 ? '9+' : pendingCount}
+                  </span>
+                )}
+                {to === '/time-reports' && pendingTimeReportsCount > 0 && (
+                  <span className="bg-primary text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center shrink-0">
+                    {pendingTimeReportsCount > 9 ? '9+' : pendingTimeReportsCount}
                   </span>
                 )}
               </Link>
