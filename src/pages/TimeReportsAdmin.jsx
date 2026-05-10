@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
-import { CheckCircle2, XCircle, Clock, CalendarDays } from 'lucide-react';
+import { CheckCircle2, XCircle, Clock, CalendarDays, Building2, User } from 'lucide-react';
 import { format } from 'date-fns';
 
 const STATUS_STYLES = {
@@ -23,6 +23,62 @@ function calcDuration(start, end) {
   return Math.round(diff / 60 * 100) / 100;
 }
 
+function ActionButtons({ report, onStatus }) {
+  return (
+    <div className="flex gap-1 justify-end">
+      <Button
+        size="sm"
+        variant="outline"
+        className="h-7 text-xs gap-1 text-green-600 border-green-300 hover:bg-green-50"
+        onClick={() => onStatus(report, 'אושר')}
+        disabled={report.status === 'אושר'}
+      >
+        <CheckCircle2 size={13} /> אשר
+      </Button>
+      <Button
+        size="sm"
+        variant="outline"
+        className="h-7 text-xs gap-1 text-red-500 border-red-300 hover:bg-red-50"
+        onClick={() => onStatus(report, 'נדחה')}
+        disabled={report.status === 'נדחה'}
+      >
+        <XCircle size={13} /> דחה
+      </Button>
+    </div>
+  );
+}
+
+function StatusBadge({ status }) {
+  return (
+    <span className={`text-xs px-2 py-1 rounded-full font-medium ${STATUS_STYLES[status] || ''}`}>
+      {status}
+    </span>
+  );
+}
+
+function ReportRow({ report, onStatus, isIndividual }) {
+  const duration = calcDuration(report.start_time, report.end_time);
+  return (
+    <tr className={`hover:bg-secondary/20 transition-colors ${isIndividual ? 'bg-yellow-50/40' : ''}`}>
+      <td className="px-4 py-3 font-medium text-base">
+        {isIndividual && <User size={13} className="inline ml-1 text-yellow-600" />}
+        {report.student_name}
+      </td>
+      {!isIndividual && (
+        <td className="px-4 py-3 text-muted-foreground text-base">{report.workplace_name}</td>
+      )}
+      {isIndividual && <td className="px-4 py-3 text-xs text-muted-foreground italic">{report.workplace_name}</td>}
+      <td className="px-4 py-3 font-mono text-base">{report.start_time || '—'}</td>
+      <td className="px-4 py-3 font-mono text-base">{report.end_time || '—'}</td>
+      <td className="px-4 py-3 font-mono font-semibold text-base">
+        {duration !== null ? duration.toFixed(2) : '—'}
+      </td>
+      <td className="px-4 py-3"><StatusBadge status={report.status} /></td>
+      <td className="px-4 py-3"><ActionButtons report={report} onStatus={onStatus} /></td>
+    </tr>
+  );
+}
+
 export default function TimeReportsAdmin() {
   const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [activeTab, setActiveTab] = useState('ממתין');
@@ -40,17 +96,62 @@ export default function TimeReportsAdmin() {
   const pending = changedReports.filter(r => r.status === 'ממתין');
   const approved = changedReports.filter(r => r.status === 'אושר');
   const rejected = changedReports.filter(r => r.status === 'נדחה');
-
   const tabReports = activeTab === 'ממתין' ? pending : activeTab === 'אושר' ? approved : rejected;
+
+  // Group reports into: workplace-level rows + individual-override rows
+  const { workplaceGroups, individualRows } = useMemo(() => {
+    // Group by workplace
+    const byWorkplace = {};
+    tabReports.forEach(r => {
+      if (!byWorkplace[r.workplace_id]) byWorkplace[r.workplace_id] = [];
+      byWorkplace[r.workplace_id].push(r);
+    });
+
+    const workplaceGroups = []; // { workplace_name, workplace_id, representative, students, isUniform }
+    const individualRows = []; // reports that differ from their workplace group
+
+    Object.entries(byWorkplace).forEach(([wpId, students]) => {
+      // Find the most common time combination among students in this workplace
+      const timeFreq = {};
+      students.forEach(r => {
+        const key = `${r.start_time}|${r.end_time}`;
+        timeFreq[key] = (timeFreq[key] || 0) + 1;
+      });
+      const dominantKey = Object.entries(timeFreq).sort((a, b) => b[1] - a[1])[0][0];
+      const [dominantStart, dominantEnd] = dominantKey.split('|');
+
+      // Representative report for the workplace row (use first student that matches dominant)
+      const representative = students.find(r => r.start_time === dominantStart && r.end_time === dominantEnd) || students[0];
+
+      const isUniform = Object.keys(timeFreq).length === 1;
+
+      workplaceGroups.push({
+        workplace_id: wpId,
+        workplace_name: students[0].workplace_name,
+        representative,
+        studentCount: students.length,
+        isUniform,
+      });
+
+      // Students who deviate from the dominant time → individual rows
+      students.forEach(r => {
+        if (r.start_time !== dominantStart || r.end_time !== dominantEnd) {
+          individualRows.push(r);
+        }
+      });
+    });
+
+    workplaceGroups.sort((a, b) => (a.workplace_name || '').localeCompare(b.workplace_name || '', 'he'));
+    individualRows.sort((a, b) => (a.workplace_name || '').localeCompare(b.workplace_name || '', 'he'));
+
+    return { workplaceGroups, individualRows };
+  }, [tabReports]);
 
   const handleStatus = async (report, status) => {
     await base44.entities.TimeReport.update(report.id, { status });
-
-    // If approving, update hours in the daily assignments
     if (status === 'אושר') {
       const duration = calcDuration(report.start_time, report.end_time);
       if (duration !== null) {
-        // Find matching assignment for this student on this date
         const assignments = await base44.entities.Assignment.filter({
           date: report.date,
           student_id: report.student_id,
@@ -60,9 +161,16 @@ export default function TimeReportsAdmin() {
         }
       }
     }
-
     queryClient.invalidateQueries({ queryKey: ['time-reports', selectedDate] });
     queryClient.invalidateQueries({ queryKey: ['assignments', selectedDate] });
+  };
+
+  // Approve/reject all students in a workplace group
+  const handleWorkplaceStatus = async (wpId, status) => {
+    const group = tabReports.filter(r => r.workplace_id === wpId);
+    for (const r of group) {
+      await handleStatus(r, status);
+    }
   };
 
   const tabs = [
@@ -70,6 +178,18 @@ export default function TimeReportsAdmin() {
     { key: 'אושר', label: 'אושרו', count: approved.length, color: 'text-green-600', icon: CheckCircle2 },
     { key: 'נדחה', label: 'נדחו', count: rejected.length, color: 'text-red-500', icon: XCircle },
   ];
+
+  const tableHeaders = (
+    <tr>
+      <th className="text-right px-4 py-3 text-base font-semibold text-muted-foreground">שם תלמיד</th>
+      <th className="text-right px-4 py-3 text-base font-semibold text-muted-foreground">מקום עבודה</th>
+      <th className="text-right px-4 py-3 text-base font-semibold text-muted-foreground">כניסה</th>
+      <th className="text-right px-4 py-3 text-base font-semibold text-muted-foreground">יציאה</th>
+      <th className="text-right px-4 py-3 text-base font-semibold text-muted-foreground">שעות</th>
+      <th className="text-right px-4 py-3 text-base font-semibold text-muted-foreground">סטטוס</th>
+      <th className="px-4 py-3"></th>
+    </tr>
+  );
 
   return (
     <div className="p-8">
@@ -127,63 +247,103 @@ export default function TimeReportsAdmin() {
           </p>
         </div>
       ) : (
-        <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden">
-          <table className="w-full text-base">
-            <thead className="bg-secondary/60 border-b border-border">
-              <tr>
-                <th className="text-right px-4 py-3 text-base font-semibold text-muted-foreground">שם תלמיד</th>
-                <th className="text-right px-4 py-3 text-base font-semibold text-muted-foreground">מקום עבודה</th>
-                <th className="text-right px-4 py-3 text-base font-semibold text-muted-foreground">כניסה</th>
-                <th className="text-right px-4 py-3 text-base font-semibold text-muted-foreground">יציאה</th>
-                <th className="text-right px-4 py-3 text-base font-semibold text-muted-foreground">שעות</th>
-                <th className="text-right px-4 py-3 text-base font-semibold text-muted-foreground">סטטוס</th>
-                <th className="px-4 py-3"></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {tabReports.map(r => {
-                const duration = calcDuration(r.start_time, r.end_time);
-                return (
-                  <tr key={r.id} className="hover:bg-secondary/20 transition-colors">
-                    <td className="px-4 py-3 font-medium text-base">{r.student_name}</td>
-                    <td className="px-4 py-3 text-muted-foreground text-base">{r.workplace_name}</td>
-                    <td className="px-4 py-3 font-mono text-base">{r.start_time || '—'}</td>
-                    <td className="px-4 py-3 font-mono text-base">{r.end_time || '—'}</td>
-                    <td className="px-4 py-3 font-mono font-semibold text-base">
-                      {duration !== null ? duration.toFixed(2) : '—'}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className={`text-xs px-2 py-1 rounded-full font-medium ${STATUS_STYLES[r.status] || ''}`}>
-                        {r.status}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex gap-1 justify-end">
-                        <Button
-                          size="sm"
-                          variant={r.status === 'אושר' ? 'default' : 'outline'}
-                          className="h-7 text-xs gap-1 text-green-600 border-green-300 hover:bg-green-50"
-                          onClick={() => handleStatus(r, 'אושר')}
-                          disabled={r.status === 'אושר'}
-                        >
-                          <CheckCircle2 size={13} /> אשר
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="h-7 text-xs gap-1 text-red-500 border-red-300 hover:bg-red-50"
-                          onClick={() => handleStatus(r, 'נדחה')}
-                          disabled={r.status === 'נדחה'}
-                        >
-                          <XCircle size={13} /> דחה
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+        <div className="space-y-6">
+
+          {/* --- Section 1: Workplace changes --- */}
+          {workplaceGroups.length > 0 && (
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <Building2 size={16} className="text-primary" />
+                <h3 className="font-semibold text-base">שינויים במחלקות</h3>
+                <span className="text-xs text-muted-foreground">({workplaceGroups.length} מקומות עבודה)</span>
+              </div>
+              <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden">
+                <table className="w-full text-base">
+                  <thead className="bg-secondary/60 border-b border-border">
+                    <tr>
+                      <th className="text-right px-4 py-3 text-base font-semibold text-muted-foreground">מקום עבודה</th>
+                      <th className="text-right px-4 py-3 text-base font-semibold text-muted-foreground">תלמידים</th>
+                      <th className="text-right px-4 py-3 text-base font-semibold text-muted-foreground">כניסה</th>
+                      <th className="text-right px-4 py-3 text-base font-semibold text-muted-foreground">יציאה</th>
+                      <th className="text-right px-4 py-3 text-base font-semibold text-muted-foreground">שעות</th>
+                      <th className="text-right px-4 py-3 text-base font-semibold text-muted-foreground">סטטוס</th>
+                      <th className="px-4 py-3"></th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {workplaceGroups.map(({ workplace_id, workplace_name, representative, studentCount, isUniform }) => {
+                      const duration = calcDuration(representative.start_time, representative.end_time);
+                      return (
+                        <tr key={workplace_id} className="hover:bg-secondary/20 transition-colors">
+                          <td className="px-4 py-3 font-semibold text-base">{workplace_name}</td>
+                          <td className="px-4 py-3 text-sm text-muted-foreground">
+                            <span className="bg-primary/10 text-primary text-xs px-2 py-0.5 rounded-full font-medium">
+                              {studentCount} תלמידים
+                            </span>
+                            {!isUniform && (
+                              <span className="mr-2 text-xs text-yellow-600 bg-yellow-100 px-2 py-0.5 rounded-full">שעות מעורבות</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 font-mono text-base">{representative.start_time || '—'}</td>
+                          <td className="px-4 py-3 font-mono text-base">{representative.end_time || '—'}</td>
+                          <td className="px-4 py-3 font-mono font-semibold text-base">
+                            {duration !== null ? duration.toFixed(2) : '—'}
+                          </td>
+                          <td className="px-4 py-3"><StatusBadge status={representative.status} /></td>
+                          <td className="px-4 py-3">
+                            <div className="flex gap-1 justify-end">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-7 text-xs gap-1 text-green-600 border-green-300 hover:bg-green-50"
+                                onClick={() => handleWorkplaceStatus(workplace_id, 'אושר')}
+                                disabled={tabReports.filter(r => r.workplace_id === workplace_id).every(r => r.status === 'אושר')}
+                              >
+                                <CheckCircle2 size={13} /> אשר הכל
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-7 text-xs gap-1 text-red-500 border-red-300 hover:bg-red-50"
+                                onClick={() => handleWorkplaceStatus(workplace_id, 'נדחה')}
+                                disabled={tabReports.filter(r => r.workplace_id === workplace_id).every(r => r.status === 'נדחה')}
+                              >
+                                <XCircle size={13} /> דחה הכל
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* --- Section 2: Individual student overrides --- */}
+          {individualRows.length > 0 && (
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <User size={16} className="text-yellow-600" />
+                <h3 className="font-semibold text-base">שינויים פרטניים בתלמידים</h3>
+                <span className="text-xs text-muted-foreground">({individualRows.length} תלמידים)</span>
+              </div>
+              <div className="bg-card rounded-2xl border border-yellow-200 shadow-sm overflow-hidden">
+                <table className="w-full text-base">
+                  <thead className="bg-yellow-50/60 border-b border-yellow-200">
+                    {tableHeaders}
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {individualRows.map(r => (
+                      <ReportRow key={r.id} report={r} onStatus={handleStatus} isIndividual={true} />
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
         </div>
       )}
     </div>
