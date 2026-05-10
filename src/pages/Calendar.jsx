@@ -129,27 +129,27 @@ function DayColumn({ day, farmerRequests, absences, workplaces }) {
     <div className={`flex-1 min-w-0 bg-card rounded-xl border ${isToday ? 'border-primary shadow-sm' : 'border-border'} p-3 space-y-3`}>
       {/* Header */}
       <div className={`text-center pb-2 border-b border-border`}>
-        <div className={`text-sm font-semibold ${isToday ? 'text-primary' : 'text-muted-foreground'}`}>
+        <div className={`text-lg font-semibold ${isToday ? 'text-primary' : 'text-muted-foreground'}`}>
           {DAY_NAMES[day.getDay()]}
         </div>
-        <div className={`text-base font-bold mt-0.5 ${isToday ? 'text-primary' : ''}`}>
+        <div className={`text-xl font-bold mt-0.5 ${isToday ? 'text-primary' : ''}`}>
           {day.toLocaleDateString('he-IL', { day: 'numeric', month: 'numeric' })}
         </div>
       </div>
 
       {/* Farmers section */}
       <div>
-        <div className="text-sm font-semibold text-foreground mb-1">🌾 חקלאים</div>
+        <div className="text-base font-bold text-foreground mb-2">🌾 חקלאים</div>
         {dayFarmerRequests.length === 0 ? (
-          <p className="text-xs text-muted-foreground">אין דרישות</p>
+          <p className="text-sm text-muted-foreground">אין דרישות</p>
         ) : (
           <div className="space-y-1">
             {dayFarmerRequests.map(req => (
               <div key={req.id} className="flex items-center justify-between gap-1 bg-primary/5 border border-primary/15 rounded-md px-2 py-1">
                 <div className="min-w-0">
-                  <div className="text-xs font-medium truncate">{req.workplace_name}</div>
+                  <div className="text-sm font-medium truncate">{req.workplace_name}</div>
                   {req.requested_volunteers && (
-                    <div className="text-xs text-muted-foreground">{req.requested_volunteers} מתנדבים</div>
+                    <div className="text-sm text-muted-foreground">{req.requested_volunteers} מתנדבים</div>
                   )}
                 </div>
                 <button
@@ -167,16 +167,16 @@ function DayColumn({ day, farmerRequests, absences, workplaces }) {
 
       {/* Absences section */}
       <div>
-        <div className="text-sm font-semibold text-foreground mb-1">🚫 היעדרויות</div>
+        <div className="text-base font-bold text-foreground mb-2">🚫 היעדרויות</div>
         {dayAbsences.length === 0 ? (
-          <p className="text-xs text-muted-foreground">אין היעדרויות</p>
+          <p className="text-sm text-muted-foreground">אין היעדרויות</p>
         ) : (
           <div className="space-y-1">
             {dayAbsences.map(abs => (
               <div key={abs.id} className="bg-destructive/5 border border-destructive/15 rounded-md px-2 py-1">
-                <div className="text-xs font-medium">{abs.student_name || abs.parsed_student_name || '—'}</div>
+                <div className="text-sm font-medium">{abs.student_name || abs.parsed_student_name || '—'}</div>
                 {abs.parsed_reason && (
-                  <div className="text-xs text-muted-foreground truncate">{abs.parsed_reason}</div>
+                  <div className="text-sm text-muted-foreground truncate">{abs.parsed_reason}</div>
                 )}
               </div>
             ))}
