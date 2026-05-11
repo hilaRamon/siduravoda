@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import jsPDF from 'jspdf';
 
 const SECTIONS = [
   {
@@ -262,31 +263,120 @@ function MarkdownText({ text }) {
   );
 }
 
+// Strip ** bold markers for plain text
+function stripBold(str) {
+  return str.replace(/\*\*/g, '');
+}
+
+// Flatten all sections into lines for PDF
+function buildPdfLines() {
+  const lines = [];
+  SECTIONS.forEach(section => {
+    lines.push({ type: 'h1', text: section.title });
+    if (section.content) {
+      section.content.split('\n').forEach(line => {
+        if (!line.trim()) return;
+        lines.push({ type: line.startsWith('- ') ? 'bullet' : 'body', text: stripBold(line.startsWith('- ') ? line.slice(2) : line) });
+      });
+    }
+    section.subsections?.forEach(sub => {
+      lines.push({ type: 'h2', text: sub.title });
+      sub.content.split('\n').forEach(line => {
+        if (!line.trim()) return;
+        lines.push({ type: line.startsWith('- ') ? 'bullet' : 'body', text: stripBold(line.startsWith('- ') ? line.slice(2) : line) });
+      });
+    });
+  });
+  return lines;
+}
+
 export default function SRSViewer() {
   const [openSections, setOpenSections] = useState({ 0: true });
 
   const toggle = (i) => setOpenSections(prev => ({ ...prev, [i]: !prev[i] }));
 
-  const handleDownload = () => {
-    fetch('/src/docs/SRS_Regivim_System.md')
-      .then(r => r.ok ? r.blob() : null)
-      .then(blob => {
-        if (!blob) return;
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'SRS_Regivim_System.md';
-        a.click();
-        URL.revokeObjectURL(url);
+  const handleDownloadPdf = () => {
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    const pageW = doc.internal.pageSize.getWidth();
+    const pageH = doc.internal.pageSize.getHeight();
+    const margin = 15;
+    const maxW = pageW - margin * 2;
+    let y = margin;
+
+    const checkPage = (needed) => {
+      if (y + needed > pageH - margin) { doc.addPage(); y = margin; }
+    };
+
+    const addWrappedText = (text, fontSize, isBold, color, indent = 0) => {
+      doc.setFontSize(fontSize);
+      doc.setFont('helvetica', isBold ? 'bold' : 'normal');
+      doc.setTextColor(...color);
+      const lines = doc.splitTextToSize(text, maxW - indent);
+      lines.forEach(line => {
+        checkPage(fontSize * 0.4 + 1);
+        // RTL: align right
+        doc.text(line, pageW - margin - indent, y, { align: 'right' });
+        y += fontSize * 0.4 + 1;
       });
+    };
+
+    // Title
+    doc.setFontSize(18);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(30, 40, 100);
+    doc.text('מפרט דרישות מערכת — רגבים', pageW - margin, y, { align: 'right' });
+    y += 10;
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(120, 120, 120);
+    doc.text('גרסה 1.0 | 2026-05-11', pageW - margin, y, { align: 'right' });
+    y += 8;
+    doc.setDrawColor(200, 200, 200);
+    doc.line(margin, y, pageW - margin, y);
+    y += 6;
+
+    const pdfLines = buildPdfLines();
+    pdfLines.forEach(item => {
+      if (item.type === 'h1') {
+        y += 4;
+        checkPage(10);
+        addWrappedText(item.text, 13, true, [30, 40, 100]);
+        y += 1;
+        doc.setDrawColor(180, 190, 230);
+        doc.line(margin, y, pageW - margin, y);
+        y += 3;
+      } else if (item.type === 'h2') {
+        y += 2;
+        checkPage(8);
+        addWrappedText(item.text, 11, true, [60, 90, 180]);
+        y += 1;
+      } else if (item.type === 'bullet') {
+        checkPage(6);
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(40, 40, 40);
+        const lines = doc.splitTextToSize(item.text, maxW - 8);
+        lines.forEach((line, idx) => {
+          checkPage(5);
+          doc.text(line, pageW - margin - 6, y, { align: 'right' });
+          if (idx === 0) doc.text('•', pageW - margin - 1, y, { align: 'right' });
+          y += 5;
+        });
+      } else {
+        checkPage(5);
+        addWrappedText(item.text, 10, false, [40, 40, 40]);
+      }
+    });
+
+    doc.save('מפרט_מערכת_רגבים.pdf');
   };
 
   return (
     <div className="space-y-4 max-w-3xl">
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">מפרט דרישות מערכת רגבים — גרסה 1.0</p>
-        <Button variant="outline" size="sm" onClick={handleDownload}>
-          <Download size={14} className="ml-1" /> הורד Markdown
+        <Button variant="outline" size="sm" onClick={handleDownloadPdf}>
+          <Download size={14} className="ml-1" /> הורד PDF
         </Button>
       </div>
 
