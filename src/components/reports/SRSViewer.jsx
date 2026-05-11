@@ -1,7 +1,8 @@
-import { useState } from 'react';
-import { Download } from 'lucide-react';
+import { useState, useRef } from 'react';
+import { Download, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 
 const SECTIONS = [
   {
@@ -263,120 +264,109 @@ function MarkdownText({ text }) {
   );
 }
 
-// Strip ** bold markers for plain text
-function stripBold(str) {
-  return str.replace(/\*\*/g, '');
+// Render all sections as HTML for PDF capture
+function SRSPrintContent({ innerRef }) {
+  return (
+    <div ref={innerRef} style={{ display: 'none', position: 'fixed', top: '-9999px', left: 0, width: '794px', background: 'white', padding: '32px', fontFamily: 'Arial, sans-serif', direction: 'rtl' }}>
+      <div style={{ marginBottom: '24px', borderBottom: '2px solid #3b4fa8', paddingBottom: '12px' }}>
+        <h1 style={{ fontSize: '22px', fontWeight: 'bold', color: '#1e2864', margin: 0 }}>מפרט דרישות מערכת — רגבים</h1>
+        <p style={{ fontSize: '12px', color: '#888', marginTop: '4px' }}>גרסה 1.0 | 2026-05-11</p>
+      </div>
+      {SECTIONS.map((section, si) => (
+        <div key={si} style={{ marginBottom: '24px' }}>
+          <h2 style={{ fontSize: '15px', fontWeight: 'bold', color: '#1e2864', borderBottom: '1px solid #b4bce8', paddingBottom: '4px', marginBottom: '10px' }}>{section.title}</h2>
+          {section.content && <SRSPrintText text={section.content} />}
+          {section.subsections?.map((sub, subi) => (
+            <div key={subi} style={{ marginBottom: '12px', paddingRight: '12px', borderRight: '3px solid #3b4fa8' }}>
+              <h3 style={{ fontSize: '13px', fontWeight: 'bold', color: '#3b4fa8', marginBottom: '6px' }}>{sub.title}</h3>
+              <SRSPrintText text={sub.content} />
+            </div>
+          ))}
+        </div>
+      ))}
+    </div>
+  );
 }
 
-// Flatten all sections into lines for PDF
-function buildPdfLines() {
-  const lines = [];
-  SECTIONS.forEach(section => {
-    lines.push({ type: 'h1', text: section.title });
-    if (section.content) {
-      section.content.split('\n').forEach(line => {
-        if (!line.trim()) return;
-        lines.push({ type: line.startsWith('- ') ? 'bullet' : 'body', text: stripBold(line.startsWith('- ') ? line.slice(2) : line) });
-      });
-    }
-    section.subsections?.forEach(sub => {
-      lines.push({ type: 'h2', text: sub.title });
-      sub.content.split('\n').forEach(line => {
-        if (!line.trim()) return;
-        lines.push({ type: line.startsWith('- ') ? 'bullet' : 'body', text: stripBold(line.startsWith('- ') ? line.slice(2) : line) });
-      });
-    });
-  });
-  return lines;
+function SRSPrintText({ text }) {
+  const lines = text.split('\n');
+  return (
+    <div style={{ fontSize: '11px', lineHeight: '1.7', color: '#222' }}>
+      {lines.map((line, i) => {
+        if (!line.trim()) return <div key={i} style={{ height: '6px' }} />;
+        const renderInline = (str) => {
+          const parts = str.split(/(\*\*[^*]+\*\*)/g);
+          return parts.map((part, j) =>
+            part.startsWith('**') && part.endsWith('**')
+              ? <strong key={j}>{part.slice(2, -2)}</strong>
+              : part
+          );
+        };
+        if (line.startsWith('- ')) {
+          return (
+            <div key={i} style={{ display: 'flex', gap: '6px', marginBottom: '2px' }}>
+              <span style={{ color: '#3b4fa8', flexShrink: 0 }}>•</span>
+              <span>{renderInline(line.slice(2))}</span>
+            </div>
+          );
+        }
+        return <p key={i} style={{ margin: '2px 0' }}>{renderInline(line)}</p>;
+      })}
+    </div>
+  );
 }
 
 export default function SRSViewer() {
   const [openSections, setOpenSections] = useState({ 0: true });
+  const [exporting, setExporting] = useState(false);
+  const printRef = useRef(null);
 
   const toggle = (i) => setOpenSections(prev => ({ ...prev, [i]: !prev[i] }));
 
-  const handleDownloadPdf = () => {
-    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-    const pageW = doc.internal.pageSize.getWidth();
-    const pageH = doc.internal.pageSize.getHeight();
-    const margin = 15;
-    const maxW = pageW - margin * 2;
-    let y = margin;
+  const handleDownloadPdf = async () => {
+    setExporting(true);
+    const el = printRef.current;
+    el.style.display = 'block';
+    await new Promise(r => setTimeout(r, 150));
 
-    const checkPage = (needed) => {
-      if (y + needed > pageH - margin) { doc.addPage(); y = margin; }
-    };
+    const canvas = await html2canvas(el, { scale: 1.5, useCORS: true, backgroundColor: '#ffffff' });
+    el.style.display = 'none';
 
-    const addWrappedText = (text, fontSize, isBold, color, indent = 0) => {
-      doc.setFontSize(fontSize);
-      doc.setFont('helvetica', isBold ? 'bold' : 'normal');
-      doc.setTextColor(...color);
-      const lines = doc.splitTextToSize(text, maxW - indent);
-      lines.forEach(line => {
-        checkPage(fontSize * 0.4 + 1);
-        // RTL: align right
-        doc.text(line, pageW - margin - indent, y, { align: 'right' });
-        y += fontSize * 0.4 + 1;
-      });
-    };
+    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    const pageW = pdf.internal.pageSize.getWidth();
+    const pageH = pdf.internal.pageSize.getHeight();
+    const margin = 10;
+    const contentW = pageW - margin * 2;
+    const contentH = pageH - margin * 2;
+    const pxPerMM = canvas.width / contentW;
+    const pageHeightPx = contentH * pxPerMM;
 
-    // Title
-    doc.setFontSize(18);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(30, 40, 100);
-    doc.text('מפרט דרישות מערכת — רגבים', pageW - margin, y, { align: 'right' });
-    y += 10;
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(120, 120, 120);
-    doc.text('גרסה 1.0 | 2026-05-11', pageW - margin, y, { align: 'right' });
-    y += 8;
-    doc.setDrawColor(200, 200, 200);
-    doc.line(margin, y, pageW - margin, y);
-    y += 6;
+    let srcY = 0;
+    let firstPage = true;
+    while (srcY < canvas.height) {
+      const sliceH = Math.min(pageHeightPx, canvas.height - srcY);
+      const slice = document.createElement('canvas');
+      slice.width = canvas.width;
+      slice.height = sliceH;
+      slice.getContext('2d').drawImage(canvas, 0, srcY, canvas.width, sliceH, 0, 0, canvas.width, sliceH);
+      if (!firstPage) pdf.addPage();
+      pdf.addImage(slice.toDataURL('image/jpeg', 0.9), 'JPEG', margin, margin, contentW, sliceH / pxPerMM);
+      srcY += sliceH;
+      firstPage = false;
+    }
 
-    const pdfLines = buildPdfLines();
-    pdfLines.forEach(item => {
-      if (item.type === 'h1') {
-        y += 4;
-        checkPage(10);
-        addWrappedText(item.text, 13, true, [30, 40, 100]);
-        y += 1;
-        doc.setDrawColor(180, 190, 230);
-        doc.line(margin, y, pageW - margin, y);
-        y += 3;
-      } else if (item.type === 'h2') {
-        y += 2;
-        checkPage(8);
-        addWrappedText(item.text, 11, true, [60, 90, 180]);
-        y += 1;
-      } else if (item.type === 'bullet') {
-        checkPage(6);
-        doc.setFontSize(10);
-        doc.setFont('helvetica', 'normal');
-        doc.setTextColor(40, 40, 40);
-        const lines = doc.splitTextToSize(item.text, maxW - 8);
-        lines.forEach((line, idx) => {
-          checkPage(5);
-          doc.text(line, pageW - margin - 6, y, { align: 'right' });
-          if (idx === 0) doc.text('•', pageW - margin - 1, y, { align: 'right' });
-          y += 5;
-        });
-      } else {
-        checkPage(5);
-        addWrappedText(item.text, 10, false, [40, 40, 40]);
-      }
-    });
-
-    doc.save('מפרט_מערכת_רגבים.pdf');
+    pdf.save('מפרט_מערכת_רגבים.pdf');
+    setExporting(false);
   };
 
   return (
     <div className="space-y-4 max-w-3xl">
+      <SRSPrintContent innerRef={printRef} />
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">מפרט דרישות מערכת רגבים — גרסה 1.0</p>
-        <Button variant="outline" size="sm" onClick={handleDownloadPdf}>
-          <Download size={14} className="ml-1" /> הורד PDF
+        <Button variant="outline" size="sm" onClick={handleDownloadPdf} disabled={exporting}>
+          {exporting ? <Loader2 size={14} className="animate-spin ml-1" /> : <Download size={14} className="ml-1" />}
+          {exporting ? 'מייצא...' : 'הורד PDF'}
         </Button>
       </div>
 
