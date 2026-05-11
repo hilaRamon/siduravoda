@@ -153,6 +153,8 @@ export default function TimeReporting() {
   const [overrides, setOverrides] = useState({});   // { studentId: { start, end } }
   const [search, setSearch] = useState('');
   const [saving, setSaving] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [progressLabel, setProgressLabel] = useState('');
 
   const submitted = !!localStorage.getItem(SUBMITTED_KEY(selectedDate));
 
@@ -252,47 +254,63 @@ export default function TimeReporting() {
 
   const handleSubmit = async () => {
     setSaving(true);
+    setProgress(0);
+    setProgressLabel('טוען נתונים קיימים...');
     try {
       const existing = await base44.entities.TimeReport.filter({ date: selectedDate });
       const existingByStudent = {};
       existing.forEach(r => { existingByStudent[r.student_id] = r; });
 
+      // Build flat list of all student operations
+      const ops = [];
       for (const wp of workplacesToShow) {
         const wpId = wp.workplace_id || wp.id;
-        const wpName = wp.workplace_name || wp.name;
         const students = workplaceStudents[wpId] || [];
         const groupStart = groupTimes[wpId]?.start ?? DEFAULT_START;
         const groupEnd = groupTimes[wpId]?.end ?? DEFAULT_END;
-
         for (const a of students) {
           const ov = overrides[a.student_id];
-          const start_time = ov?.start ?? groupStart;
-          const end_time = ov?.end ?? groupEnd;
-
-          const data = {
-            date: selectedDate,
-            student_id: a.student_id,
-            student_name: a.student_name,
-            workplace_id: a.workplace_id,
-            workplace_name: a.workplace_name,
-            start_time,
-            end_time,
-            status: 'ממתין',
-          };
-
-          if (existingByStudent[a.student_id]) {
-            await base44.entities.TimeReport.update(existingByStudent[a.student_id].id, data);
-          } else {
-            await base44.entities.TimeReport.create(data);
-          }
+          ops.push({ a, groupStart, groupEnd, ov });
         }
       }
 
+      const total = ops.length;
+      for (let i = 0; i < ops.length; i++) {
+        const { a, groupStart, groupEnd, ov } = ops[i];
+        const start_time = ov?.start ?? groupStart;
+        const end_time = ov?.end ?? groupEnd;
+        const data = {
+          date: selectedDate,
+          student_id: a.student_id,
+          student_name: a.student_name,
+          workplace_id: a.workplace_id,
+          workplace_name: a.workplace_name,
+          start_time,
+          end_time,
+          status: 'ממתין',
+        };
+
+        if (existingByStudent[a.student_id]) {
+          await base44.entities.TimeReport.update(existingByStudent[a.student_id].id, data);
+        } else {
+          await base44.entities.TimeReport.create(data);
+        }
+
+        const pct = Math.round(((i + 1) / total) * 100);
+        setProgress(pct);
+        setProgressLabel(`מעדכן תלמיד ${i + 1} מתוך ${total}...`);
+      }
+
+      setProgress(100);
+      setProgressLabel('הושלם!');
+      await new Promise(r => setTimeout(r, 600));
+
       localStorage.setItem(SUBMITTED_KEY(selectedDate), '1');
-      // Force re-render
       setGroupTimes(prev => ({ ...prev }));
     } finally {
       setSaving(false);
+      setProgress(0);
+      setProgressLabel('');
     }
   };
 
@@ -320,6 +338,41 @@ export default function TimeReporting() {
 
   return (
     <div className="min-h-screen bg-background p-4 md:p-8" dir="rtl">
+
+      {/* Progress Overlay */}
+      {saving && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center">
+          <div className="bg-card rounded-2xl shadow-2xl p-8 w-80 flex flex-col items-center gap-5" dir="rtl">
+            <div className="relative w-24 h-24">
+              <svg className="w-24 h-24 -rotate-90" viewBox="0 0 96 96">
+                <circle cx="48" cy="48" r="40" fill="none" stroke="hsl(var(--secondary))" strokeWidth="8" />
+                <circle
+                  cx="48" cy="48" r="40" fill="none"
+                  stroke="hsl(var(--primary))" strokeWidth="8"
+                  strokeLinecap="round"
+                  strokeDasharray={`${2 * Math.PI * 40}`}
+                  strokeDashoffset={`${2 * Math.PI * 40 * (1 - progress / 100)}`}
+                  className="transition-all duration-300 ease-out"
+                />
+              </svg>
+              <div className="absolute inset-0 flex items-center justify-center">
+                <span className="text-xl font-bold text-foreground">{progress}%</span>
+              </div>
+            </div>
+            <div className="text-center">
+              <p className="font-semibold text-base">{progress === 100 ? '✓ הושלם!' : 'שולח דיווח...'}</p>
+              <p className="text-sm text-muted-foreground mt-1">{progressLabel}</p>
+            </div>
+            <div className="w-full h-2 bg-secondary rounded-full overflow-hidden">
+              <div
+                className="h-full bg-primary rounded-full transition-all duration-300 ease-out"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="max-w-4xl mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
