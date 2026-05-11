@@ -22,20 +22,19 @@ function calcDuration(start, end) {
 
 function TimeInput({ value, onChange }) {
   const [local, setLocal] = useState(value);
-  const [dirty, setDirty] = useState(false);
 
   // Sync if parent changes (e.g. group reset)
-  useEffect(() => { setLocal(value); setDirty(false); }, [value]);
+  useEffect(() => { setLocal(value); }, [value]);
+
+  const dirty = local !== value;
 
   const handleChange = (e) => {
     setLocal(e.target.value);
-    setDirty(e.target.value !== value);
   };
 
   const commit = () => {
-    if (dirty) {
+    if (local !== value) {
       onChange(local);
-      setDirty(false);
     }
   };
 
@@ -45,18 +44,15 @@ function TimeInput({ value, onChange }) {
         type="time"
         value={local}
         onChange={handleChange}
-        onBlur={commit}
-        className="h-8 w-24 border border-border rounded-md px-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary bg-card"
+        className={`h-9 w-28 border rounded-md px-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary bg-card transition-colors ${dirty ? 'border-primary ring-1 ring-primary/40' : 'border-border'}`}
       />
-      {dirty && (
-        <button
-          onClick={commit}
-          className="h-8 w-8 flex items-center justify-center rounded-md bg-primary text-white hover:bg-primary/90 transition-colors shrink-0"
-          title="אשר"
-        >
-          <CheckCircle2 size={15} />
-        </button>
-      )}
+      <button
+        onClick={commit}
+        className={`h-9 w-9 flex items-center justify-center rounded-md transition-colors shrink-0 ${dirty ? 'bg-primary text-white hover:bg-primary/90' : 'bg-secondary text-muted-foreground hover:bg-secondary/80'}`}
+        title="אשר שעה"
+      >
+        <Check size={15} />
+      </button>
     </div>
   );
 }
