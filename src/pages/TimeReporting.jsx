@@ -151,6 +151,7 @@ export default function TimeReporting() {
   const [saving, setSaving] = useState(false);
   const [progress, setProgress] = useState(0);
   const [progressLabel, setProgressLabel] = useState('');
+  const [timeError, setTimeError] = useState('');
 
   const submitted = !!localStorage.getItem(SUBMITTED_KEY(selectedDate));
 
@@ -229,22 +230,43 @@ export default function TimeReporting() {
     return allStudents.filter(a => a.student_name.includes(search.trim()));
   }, [search, allStudents]);
 
+  const validateTimes = (start, end) => {
+    if (!start || !end) return true;
+    const [sh, sm] = start.split(':').map(Number);
+    const [eh, em] = end.split(':').map(Number);
+    return (eh * 60 + em) > (sh * 60 + sm);
+  };
+
   const handleGroupTimeChange = (workplaceId, field, val) => {
+    const current = groupTimes[workplaceId] || { start: DEFAULT_START, end: DEFAULT_END };
+    const newTimes = { ...current, [field]: val };
+    if (!validateTimes(newTimes.start, newTimes.end)) {
+      setTimeError('שעת יציאה חייבת להיות מאוחרת משעת כניסה');
+      setTimeout(() => setTimeError(''), 3000);
+      return;
+    }
+    setTimeError('');
     setGroupTimes(prev => ({
       ...prev,
-      [workplaceId]: { ...(prev[workplaceId] || { start: DEFAULT_START, end: DEFAULT_END }), [field]: val },
+      [workplaceId]: newTimes,
     }));
   };
 
   const handleOverrideChange = (studentId, field, val, groupStart, groupEnd) => {
     if (field === null) {
-      // Reset override
       setOverrides(prev => { const n = { ...prev }; delete n[studentId]; return n; });
       return;
     }
+    const current = overrides[studentId] || { start: groupStart, end: groupEnd };
+    const newTimes = { ...current, [field]: val };
+    if (!validateTimes(newTimes.start, newTimes.end)) {
+      setTimeError('שעת יציאה חייבת להיות מאוחרת משעת כניסה');
+      setTimeout(() => setTimeError(''), 3000);
+      return;
+    }
+    setTimeError('');
     setOverrides(prev => {
-      const current = prev[studentId] || { start: groupStart, end: groupEnd };
-      return { ...prev, [studentId]: { ...current, [field]: val } };
+      return { ...prev, [studentId]: newTimes };
     });
   };
 
@@ -442,6 +464,13 @@ export default function TimeReporting() {
             </div>
           )}
         </div>
+
+        {/* Time error toast */}
+        {timeError && (
+          <div className="fixed top-6 right-1/2 translate-x-1/2 z-50 bg-destructive text-destructive-foreground px-5 py-3 rounded-xl shadow-xl text-sm font-medium flex items-center gap-2 animate-in fade-in slide-in-from-top-2">
+            <span>⚠️</span> {timeError}
+          </div>
+        )}
 
         {/* Workplace groups */}
         {isLoading ? (
