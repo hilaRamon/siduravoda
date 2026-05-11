@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
-import { FileSpreadsheet, Shuffle, Loader2, UserCheck, BarChart2, Users } from 'lucide-react';
+import { FileSpreadsheet, Shuffle, Loader2, UserCheck, BarChart2, Users, BookOpen } from 'lucide-react';
 import { format, eachDayOfInterval, parseISO } from 'date-fns';
 import PeriodicWorkReport from '@/components/reports/PeriodicWorkReport';
 import PeriodWorkReport from '@/components/reports/PeriodWorkReport';
@@ -12,6 +12,7 @@ import TimeReportingLink from '@/components/reports/TimeReportingLink';
 import BackupExport from '@/components/reports/BackupExport';
 import BackupEmailSettings from '@/components/reports/BackupEmailSettings';
 import ImportAssignments from '@/components/reports/ImportAssignments';
+import SRSViewer from '@/components/reports/SRSViewer';
 
 export default function Reports() {
   const [randomizing, setRandomizing] = useState(false);
@@ -200,6 +201,7 @@ export default function Reports() {
           { key: 'periodic', label: 'דוח עבודה חודשי', icon: BarChart2 },
           { key: 'period', label: 'דוח עבודה לתקופה', icon: BarChart2 },
           { key: 'student', label: 'דוח עבודת תלמיד', icon: Users },
+          { key: 'srs', label: 'מפרט מערכת', icon: BookOpen },
         ].map(({ key, label, icon: Icon }) => (
           <button
             key={key}
@@ -217,6 +219,7 @@ export default function Reports() {
       {activeTab === 'periodic' && <PeriodicWorkReport />}
       {activeTab === 'period' && <PeriodWorkReport />}
       {activeTab === 'student' && <StudentWorkReport />}
+      {activeTab === 'srs' && <SRSViewer />}
 
       {activeTab === 'tools' && <div className="space-y-4 max-w-2xl">
 
