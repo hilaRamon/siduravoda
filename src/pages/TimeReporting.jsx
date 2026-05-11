@@ -4,7 +4,7 @@ import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { format } from 'date-fns';
-import { Send, Clock, CheckCircle2, ChevronDown, ChevronUp, Search, CalendarDays } from 'lucide-react';
+import { Send, Clock, CheckCircle2, ChevronDown, ChevronUp, Search, CalendarDays, Check } from 'lucide-react';
 
 const DEFAULT_START = '07:00';
 const DEFAULT_END = '11:45';
@@ -21,13 +21,43 @@ function calcDuration(start, end) {
 }
 
 function TimeInput({ value, onChange }) {
+  const [local, setLocal] = useState(value);
+  const [dirty, setDirty] = useState(false);
+
+  // Sync if parent changes (e.g. group reset)
+  useEffect(() => { setLocal(value); setDirty(false); }, [value]);
+
+  const handleChange = (e) => {
+    setLocal(e.target.value);
+    setDirty(e.target.value !== value);
+  };
+
+  const commit = () => {
+    if (dirty) {
+      onChange(local);
+      setDirty(false);
+    }
+  };
+
   return (
-    <input
-      type="time"
-      value={value}
-      onChange={e => onChange(e.target.value)}
-      className="h-8 w-24 border border-border rounded-md px-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary bg-card"
-    />
+    <div className="flex items-center gap-1">
+      <input
+        type="time"
+        value={local}
+        onChange={handleChange}
+        onBlur={commit}
+        className="h-8 w-24 border border-border rounded-md px-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary bg-card"
+      />
+      {dirty && (
+        <button
+          onClick={commit}
+          className="h-8 w-8 flex items-center justify-center rounded-md bg-primary text-white hover:bg-primary/90 transition-colors shrink-0"
+          title="אשר"
+        >
+          <CheckCircle2 size={15} />
+        </button>
+      )}
+    </div>
   );
 }
 
