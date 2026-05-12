@@ -1,5 +1,5 @@
 # מפרט דרישות מערכת (SRS) — מערכת "רגבים"
-## Software Requirements Specification — גרסה 1.0
+## Software Requirements Specification — גרסה 1.1
 
 ---
 
@@ -140,6 +140,7 @@
 - `student_id` מתחיל ב-`"guest_"` (לדוגמה: `"guest_1700000000000"`)
 - מופיע בשיבוצים של אותו יום בלבד
 - **לא** מועתק בפעולת שכפול יום
+- מוצג בטבלה עם רקע ענבר ואייקון UserPlus
 
 ---
 
@@ -169,9 +170,9 @@
 | `color` | string | ❌ | צבע הקס לתצוגה (לדוגמה: #FF5733) |
 
 **תפקידים מיוחדים המשמשים בדוח PDF:**
-- `"נהג"` — מוצג בעמודת נהג בטבלת הדוח
-- `"ראש צוות"` — מוצג בעמודת ראש צוות
-- `'אחראי פק"ל'` — מוצג בעמודת ציוד
+- `"נהג"` — מוצג בשורת תפקידים בדוח הסידור היומי
+- `"ראש צוות"` — מוצג בשורת תפקידים
+- `'אחראי פק"ל'` — מוצג בשורת תפקידים
 
 ---
 
@@ -276,6 +277,19 @@
 | שם שדה | סוג | חובה | תיאור |
 |--------|-----|------|--------|
 | `emails` | array[string] | ❌ | רשימת כתובות מייל לגיבוי חודשי |
+
+---
+
+### 2.12 ישות: AppSettings (הגדרות מערכת)
+
+**קובץ:** `entities/AppSettings.json`
+
+| שם שדה | סוג | ברירת מחדל | חובה | תיאור |
+|--------|-----|-----------|------|--------|
+| `default_rate` | number | 40 | ❌ | תעריף שעתי ברירת מחדל לשיבוץ (₪/שעה) |
+| `default_hours` | number | 4.75 | ❌ | כמות שעות ברירת מחדל לשיבוץ |
+
+**כלל:** רשומה יחידה במערכת. ניתנת לעריכה בדף "כלי ניהול" → לשונית "הגדרות ברירות מחדל".
 
 ---
 
@@ -384,7 +398,7 @@ assignments.filter(a => a.workplace_id && a.workplace_name)
 - שדות ריקים → לא משתנים
 - מקום עבודה חדש לתלמיד ללא שיבוץ → יוצר שיבוץ חדש
 - שליחה בחלקים של 40 רשומות לפונקציה `bulkUpdateAssignments`
-- מוצגת פס התקדמות עם אחוזים בזמן הריצה
+- מוצגת פס התקדמות עם אחוזים בזמן הריצה (progress bar בדיאלוג)
 
 ---
 
@@ -459,6 +473,7 @@ hours = Math.round(diff / 60 * 100) / 100
 | דוחות | /reports | BarChart2 |
 | בקשות היעדרות | /absence-requests | MessageSquare |
 | עדכון זמנים | /time-reports | ClipboardCheck |
+| כלי ניהול | /admin-tools | Settings2 |
 
 ---
 
@@ -494,6 +509,7 @@ hours = Math.round(diff / 60 * 100) / 100
 8. שעות (EditableNumberCell)
 9. תשלום נוסף (EditableNumberCell)
 10. הערות
+11. שיבוץ (dropdown סינון: הכל / משובצים / לא משובצים)
 
 **מיון:** לפי מקום עבודה → מחזור → שם (עברית)
 
@@ -506,9 +522,20 @@ hours = Math.round(diff / 60 * 100) / 100
 - Popover עם Command (חיפוש) לבחירת מקום עבודה
 - X לביטול שיבוץ
 
+**תלמידים יומיים (שורות guest):**
+- מוצגים בתחתית הטבלה, אחרי כל התלמידים הרגילים
+- רקע ענבר `bg-amber-50/60`, גבול מקווקו `border-dashed border-amber-200`
+- אייקון UserPlus לפני השם
+
 #### 4.2.4 סיידבר לוגיסטיקה
 
 ראה סעיף 4.7
+
+#### 4.2.5 Floating Bulk Toolbar
+
+כאשר `selectedIds.size > 0`:
+- פס צף בתחתית המסך (`fixed bottom-6`)
+- מציג: "X שורות נבחרו" + כפתור "עריכה מרובה" + כפתור ביטול
 
 ---
 
@@ -649,9 +676,43 @@ validateTimes(start, end):
 
 ---
 
+### 4.10 עמוד כלי ניהול (AdminTools)
+
+**קובץ:** `pages/AdminTools.jsx`  
+**נתיב:** `/admin-tools`
+
+לשוניות:
+| מפתח | תווית | תיאור |
+|------|-------|--------|
+| `links` | קישורים | PublishedScheduleCard + TimeReportingLink |
+| `backup` | גיבוי ושחזור | BackupExport + ImportAssignments + BackupEmailSettings |
+| `random` | שיבוץ אקראי | כלים לשיבוץ רנדומלי ושיבוץ תפקידים אוטומטי |
+| `settings` | הגדרות ברירות מחדל | DefaultSettings (תעריף ושעות ברירת מחדל) |
+| `srs` | מפרט מערכת | SRSViewer — מפרט המערכת הנוכחי |
+
+#### 4.10.1 DefaultSettings
+
+**קובץ:** `components/admin/DefaultSettings.jsx`
+
+- קורא רשומת AppSettings יחידה מה-DB
+- מאפשר עריכת `default_rate` ו-`default_hours`
+- שמירה: CREATE אם לא קיים, UPDATE אם קיים
+- מציג הודעת "נשמר!" אחרי שמירה
+
+#### 4.10.2 שיבוץ אקראי (כלי dev)
+
+- מוחק את כל השיבוצים מ-01/04/2026 ומשבץ מחדש רנדומלית
+- מגביל ל-10 מקומות עבודה ראשונים + "לא עובד" + "לימודים"
+
+#### 4.10.3 שיבוץ תפקידים אוטומטי (כלי dev)
+
+- משבץ נהג / אחראי פק"ל / ראש צוות לכל יום בצורה מחזורית
+
+---
+
 ## 5. מנוע דוחות
 
-### 5.1 דוח סידור עבודה יומי (PDF)
+### 5.1 דוח סידור עבודה יומי — כפתור מהשיבוצים (DailyReportPDFButton)
 
 **קובץ:** `components/reports/DailyReportPDFButton.jsx`
 
@@ -667,12 +728,14 @@ validateTimes(start, end):
 **שדות שנבנים לכל קבוצה:**
 - `workplaceName` — שם מקום העבודה
 - `students[]` — רשימת תלמידים ממוינת לפי שם
-- `vehicleName` — שמות רכבים מחוברים (`vehicle_name + vehicle_name_2 + vehicle_name_3`)
+- `vehicleName` — שמות רכבים 1+2+3 מחוברים ב-" + "
 - `exitTime` — שעת יציאה (מ-WorkplaceLogistics, ברירת מחדל "06:35")
 - `notes` — הערות
-- `driverName` — שם הנהג (מ-Assignment.role="נהג", רק אם באותה מחלקה)
-- `teamLeaderName` — שם ראש צוות
-- `equipName` — שם אחראי פק"ל
+- `driverName` — שם הנהג (רק אם משובץ **לאותה מחלקה**)
+- `teamLeaderName` — שם ראש צוות (רק אם משובץ **לאותה מחלקה**)
+- `equipName` — שם אחראי פק"ל (רק אם משובץ **לאותה מחלקה**)
+
+> **חשוב:** בעלי תפקידים מוצגים **רק** בטבלת מקום העבודה שאליו הם משובצים בפועל — לא גלובלית.
 
 #### 5.1.2 מבנה ה-HTML הנסתר
 
@@ -680,10 +743,10 @@ validateTimes(start, end):
 div (width=794px, font-family=Arial, dir=rtl)
   └── כותרת: "סידור עבודה" + תאריך גרגוריאני + עברי
   └── לכל מחלקה:
-        └── header: שם + הערות + רכב (כחול) + שעה (ירוק)
+        └── header: שם + הערות + רכב (badge כחול) + שעה (badge ירוק)
         └── table:
               thead: שם תלמיד | אחראי פק"ל | נהג | ראש צוות
-              tbody: שורה לכל תלמיד
+              tbody: שורה לכל תלמיד (נהג/ראש צוות בשורה ראשונה בלבד)
               tfoot: סה"כ תלמידים: N
 ```
 
@@ -708,16 +771,85 @@ margin = 10mm
 
 ---
 
-### 5.2 דוח עבודה תקופתי
+### 5.2 דוח סידור עבודה יומי — מדף הדוחות (DailyAssignmentReport)
+
+**קובץ:** `components/reports/DailyAssignmentReport.jsx`  
+**מיקום:** דף הדוחות (`/reports`) → לשונית "סידור יומי"
+
+#### 5.2.1 שונה מ-DailyReportPDFButton
+
+| היבט | DailyReportPDFButton | DailyAssignmentReport |
+|------|---------------------|----------------------|
+| מיקום | דף שיבוצים | דף דוחות |
+| פריסה | טבלה אחת לכל מחלקה | **שני טורים** בעמוד |
+| מיון תלמידים | לפי שם ראשון | **לפי שם משפחה** (מילה אחרונה) |
+| בעלי תפקידים | בשורות הטבלה | **שורת תפקידים נפרדת** מעל הרשימה |
+| רכב+שעה | badge קטן בכותרת | **שורה בולטת** עם גופן גדול |
+
+#### 5.2.2 מבנה כרטיס מחלקה (PdfCard)
+
+```
+כרטיס (border 2px, border-radius 6px):
+  ┌─────────────────────────────────────────┐
+  │ כותרת: שם מקום עבודה (כחול כהה, לבן)   │
+  ├─────────────────────────────────────────┤
+  │ שורת לוגיסטיקה (צהוב): 🚗 רכבים | ⏰ שעה │
+  │  (גופן 15–17px, שעה באדום בולט)         │
+  ├──────────┬──────────┬────────────────────┤
+  │  נהג     │ ראש צוות │   אחראי פק"ל       │
+  │  [שם]    │  [שם]    │    [שם]             │
+  ├─────────────────────────────────────────┤
+  │ • שם תלמיד א                             │
+  │ • שם תלמיד ב                             │
+  │ ...                                     │
+  ├─────────────────────────────────────────┤
+  │ סה"כ: N תלמידים                         │
+  └─────────────────────────────────────────┘
+```
+
+#### 5.2.3 לוגיקת בעלי תפקידים
+
+```
+לכל מחלקה:
+  driverName:
+    1. log.driver_student_name (מהלוגיסטיקה)
+    2. תלמיד עם role='נהג' באותה מחלקה
+    3. תלמיד עם role='נהג' גלובלי (כל יום)
+    4. '—'
+
+  teamLeaderName:
+    1. תלמיד עם role='ראש צוות' באותה מחלקה
+    2. תלמיד עם role='ראש צוות' גלובלי
+    3. '—'
+
+  pakalName:
+    1. תלמיד עם role='אחראי פק"ל' באותה מחלקה
+    2. תלמיד עם role='אחראי פק"ל' גלובלי
+    3. '—'
+```
+
+#### 5.2.4 ייצוא PDF — מנגנון
+
+הרכיב הנסתר (`printRef`) ממוקם `position:fixed, left:-9999px` עם `visibility:hidden`.  
+בייצוא:
+1. `el.style.visibility = 'visible'`
+2. המתן 300ms לרינדור
+3. `html2canvas(el, { scale: 2, backgroundColor: '#ffffff' })`
+4. `el.style.visibility = 'hidden'`
+5. חיתוך לדפים + שמירה כ-JPEG 0.93
+
+---
+
+### 5.3 דוח עבודה תקופתי
 
 **קובץ:** `components/reports/PeriodWorkReport.jsx`
 
-#### 5.2.1 פילטרים
+#### 5.3.1 פילטרים
 
 - תאריך התחלה וסוף (חובה)
 - מקומות עבודה (multi-select עם Command+Popover, ברירת מחדל = הכל)
 
-#### 5.2.2 אגרגציה
+#### 5.3.2 אגרגציה
 
 ```
 לכל assignment בטווח:
@@ -734,13 +866,13 @@ margin = 10mm
 
 **סינון:** `SKIP_WORKPLACES = ['לא עובד', 'לימודים']` — לא נכללים
 
-#### 5.2.3 תצוגת הדוח
+#### 5.3.3 תצוגת הדוח
 
 - מיון: מקומות עבודה לפי שם עברי
 - לכל מקום עבודה: טבלה + שורת סה"כ
 - כותרת: "לכבוד: {שם מקום עבודה}"
 
-#### 5.2.4 ייצוא
+#### 5.3.4 ייצוא
 
 **PDF:** portrait A4, scale=1.5, חיתוך לפי sections
 **Excel (XLSX):** 
@@ -750,7 +882,7 @@ margin = 10mm
 
 ---
 
-### 5.3 דוח תלמיד-עבודה (StudentWorkReport)
+### 5.4 דוח תלמיד-עבודה (StudentWorkReport)
 
 **קובץ:** `components/reports/StudentWorkReport.jsx`
 
@@ -838,7 +970,22 @@ margin = 10mm
 **קובץ:** `functions/sendMonthlyBackup.js`  
 **הפעלה:** Automation מתוזמן (1 בחודש)
 
-- שולח מייל עם נתוני גיבוי לכתובות מ-BackupSettings.emails
+#### 7.2.1 תהליך הגיבוי
+
+1. **טעינת נתונים:** Student, Workplace, Vehicle, Assignment, BackupSettings
+2. **בניית קבצי XLSX:** גיליון נפרד לכל ישות (תלמידים, מקומות עבודה, רכבים, שיבוצים)
+3. **העלאה לענן:** `UploadFile API` — כל קובץ מועלה כ-`File` object, מוחזר `file_url` ציבורי
+4. **שליחת מייל:** נשלח מייל אחד לכל כתובת ב-`BackupSettings.emails` עם קישורים להורדה
+5. **פורמט מייל:** רשימת קישורים להורדה (בתוקף מספר ימים)
+
+#### 7.2.2 קבצים שנוצרים
+
+| שם קובץ | תוכן |
+|---------|------|
+| `גיבוי_תלמידים_{date}.xlsx` | כל התלמידים עם כל השדות |
+| `גיבוי_מקומות_עבודה_{date}.xlsx` | כל מקומות העבודה |
+| `גיבוי_רכבים_{date}.xlsx` | כל הרכבים |
+| `גיבוי_שיבוצים_{date}.xlsx` | כל השיבוצים (ממוין לפי תאריך → שם תלמיד) |
 
 ---
 
@@ -877,6 +1024,7 @@ src/
 │   └── utils.js                     # cn() utility
 │
 ├── entities/
+│   ├── AppSettings.json             # הגדרות ברירות מחדל (חדש)
 │   ├── Assignment.json
 │   ├── BackupSettings.json
 │   ├── FarmerRequest.json
@@ -899,6 +1047,7 @@ src/
 │
 ├── pages/
 │   ├── AbsenceRequests.jsx
+│   ├── AdminTools.jsx               # כלי ניהול — לשוניות: קישורים/גיבוי/שיבוץ/הגדרות/מפרט
 │   ├── Assignments.jsx
 │   ├── Calendar.jsx
 │   ├── Dashboard.jsx
@@ -914,12 +1063,14 @@ src/
 └── components/
     ├── Layout.jsx
     ├── UserNotRegisteredError.jsx
+    ├── admin/
+    │   └── DefaultSettings.jsx      # עריכת הגדרות ברירת מחדל (AppSettings)
     ├── assignments/
     │   ├── LogisticsSidebar.jsx
     │   └── VehicleSlot.jsx
     ├── reports/
-    │   ├── DailyReportPDFButton.jsx
-    │   ├── DailyAssignmentReport.jsx
+    │   ├── DailyReportPDFButton.jsx # כפתור PDF בדף שיבוצים (טבלה רגילה, חד-עמודה)
+    │   ├── DailyAssignmentReport.jsx # דוח יומי בדף הדוחות (שני טורים, מיון לפי שם משפחה)
     │   ├── PeriodWorkReport.jsx
     │   ├── StudentWorkReport.jsx
     │   ├── TimeReportingLink.jsx
@@ -927,7 +1078,8 @@ src/
     │   ├── BackupExport.jsx
     │   ├── ImportAssignments.jsx
     │   ├── PeriodicWorkReport.jsx
-    │   └── PublishedScheduleCard.jsx
+    │   ├── PublishedScheduleCard.jsx
+    │   └── SRSViewer.jsx            # מציג את מפרט המערכת (קריאה מ-docs/)
     ├── students/
     │   ├── ForbiddenWorkplacesCell.jsx
     │   ├── ImportModal.jsx
@@ -950,7 +1102,7 @@ src/
 
 **אאא- לפני שיבוץ** — ערך distance_status לתלמיד שטרם שובץ. ראה: [Sunday Rule](#313-כלל-יום-ראשון-sunday-rule)
 
-**אחראי פק"ל** — תפקיד. מוצג בעמודה נפרדת בדוח ה-PDF. ראה: [Role](#25-ישות-role-תפקיד)
+**אחראי פק"ל** — תפקיד. מוצג בשורת תפקידים בדוח הסידור. ראה: [Role](#25-ישות-role-תפקיד)
 
 **אישור דיווחי זמנים** — ראה: [TimeReportsAdmin](#49-עמוד-אישור-זמנים-timereportsadmin)
 
@@ -972,11 +1124,13 @@ src/
 
 **דיווח זמנים** — ראה: [TimeReporting](#48-עמוד-דיווח-זמנים-timereporting)
 
-**דיווח תקופתי** — ראה: [PeriodWorkReport](#52-דוח-עבודה-תקופתי)
+**דיווח תקופתי** — ראה: [PeriodWorkReport](#53-דוח-עבודה-תקופתי)
 
 **דנורמליזציה (Denormalization)** — שמירת שם מקום עבודה/תלמיד ישירות ברשומת Assignment לנוחות שאילתות.
 
 ### ה
+
+**הגדרות ברירות מחדל** — ראה: [AppSettings](#212-ישות-appsettings-הגדרות-מערכת), [DefaultSettings](#4101-defaultsettings)
 
 **השבתת מחזור** — כפתור בדף תלמידים להשבית קבוצה שלמה.
 
@@ -988,11 +1142,13 @@ src/
 
 **יום ראשון** — ראה: [Sunday Rule](#313-כלל-יום-ראשון-sunday-rule)
 
-**ייצוא Excel** — ראה: [דוח תקופתי ייצוא](#524-ייצוא)
+**ייצוא Excel** — ראה: [דוח תקופתי ייצוא](#534-ייצוא)
 
-**ייצוא PDF** — ראה: [דוח יומי](#513-ייצוא-pdf), [דוח תקופתי](#524-ייצוא)
+**ייצוא PDF** — ראה: [דוח יומי](#513-ייצוא-pdf), [דוח תקופתי](#534-ייצוא), [DailyAssignmentReport](#524-ייצוא-pdf--מנגנון)
 
 ### כ
+
+**כלי ניהול** — ראה: [AdminTools](#410-עמוד-כלי-ניהול-admintools)
 
 **כלל ראשון** — מיפוי distance_status → workplace ביום ראשון. ראה: [Sunday Rule](#313-כלל-יום-ראשון-sunday-rule)
 
@@ -1014,13 +1170,15 @@ src/
 
 **מקום עבודה** — ראה: [Workplace](#22-ישות-workplace-מקום-עבודה)
 
+**מפרט מערכת** — SRSViewer. ראה: [AdminTools](#410-עמוד-כלי-ניהול-admintools)
+
 ### נ
 
-**נהג** — תפקיד. מוצג בדוח PDF. ראה: [buildReportGroups](#511-בנית-הדוח)
+**נהג** — תפקיד. מוצג בשורת תפקידים בדוח. ראה: [DailyAssignmentReport](#522-מבנה-כרטיס-מחלקה-pdfcard)
 
 ### ס
 
-**סידור עבודה יומי (PDF)** — ראה: [DailyReportPDFButton](#51-דוח-סידור-עבודה-יומי-pdf)
+**סידור עבודה יומי (PDF)** — ראה: [DailyReportPDFButton](#51-דוח-סידור-עבודה-יומי--כפתור-מהשיבוצים-dailyreportpdfbutton), [DailyAssignmentReport](#52-דוח-סידור-עבודה-יומי--מדף-הדוחות-dailyassignmentreport)
 
 **סיידבר לוגיסטיקה** — ראה: [LogisticsSidebar](#47-סיידבר-לוגיסטיקה-logisticssidebar)
 
@@ -1040,7 +1198,7 @@ src/
 
 ### ר
 
-**ראש צוות** — תפקיד. מוצג בדוח PDF.
+**ראש צוות** — תפקיד. מוצג בשורת תפקידים בדוח.
 
 **רכב** — ראה: [Vehicle](#24-ישות-vehicle-רכב)
 
@@ -1051,6 +1209,8 @@ src/
 **שיבוץ** — ראה: [Assignment](#23-ישות-assignment-שיבוץ)
 
 **שיבוץ יומי (guest)** — ראה: [תלמיד יומי](#23-ישות-assignment-שיבוץ)
+
+**שם משפחה (מיון)** — המילה האחרונה בשם. משמשת למיון תלמידים ב-DailyAssignmentReport.
 
 ### ת
 
@@ -1064,6 +1224,8 @@ src/
 
 ### A–Z
 
+**AppSettings** — ראה: [ישות AppSettings](#212-ישות-appsettings-הגדרות-מערכת)
+
 **Assignment** — ראה: [ישות Assignment](#23-ישות-assignment-שיבוץ)
 
 **BackupSettings** — ראה: [ישות BackupSettings](#211-ישות-backupsettings-הגדרות-גיבוי)
@@ -1076,9 +1238,13 @@ src/
 
 **DEFAULT_END / DEFAULT_START** — קבועים `"07:00"`, `"11:45"`. ראה: [TimeReport](#27-ישות-timereport-דיווח-זמנים)
 
+**DefaultSettings** — ראה: [4.10.1](#4101-defaultsettings)
+
 **Denormalization** — ראה: דנורמליזציה
 
-**DailyReportPDFButton** — ראה: [5.1](#51-דוח-סידור-עבודה-יומי-pdf)
+**DailyAssignmentReport** — ראה: [5.2](#52-דוח-סידור-עבודה-יומי--מדף-הדוחות-dailyassignmentreport)
+
+**DailyReportPDFButton** — ראה: [5.1](#51-דוח-סידור-עבודה-יומי--כפתור-מהשיבוצים-dailyreportpdfbutton)
 
 **EditableNumberCell** — תא טבלה עם עריכה inline. ראה: [4.2.3](#423-טבלת-שיבוצים)
 
@@ -1100,7 +1266,9 @@ src/
 
 **NON_WORK** — `['לא עובד', 'לימודים', 'לא יצא']`. ראה: [Workplace](#22-ישות-workplace-מקום-עבודה)
 
-**PeriodWorkReport** — ראה: [5.2](#52-דוח-עבודה-תקופתי)
+**PdfCard** — רכיב כרטיס מחלקה ב-DailyAssignmentReport. ראה: [5.2.2](#522-מבנה-כרטיס-מחלקה-pdfcard)
+
+**PeriodWorkReport** — ראה: [5.3](#53-דוח-עבודה-תקופתי)
 
 **PublishedSchedule** — ראה: [ישות PublishedSchedule](#210-ישות-publishedschedule-סידור-מפורסם)
 
@@ -1110,13 +1278,15 @@ src/
 
 **RTL** — כיוון ממשק (ימין לשמאל). `dir="rtl"` על `<body>`.
 
-**SKIP_WORKPLACES** — `['לא עובד', 'לימודים']`. ראה: [PeriodWorkReport](#52-דוח-עבודה-תקופתי)
+**SKIP_WORKPLACES** — `['לא עובד', 'לימודים']`. ראה: [PeriodWorkReport](#53-דוח-עבודה-תקופתי)
+
+**SRSViewer** — רכיב המציג את מפרט המערכת בדף AdminTools.
 
 **Student** — ראה: [ישות Student](#21-ישות-student-תלמיד)
 
 **Sunday Rule** — ראה: [3.1.3](#313-כלל-יום-ראשון-sunday-rule)
 
-**TimeInput** — רכיב React לקלט שעה עם commit pattern. ראה: [4.8.1](#481-שליחת-דיווח-timereporting)
+**TimeInput** — רכיב React לקלט שעה עם commit pattern. ראה: [4.8.1](#481-רכיב-timeinput)
 
 **TimeReport** — ראה: [ישות TimeReport](#27-ישות-timereport-דיווח-זמנים)
 
@@ -1140,5 +1310,5 @@ src/
 
 ---
 
-*מסמך זה נוצר אוטומטית ב-2026-05-11 על בסיס קוד המערכת.*  
-*גרסה: 1.0 | שפה: עברית | כיוון: RTL*
+*מסמך זה עודכן ב-2026-05-12 על בסיס קוד המערכת.*  
+*גרסה: 1.1 | שפה: עברית | כיוון: RTL*
