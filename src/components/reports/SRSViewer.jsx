@@ -1,8 +1,12 @@
 import { useState, useRef } from 'react';
-import { Download, Loader2 } from 'lucide-react';
+import { Download, Loader2, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
+import {
+  Document, Packer, Paragraph, TextRun, HeadingLevel,
+  AlignmentType, BorderStyle, ShadingType
+} from 'docx';
 
 const SECTIONS = [
   {
@@ -316,12 +320,95 @@ function SRSPrintText({ text }) {
   );
 }
 
+function buildDocxParagraphs() {
+  const paragraphs = [];
+
+  // Title
+  paragraphs.push(new Paragraph({
+    text: 'מפרט דרישות מערכת — רגבים',
+    heading: HeadingLevel.TITLE,
+    alignment: AlignmentType.CENTER,
+    spacing: { after: 200 },
+  }));
+  paragraphs.push(new Paragraph({
+    children: [new TextRun({ text: 'גרסה 1.1 | 2026-05-12', color: '888888', size: 22 })],
+    alignment: AlignmentType.CENTER,
+    spacing: { after: 400 },
+  }));
+
+  for (const section of SECTIONS) {
+    // Section heading
+    paragraphs.push(new Paragraph({
+      text: section.title,
+      heading: HeadingLevel.HEADING_1,
+      spacing: { before: 400, after: 120 },
+      border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: '3b4fa8' } },
+    }));
+
+    if (section.content) {
+      for (const line of section.content.split('\n')) {
+        paragraphs.push(...lineToDocxParagraph(line));
+      }
+    }
+
+    for (const sub of section.subsections || []) {
+      paragraphs.push(new Paragraph({
+        text: sub.title,
+        heading: HeadingLevel.HEADING_2,
+        spacing: { before: 240, after: 80 },
+      }));
+      for (const line of sub.content.split('\n')) {
+        paragraphs.push(...lineToDocxParagraph(line));
+      }
+    }
+  }
+
+  return paragraphs;
+}
+
+function lineToDocxParagraph(line) {
+  if (!line.trim()) return [new Paragraph({ text: '', spacing: { after: 60 } })];
+
+  const isBullet = line.startsWith('- ');
+  const text = isBullet ? line.slice(2) : line;
+
+  // Parse bold (**text**)
+  const parts = text.split(/(\*\*[^*]+\*\*)/g);
+  const runs = parts.map(p =>
+    p.startsWith('**') && p.endsWith('**')
+      ? new TextRun({ text: p.slice(2, -2), bold: true, size: 22 })
+      : new TextRun({ text: p, size: 22 })
+  );
+
+  return [new Paragraph({
+    children: runs,
+    bullet: isBullet ? { level: 0 } : undefined,
+    spacing: { after: 60 },
+  })];
+}
+
 export default function SRSViewer() {
   const [openSections, setOpenSections] = useState({ 0: true });
   const [exporting, setExporting] = useState(false);
+  const [exportingWord, setExportingWord] = useState(false);
   const printRef = useRef(null);
 
   const toggle = (i) => setOpenSections(prev => ({ ...prev, [i]: !prev[i] }));
+
+  const handleDownloadWord = async () => {
+    setExportingWord(true);
+    const doc = new Document({
+      sections: [{ properties: {}, children: buildDocxParagraphs() }],
+    });
+    const blob = await Packer.toBlob(doc);
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'מפרט_מערכת_רגבים.docx';
+    a.click();
+    URL.revokeObjectURL(url);
+    setExportingWord(false);
+  };
 
   const handleDownloadPdf = async () => {
     setExporting(true);
@@ -364,10 +451,16 @@ export default function SRSViewer() {
       <SRSPrintContent innerRef={printRef} />
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">מפרט דרישות מערכת רגבים — גרסה 1.0</p>
-        <Button variant="outline" size="sm" onClick={handleDownloadPdf} disabled={exporting}>
-          {exporting ? <Loader2 size={14} className="animate-spin ml-1" /> : <Download size={14} className="ml-1" />}
-          {exporting ? 'מייצא...' : 'הורד PDF'}
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={handleDownloadWord} disabled={exportingWord}>
+            {exportingWord ? <Loader2 size={14} className="animate-spin ml-1" /> : <FileText size={14} className="ml-1" />}
+            {exportingWord ? 'מייצא...' : 'הורד Word'}
+          </Button>
+          <Button variant="outline" size="sm" onClick={handleDownloadPdf} disabled={exporting}>
+            {exporting ? <Loader2 size={14} className="animate-spin ml-1" /> : <Download size={14} className="ml-1" />}
+            {exporting ? 'מייצא...' : 'הורד PDF'}
+          </Button>
+        </div>
       </div>
 
       <div className="space-y-2">
