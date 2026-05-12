@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
-import { FileSpreadsheet, Shuffle, Loader2, UserCheck, BookOpen, Settings2, Wrench } from 'lucide-react';
+import { Shuffle, Loader2, UserCheck, BookOpen, Settings2, HardDriveDownload } from 'lucide-react';
 import { format, eachDayOfInterval, parseISO } from 'date-fns';
 import PublishedScheduleCard from '@/components/reports/PublishedScheduleCard';
 import TimeReportingLink from '@/components/reports/TimeReportingLink';
@@ -17,7 +17,7 @@ export default function AdminTools() {
   const [randomStatus, setRandomStatus] = useState('');
   const [assigningRoles, setAssigningRoles] = useState(false);
   const [rolesStatus, setRolesStatus] = useState('');
-  const [activeTab, setActiveTab] = useState('tools');
+  const [activeTab, setActiveTab] = useState('links');
 
   // --- Random Assignment ---
   const handleRandomAssignment = async () => {
@@ -123,7 +123,9 @@ export default function AdminTools() {
   };
 
   const tabs = [
-    { key: 'tools', label: 'כלי ניהול', icon: Wrench },
+    { key: 'links', label: 'כישורים', icon: BookOpen },
+    { key: 'backup', label: 'גיבוי ושחזור', icon: HardDriveDownload },
+    { key: 'random', label: 'שיבוץ אקראי', icon: Shuffle },
     { key: 'settings', label: 'הגדרות ברירות מחדל', icon: Settings2 },
     { key: 'srs', label: 'מפרט מערכת', icon: BookOpen },
   ];
@@ -153,14 +155,23 @@ export default function AdminTools() {
       {activeTab === 'settings' && <DefaultSettings />}
       {activeTab === 'srs' && <SRSViewer />}
 
-      {activeTab === 'tools' && (
+      {activeTab === 'links' && (
         <div className="space-y-4 max-w-2xl">
           <PublishedScheduleCard />
           <TimeReportingLink />
+        </div>
+      )}
+
+      {activeTab === 'backup' && (
+        <div className="space-y-4 max-w-2xl">
           <BackupExport />
           <ImportAssignments />
           <BackupEmailSettings />
+        </div>
+      )}
 
+      {activeTab === 'random' && (
+        <div className="space-y-4 max-w-2xl">
           {/* Random Assignment */}
           <div className="bg-card border border-border rounded-2xl p-6 flex items-start justify-between gap-4">
             <div className="flex items-start gap-4">
