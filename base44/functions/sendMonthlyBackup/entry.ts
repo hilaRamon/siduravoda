@@ -76,19 +76,26 @@ Deno.serve(async (req) => {
     { name: `גיבוי_שיבוצים_${dateStr}.xlsx`, wb: wbAssignments, label: 'שיבוצים יומיים' },
   ];
 
-  // Send each file as a separate email
-  await Promise.all(emails.flatMap(email =>
-    files.map(f => {
-      const body = `שלום,\n\nמצורף קובץ גיבוי חודשי: ${f.label}\nתאריך: ${dateStr}\n\nנשלח אוטומטית מהמערכת.`;
-      return base44.asServiceRole.integrations.Core.SendEmail({
-        to: email,
-        subject: `${subject} — ${f.label}`,
-        body,
-      });
-    })
-  ));
+  // Send each file as a separate email, collect results per address
+  const results = {};
+  for (const email of emails) {
+    results[email] = { success: [], failed: [] };
+    for (const f of files) {
+      try {
+        await base44.asServiceRole.integrations.Core.SendEmail({
+          to: email,
+          subject: `${subject} — ${f.label}`,
+          body: `שלום,\n\nמצורף קובץ גיבוי חודשי: ${f.label}\nתאריך: ${dateStr}\n\nנשלח אוטומטית מהמערכת.`,
+        });
+        results[email].success.push(f.label);
+      } catch (e) {
+        results[email].failed.push({ file: f.label, error: e?.message || String(e) });
+        console.error(`Failed to send to ${email} (${f.label}):`, e?.message);
+      }
+    }
+  }
 
-    return Response.json({ ok: true, sent_to: emails, date: dateStr, files: files.map(f => f.name) });
+    return Response.json({ ok: true, date: dateStr, results });
   } catch (err) {
     console.error('sendMonthlyBackup error:', err?.message || err);
     return Response.json({ ok: false, error: err?.message || String(err) }, { status: 500 });
