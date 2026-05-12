@@ -147,9 +147,17 @@ export default function Students() {
                   <td className="px-5 py-3 text-muted-foreground text-sm">{s.cohort || '—'}</td>
                   <td className="px-5 py-3 text-muted-foreground text-sm">{s.phone || '—'}</td>
                   <td className="px-5 py-3">
-                    {s.free_day ? (
+                    {Array.isArray(s.free_day) && s.free_day.length > 0 ? (
+                      <div className="flex flex-wrap gap-1">
+                        {s.free_day.map(d => (
+                          <span key={d} className={`text-xs px-2 py-0.5 rounded-full font-medium ${FREE_DAY_COLORS[d] || 'bg-secondary text-secondary-foreground'}`}>
+                            {d}
+                          </span>
+                        ))}
+                      </div>
+                    ) : s.free_day && !Array.isArray(s.free_day) ? (
                       <span className={`text-xs px-2 py-1 rounded-full font-medium ${FREE_DAY_COLORS[s.free_day] || 'bg-secondary text-secondary-foreground'}`}>
-                        יום {s.free_day}
+                        {s.free_day}
                       </span>
                     ) : '—'}
                   </td>

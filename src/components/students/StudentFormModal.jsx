@@ -52,7 +52,12 @@ export default function StudentFormModal({ open, onClose, onSave, student }) {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    onSave(student ? form : { ...form, is_active: false });
+    if (student) {
+      // Merge with existing student data to preserve fields not in this form
+      onSave({ ...student, ...form });
+    } else {
+      onSave({ ...form, is_active: true });
+    }
   };
 
   return (
