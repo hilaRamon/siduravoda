@@ -5,7 +5,7 @@ import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import {
   Document, Packer, Paragraph, TextRun, HeadingLevel,
-  AlignmentType, BorderStyle, ShadingType
+  AlignmentType, BorderStyle, convertInchesToTwip
 } from 'docx';
 
 const SECTIONS = [
@@ -323,16 +323,20 @@ function SRSPrintText({ text }) {
 function buildDocxParagraphs() {
   const paragraphs = [];
 
+  const RTL = AlignmentType.RIGHT;
+
   // Title
   paragraphs.push(new Paragraph({
     text: 'מפרט דרישות מערכת — רגבים',
     heading: HeadingLevel.TITLE,
     alignment: AlignmentType.CENTER,
+    bidirectional: true,
     spacing: { after: 200 },
   }));
   paragraphs.push(new Paragraph({
     children: [new TextRun({ text: 'גרסה 1.1 | 2026-05-12', color: '888888', size: 22 })],
     alignment: AlignmentType.CENTER,
+    bidirectional: true,
     spacing: { after: 400 },
   }));
 
@@ -341,6 +345,8 @@ function buildDocxParagraphs() {
     paragraphs.push(new Paragraph({
       text: section.title,
       heading: HeadingLevel.HEADING_1,
+      alignment: RTL,
+      bidirectional: true,
       spacing: { before: 400, after: 120 },
       border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: '3b4fa8' } },
     }));
@@ -355,6 +361,8 @@ function buildDocxParagraphs() {
       paragraphs.push(new Paragraph({
         text: sub.title,
         heading: HeadingLevel.HEADING_2,
+        alignment: RTL,
+        bidirectional: true,
         spacing: { before: 240, after: 80 },
       }));
       for (const line of sub.content.split('\n')) {
@@ -367,7 +375,7 @@ function buildDocxParagraphs() {
 }
 
 function lineToDocxParagraph(line) {
-  if (!line.trim()) return [new Paragraph({ text: '', spacing: { after: 60 } })];
+  if (!line.trim()) return [new Paragraph({ text: '', spacing: { after: 60 }, bidirectional: true })];
 
   const isBullet = line.startsWith('- ');
   const text = isBullet ? line.slice(2) : line;
@@ -383,6 +391,8 @@ function lineToDocxParagraph(line) {
   return [new Paragraph({
     children: runs,
     bullet: isBullet ? { level: 0 } : undefined,
+    alignment: AlignmentType.RIGHT,
+    bidirectional: true,
     spacing: { after: 60 },
   })];
 }
@@ -398,7 +408,12 @@ export default function SRSViewer() {
   const handleDownloadWord = async () => {
     setExportingWord(true);
     const doc = new Document({
-      sections: [{ properties: {}, children: buildDocxParagraphs() }],
+      sections: [{
+        properties: {
+          bidi: true,
+        },
+        children: buildDocxParagraphs(),
+      }],
     });
     const blob = await Packer.toBlob(doc);
     const url = URL.createObjectURL(blob);
