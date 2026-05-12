@@ -1,5 +1,5 @@
 import { Link, Outlet, useLocation } from 'react-router-dom';
-import { Building2, CalendarDays, ShieldCheck, GraduationCap, BarChart2, Truck, MessageSquare, BookOpen, ClipboardCheck } from 'lucide-react';
+import { Building2, CalendarDays, ShieldCheck, GraduationCap, BarChart2, Truck, MessageSquare, BookOpen, ClipboardCheck, Wrench } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 
@@ -11,6 +11,7 @@ const navItems = [
   { to: '/roles', label: 'תפקידים', icon: ShieldCheck },
   { to: '/vehicles', label: 'רכבים', icon: Truck },
   { to: '/reports', label: 'דוחות', icon: BarChart2 },
+  { to: '/admin-tools', label: 'כלי ניהול', icon: Wrench },
   { to: '/absence-requests', label: 'בקשות היעדרות', icon: MessageSquare },
   { to: '/time-reports', label: 'עדכון זמנים', icon: ClipboardCheck },
 ];

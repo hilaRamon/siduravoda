@@ -1,0 +1,17 @@
+{
+  "name": "AppSettings",
+  "type": "object",
+  "properties": {
+    "default_rate": {
+      "type": "number",
+      "description": "\u05ea\u05e2\u05e8\u05d9\u05e3 \u05e9\u05e2\u05ea\u05d9 \u05d1\u05e8\u05d9\u05e8\u05ea \u05de\u05d7\u05d3\u05dc (\u20aa \u05dc\u05e9\u05e2\u05d4)",
+      "default": 40
+    },
+    "default_hours": {
+      "type": "number",
+      "description": "\u05db\u05de\u05d5\u05ea \u05e9\u05e2\u05d5\u05ea \u05d1\u05e8\u05d9\u05e8\u05ea \u05de\u05d7\u05d3\u05dc \u05dc\u05e9\u05d9\u05d1\u05d5\u05e5",
+      "default": 4.75
+    }
+  },
+  "required": []
+}

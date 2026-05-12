@@ -26,6 +26,12 @@ export default function PeriodWorkReport() {
     queryFn: () => base44.entities.Assignment.list(),
   });
 
+  const { data: settingsList = [] } = useQuery({
+    queryKey: ['app-settings'],
+    queryFn: () => base44.entities.AppSettings.list(),
+  });
+  const defaultRate = settingsList[0]?.default_rate ?? 40;
+
   // Unique workplace names from assignments in range (or all if no range yet)
   const workplaceNames = useMemo(() => {
     const names = new Set(
@@ -49,7 +55,7 @@ export default function PeriodWorkReport() {
     const grouped = {};
     filtered.forEach(a => {
       const key = `${a.workplace_name}__${a.date}`;
-      if (!grouped[key]) grouped[key] = { date: a.date, workplaceName: a.workplace_name, rate: a.rate || 0, students: [] };
+      if (!grouped[key]) grouped[key] = { date: a.date, workplaceName: a.workplace_name, rate: a.rate || defaultRate, students: [] };
       grouped[key].students.push(a);
     });
 
@@ -78,7 +84,7 @@ export default function PeriodWorkReport() {
     return Object.entries(byWorkplace)
       .filter(([wp]) => selectedWorkplaces.length === 0 || selectedWorkplaces.includes(wp))
       .sort(([a], [b]) => a.localeCompare(b, 'he'));
-  }, [startDate, endDate, allAssignments, selectedWorkplaces]);
+  }, [startDate, endDate, allAssignments, selectedWorkplaces, defaultRate]);
 
   const formatDate = (d) => { const [y, m, day] = d.split('-'); return `${day}/${m}/${y}`; };
 

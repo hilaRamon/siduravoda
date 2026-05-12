@@ -18,6 +18,7 @@ import AbsenceRequests from './pages/AbsenceRequests';
 import Calendar from './pages/Calendar';
 import TimeReporting from './pages/TimeReporting';
 import TimeReportsAdmin from './pages/TimeReportsAdmin';
+import AdminTools from './pages/AdminTools';
 
 
 const AuthenticatedApp = () => {
@@ -53,6 +54,7 @@ const AuthenticatedApp = () => {
         <Route path="/absence-requests" element={<AbsenceRequests />} />
         <Route path="/calendar" element={<Calendar />} />
         <Route path="/time-reports" element={<TimeReportsAdmin />} />
+        <Route path="/admin-tools" element={<AdminTools />} />
       </Route>
       <Route path="/schedule" element={<PublicSchedule />} />
       <Route path="/time-reporting" element={<TimeReporting />} />
