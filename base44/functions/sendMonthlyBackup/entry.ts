@@ -1,12 +1,10 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 import * as XLSX from 'npm:xlsx@0.18.5';
 
-function workbookToBase64(wb) {
+function workbookToFile(wb, filename) {
   const buf = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
   const bytes = new Uint8Array(buf);
-  let binary = '';
-  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
-  return btoa(binary);
+  return new File([bytes], filename, { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
 }
 
 function buildSheet(data, columns) {
@@ -66,36 +64,40 @@ Deno.serve(async (req) => {
     'תשלום נוסף': a.bonus ?? '', 'הערות': a.notes || '',
   }));
 
-  const monthLabel = new Date().toLocaleDateString('he-IL', { month: 'long', year: 'numeric' });
-  const subject = `גיבוי חודשי — ${monthLabel}`;
-
-  const files = [
+  const fileDefs = [
     { name: `גיבוי_תלמידים_${dateStr}.xlsx`, wb: wbStudents, label: 'תלמידים וצוות' },
     { name: `גיבוי_מקומות_עבודה_${dateStr}.xlsx`, wb: wbWorkplaces, label: 'מקומות עבודה' },
     { name: `גיבוי_רכבים_${dateStr}.xlsx`, wb: wbVehicles, label: 'רכבים' },
     { name: `גיבוי_שיבוצים_${dateStr}.xlsx`, wb: wbAssignments, label: 'שיבוצים יומיים' },
   ];
 
-  // Send each file as a separate email, collect results per address
+  // Upload each file and get a public URL
+  const uploadedFiles = [];
+  for (const f of fileDefs) {
+    const file = workbookToFile(f.wb, f.name);
+    const uploadResult = await base44.asServiceRole.integrations.Core.UploadFile({ file });
+    uploadedFiles.push({ label: f.label, url: uploadResult.file_url });
+  }
+
+  const monthLabel = new Date().toLocaleDateString('he-IL', { month: 'long', year: 'numeric' });
+  const subject = `גיבוי חודשי — ${monthLabel}`;
+
+  const fileLinks = uploadedFiles.map(f => `• ${f.label}: ${f.url}`).join('\n');
+  const body = `שלום,\n\nמצורפים קישורים להורדת קבצי הגיבוי החודשי לתאריך ${dateStr}:\n\n${fileLinks}\n\n(הקישורים בתוקף למספר ימים)\n\nנשלח אוטומטית מהמערכת — רגבים.`;
+
+  // Send one email per recipient with all links
   const results = {};
   for (const email of emails) {
-    results[email] = { success: [], failed: [] };
-    for (const f of files) {
-      try {
-        await base44.asServiceRole.integrations.Core.SendEmail({
-          to: email,
-          subject: `${subject} — ${f.label}`,
-          body: `שלום,\n\nמצורף קובץ גיבוי חודשי: ${f.label}\nתאריך: ${dateStr}\n\nנשלח אוטומטית מהמערכת.`,
-        });
-        results[email].success.push(f.label);
-      } catch (e) {
-        results[email].failed.push({ file: f.label, error: e?.message || String(e) });
-        console.error(`Failed to send to ${email} (${f.label}):`, e?.message);
-      }
+    try {
+      await base44.asServiceRole.integrations.Core.SendEmail({ to: email, subject, body });
+      results[email] = { success: true };
+    } catch (e) {
+      results[email] = { success: false, error: e?.message || String(e) };
+      console.error(`Failed to send to ${email}:`, e?.message);
     }
   }
 
-    return Response.json({ ok: true, date: dateStr, results });
+    return Response.json({ ok: true, date: dateStr, files: uploadedFiles.map(f => f.label), results });
   } catch (err) {
     console.error('sendMonthlyBackup error:', err?.message || err);
     return Response.json({ ok: false, error: err?.message || String(err) }, { status: 500 });
