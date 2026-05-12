@@ -484,26 +484,49 @@ export default function Assignments() {
       const sourceAssignments = Object.values(assignmentByStudent)
         .filter(a => !a.student_id?.startsWith('guest_'));
 
+      // Map day-of-week number → Hebrew letter for free_day comparison
+      // 0=Sun,1=Mon,2=Tue,3=Wed,4=Thu
+      const DAY_NUM_TO_HEB = { 0: 'א', 1: 'ב', 2: 'ג', 3: 'ד', 4: 'ה' };
+      const targetDayHeb = DAY_NUM_TO_HEB[targetDayOfWeek]; // will be undefined for Fri/Sat
+
+      // Find the "תתת - לא עובד" workplace for free-day assignment
+      const notWorkingWp = workplaces.find(w => w.name === 'תתת - לא עובד');
+
       const toUpdate = [];
       const toCreate = [];
 
       for (const src of sourceAssignments) {
+        const student = studentById[src.student_id];
+        const isCrew = student?.cohort?.includes('צוות');
+
         // Determine workplace for target
         let targetWp;
+
         if (isSunday) {
-          // Sunday: assign by student's distance_status
-          const student = studentById[src.student_id];
+          // Sunday: assign by student's distance_status (all students)
           const distanceStatus = student?.distance_status;
-          
           if (distanceStatus && DISTANCE_WORKPLACE_MAP[distanceStatus]) {
-            // Use the mapped workplace for this distance_status
             targetWp = DISTANCE_WORKPLACE_MAP[distanceStatus];
           } else {
-            // No valid distance_status — keep original workplace from source day
             targetWp = { id: src.workplace_id, name: src.workplace_name };
           }
+        } else if (isCrew && targetDayHeb) {
+          // Crew student on a weekday: check free_day
+          const freeDays = Array.isArray(student?.free_day)
+            ? student.free_day
+            : (student?.free_day ? [student.free_day] : []);
+
+          if (freeDays.includes(targetDayHeb)) {
+            // This is a free day → assign "תתת - לא עובד"
+            targetWp = notWorkingWp
+              ? { id: notWorkingWp.id, name: notWorkingWp.name }
+              : { id: src.workplace_id, name: 'תתת - לא עובד' };
+          } else {
+            // Not a free day → leave unassigned (empty, like "before assignment")
+            targetWp = { id: '', name: '' };
+          }
         } else {
-          // Regular day: copy workplace from source
+          // Regular day, non-crew student: copy workplace from source
           targetWp = { id: src.workplace_id, name: src.workplace_name };
         }
 
@@ -706,6 +729,11 @@ export default function Assignments() {
             {cloneTargetDate && new Date(cloneTargetDate + 'T12:00:00').getDay() === 0 && (
               <div className="bg-primary/10 border border-primary/30 rounded-lg px-3 py-2 text-xs text-primary">
                 📅 יום ראשון — שיבוץ אוטומטי לפי <strong>סטטוס מרחק</strong> (קרוב / רחוק)
+              </div>
+            )}
+            {cloneTargetDate && new Date(cloneTargetDate + 'T12:00:00').getDay() !== 0 && (
+              <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-800">
+                👥 תלמידי <strong>צוות</strong>: אם היום הוא יום חופשי שלהם → יוגדרו "תתת - לא עובד". אחרת → יישארו ללא שיבוץ.
               </div>
             )}
             <div className="flex gap-2 justify-end pt-1">

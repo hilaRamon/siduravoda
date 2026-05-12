@@ -4,8 +4,15 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
 
-const FREE_DAYS = ['א', 'ב', 'ג', 'ד', 'ה'];
+const FREE_DAYS = [
+  { value: 'א', label: 'ראשון' },
+  { value: 'ב', label: 'שני' },
+  { value: 'ג', label: 'שלישי' },
+  { value: 'ד', label: 'רביעי' },
+  { value: 'ה', label: 'חמישי' },
+];
 const DISTANCES = ['קרוב', 'רחוק', 'אאא- לפני שיבוץ', 'תתת - לא עובד'];
 
 export default function StudentFormModal({ open, onClose, onSave, student }) {
@@ -13,23 +20,35 @@ export default function StudentFormModal({ open, onClose, onSave, student }) {
     full_name: '',
     phone: '',
     cohort: '',
-    free_day: '',
+    free_day: [],
     distance_status: '',
   });
 
   useEffect(() => {
     if (student) {
+      // Support legacy string value migration
+      const fd = student.free_day;
+      const freeDayArr = Array.isArray(fd) ? fd : (fd ? [fd] : []);
       setForm({
         full_name: student.full_name || '',
         phone: student.phone || '',
         cohort: student.cohort || '',
-        free_day: student.free_day || '',
+        free_day: freeDayArr,
         distance_status: student.distance_status || '',
       });
     } else {
-      setForm({ full_name: '', phone: '', cohort: '', free_day: '', distance_status: '' });
+      setForm({ full_name: '', phone: '', cohort: '', free_day: [], distance_status: '' });
     }
   }, [student, open]);
+
+  const toggleFreeDay = (day) => {
+    setForm(p => ({
+      ...p,
+      free_day: p.free_day.includes(day)
+        ? p.free_day.filter(d => d !== day)
+        : [...p.free_day, day],
+    }));
+  };
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -74,17 +93,18 @@ export default function StudentFormModal({ open, onClose, onSave, student }) {
               />
             </div>
             <div>
-              <Label>יום חופש</Label>
-              <Select value={form.free_day} onValueChange={v => setForm(p => ({ ...p, free_day: v }))}>
-                <SelectTrigger className="mt-1">
-                  <SelectValue placeholder="בחר יום" />
-                </SelectTrigger>
-                <SelectContent>
-                  {FREE_DAYS.map(d => (
-                    <SelectItem key={d} value={d}>יום {d}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label>ימי חופש</Label>
+              <div className="mt-1 flex flex-wrap gap-2">
+                {FREE_DAYS.map(d => (
+                  <label key={d.value} className="flex items-center gap-1.5 cursor-pointer select-none">
+                    <Checkbox
+                      checked={form.free_day.includes(d.value)}
+                      onCheckedChange={() => toggleFreeDay(d.value)}
+                    />
+                    <span className="text-sm">{d.label}</span>
+                  </label>
+                ))}
+              </div>
             </div>
           </div>
           <div>
