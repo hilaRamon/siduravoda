@@ -3,7 +3,10 @@ import * as XLSX from 'npm:xlsx@0.18.5';
 
 function workbookToBase64(wb) {
   const buf = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-  return btoa(String.fromCharCode(...new Uint8Array(buf)));
+  const bytes = new Uint8Array(buf);
+  let binary = '';
+  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+  return btoa(binary);
 }
 
 function buildSheet(data, columns) {
@@ -19,6 +22,7 @@ function today() {
 
 Deno.serve(async (req) => {
   const base44 = createClientFromRequest(req);
+  try {
 
   const [students, workplaces, vehicles, assignments, settingsList] = await Promise.all([
     base44.asServiceRole.entities.Student.list('full_name', 1000),
@@ -84,5 +88,9 @@ Deno.serve(async (req) => {
     })
   ));
 
-  return Response.json({ ok: true, sent_to: emails, date: dateStr, files: files.map(f => f.name) });
+    return Response.json({ ok: true, sent_to: emails, date: dateStr, files: files.map(f => f.name) });
+  } catch (err) {
+    console.error('sendMonthlyBackup error:', err?.message || err);
+    return Response.json({ ok: false, error: err?.message || String(err) }, { status: 500 });
+  }
 });

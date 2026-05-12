@@ -123,7 +123,7 @@ export default function AdminTools() {
   };
 
   const tabs = [
-    { key: 'links', label: 'כישורים', icon: BookOpen },
+    { key: 'links', label: 'קישורים', icon: BookOpen },
     { key: 'backup', label: 'גיבוי ושחזור', icon: HardDriveDownload },
     { key: 'random', label: 'שיבוץ אקראי', icon: Shuffle },
     { key: 'settings', label: 'הגדרות ברירות מחדל', icon: Settings2 },
