@@ -168,72 +168,104 @@ export default function DailyReportPDFButton({ date, assignments }) {
     setPublishing(false);
   };
 
-  const reportContent = (
-    <div ref={hiddenRef} style={{ display: 'none', width: '794px', background: 'white', padding: '16px', fontFamily: 'Arial, sans-serif' }} dir="rtl">
-      <div style={{ marginBottom: '16px', textAlign: 'center' }}>
-        <h2 style={{ fontSize: '16px', fontWeight: 'bold', margin: 0 }}>סידור עבודה</h2>
-        <p style={{ fontSize: '13px', margin: '4px 0 0' }}>{gregDate} — {hebrewDate}</p>
-      </div>
+  // Split groups into two columns
+  const leftCol = reportGroups.filter((_, i) => i % 2 === 0);
+  const rightCol = reportGroups.filter((_, i) => i % 2 === 1);
 
-      {reportGroups.map((group) => (
-        <div key={group.workplaceName} style={{ marginBottom: '16px' }}>
-          <div style={{ background: '#e5e7eb', padding: '8px 8px', fontWeight: 'bold', fontSize: '12px', border: '1px solid #9ca3af', borderBottom: 'none' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px' }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                <span>{group.workplaceName}</span>
-                {group.notes && (
-                  <span style={{ fontWeight: 'normal', fontSize: '11px', color: '#78350f' }}>📝 {group.notes}</span>
-                )}
-              </div>
-              <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
-                {group.vehicleName && (
-                  <span style={{ fontWeight: 'bold', fontSize: '11px', background: '#1e40af', color: '#fff', padding: '3px 8px', borderRadius: '4px', whiteSpace: 'nowrap' }}>
-                    🚐 {group.vehicleName}
-                  </span>
-                )}
-                {group.exitTime && (
-                  <span style={{ fontWeight: 'bold', fontSize: '11px', background: '#166534', color: '#fff', padding: '3px 8px', borderRadius: '4px', whiteSpace: 'nowrap' }}>
-                    ⏰ {group.exitTime}
-                  </span>
-                )}
-              </div>
+  const renderGroup = (group) => {
+    // Build student rows: show role name next to the student who holds it
+    const rows = group.students.map(s => {
+      let roleLabel = '';
+      if (s.role === 'נהג') roleLabel = 'נהג';
+      else if (s.role === 'ראש צוות') roleLabel = 'ראש צוות';
+      else if (s.role === 'אחראי פק"ל') roleLabel = 'אחראי פק"ל';
+      return { name: s.student_name, role: roleLabel };
+    });
+
+    return (
+      <div key={group.workplaceName} style={{ marginBottom: '10px', border: '1px solid #9ca3af', borderRadius: '4px', overflow: 'hidden' }}>
+        {/* Header: workplace name */}
+        <div style={{ background: '#1e3a8a', color: '#fff', padding: '5px 8px', fontWeight: 'bold', fontSize: '13px' }}>
+          {group.workplaceName}
+        </div>
+
+        {/* Logistics row: vehicle + exit time — BIG & prominent */}
+        <div style={{ background: '#fef9c3', borderBottom: '2px solid #ca8a04', padding: '6px 8px', display: 'flex', gap: '16px', alignItems: 'center' }}>
+          {group.vehicleName && (
+            <div>
+              <div style={{ fontSize: '9px', color: '#78716c' }}>רכב</div>
+              <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#1e3a8a' }}>🚐 {group.vehicleName}</div>
             </div>
-          </div>
-          <table style={{ width: '100%', fontSize: '11px', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr style={{ background: '#f9fafb' }}>
-                <th style={{ border: '1px solid #d1d5db', padding: '4px 8px', textAlign: 'right' }}>שם תלמיד</th>
-                <th style={{ border: '1px solid #d1d5db', padding: '4px 8px', textAlign: 'center', width: '80px' }}>אחראי פק"ל</th>
-                <th style={{ border: '1px solid #d1d5db', padding: '4px 8px', textAlign: 'right', width: '110px' }}>נהג</th>
-                <th style={{ border: '1px solid #d1d5db', padding: '4px 8px', textAlign: 'right', width: '110px' }}>ראש צוות</th>
-              </tr>
-            </thead>
-            <tbody>
-              {group.students.map((s, i) => (
-                <tr key={s.id} style={{ background: i % 2 === 0 ? '#fff' : '#f9fafb' }}>
-                  <td style={{ border: '1px solid #d1d5db', padding: '3px 8px' }}>{s.student_name}</td>
-                  <td style={{ border: '1px solid #d1d5db', padding: '3px 8px', textAlign: 'center' }}>
-                    {s.role === 'אחראי פק"ל' ? '✓' : (group.equipName && i === 0 && !group.students.some(st => st.role === 'אחראי פק"ל') ? '' : '')}
-                  </td>
-                  <td style={{ border: '1px solid #d1d5db', padding: '3px 8px' }}>
-                    {i === 0 ? group.driverName : ''}
-                  </td>
-                  <td style={{ border: '1px solid #d1d5db', padding: '3px 8px' }}>
-                    {i === 0 ? group.teamLeaderName : ''}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-            <tfoot>
-              <tr style={{ background: '#f3f4f6' }}>
-                <td colSpan={4} style={{ border: '1px solid #d1d5db', padding: '3px 8px', textAlign: 'right', fontWeight: '500' }}>
-                  סה"כ תלמידים: {group.students.length}
+          )}
+          {group.exitTime && (
+            <div>
+              <div style={{ fontSize: '9px', color: '#78716c' }}>שעת יציאה</div>
+              <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#b91c1c' }}>⏰ {group.exitTime}</div>
+            </div>
+          )}
+          {group.notes && (
+            <div style={{ fontSize: '10px', color: '#78350f', marginRight: 'auto' }}>📝 {group.notes}</div>
+          )}
+        </div>
+
+        {/* Students table */}
+        <table style={{ width: '100%', fontSize: '11px', borderCollapse: 'collapse' }}>
+          <thead>
+            <tr style={{ background: '#dbeafe' }}>
+              <th style={{ border: '1px solid #d1d5db', padding: '3px 6px', textAlign: 'right' }}>שם תלמיד</th>
+              <th style={{ border: '1px solid #d1d5db', padding: '3px 6px', textAlign: 'right', width: '80px' }}>תפקיד</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r, i) => (
+              <tr key={i} style={{ background: i % 2 === 0 ? '#fff' : '#f9fafb' }}>
+                <td style={{ border: '1px solid #e5e7eb', padding: '3px 6px' }}>{r.name}</td>
+                <td style={{ border: '1px solid #e5e7eb', padding: '3px 6px', fontWeight: r.role ? '700' : 'normal', color: r.role ? '#1d4ed8' : 'inherit' }}>
+                  {r.role || ''}
                 </td>
               </tr>
-            </tfoot>
-          </table>
-        </div>
-      ))}
+            ))}
+          </tbody>
+          <tfoot>
+            <tr style={{ background: '#f3f4f6' }}>
+              <td colSpan={2} style={{ border: '1px solid #d1d5db', padding: '3px 6px', fontSize: '10px', color: '#6b7280' }}>
+                סה"כ: {group.students.length} תלמידים
+              </td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    );
+  };
+
+  const reportContent = (
+    <div ref={hiddenRef} style={{ display: 'none', width: '794px', background: 'white', padding: '16px', fontFamily: 'Arial, sans-serif' }} dir="rtl">
+      <div style={{ marginBottom: '12px', textAlign: 'center', borderBottom: '2px solid #1e3a8a', paddingBottom: '8px' }}>
+        <h2 style={{ fontSize: '18px', fontWeight: 'bold', margin: 0, color: '#1e3a8a' }}>סידור עבודה</h2>
+        <p style={{ fontSize: '12px', margin: '3px 0 0', color: '#555' }}>{gregDate} — {hebrewDate}</p>
+      </div>
+
+      {/* Two-column layout using a table for reliable PDF rendering */}
+      <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
+        <colgroup>
+          <col style={{ width: '50%' }} />
+          <col style={{ width: '8px' }} />
+          <col style={{ width: '50%' }} />
+        </colgroup>
+        <tbody>
+          {Array.from({ length: Math.max(leftCol.length, rightCol.length) }).map((_, i) => (
+            <tr key={i} style={{ verticalAlign: 'top' }}>
+              <td style={{ padding: '0 4px 0 0', verticalAlign: 'top' }}>
+                {leftCol[i] ? renderGroup(leftCol[i]) : null}
+              </td>
+              <td />
+              <td style={{ padding: '0 0 0 4px', verticalAlign: 'top' }}>
+                {rightCol[i] ? renderGroup(rightCol[i]) : null}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 
