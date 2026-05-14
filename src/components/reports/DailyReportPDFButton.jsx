@@ -108,9 +108,9 @@ const S = {
   logVal: { fontWeight: 'bold', color: '#1e3a8a' },
   logValRed: { fontWeight: 'bold', color: '#b91c1c' },
   table: { width: '100%', fontSize: '8px', borderCollapse: 'collapse' },
-  th: { background: '#dbeafe', border: '1px solid #d1d5db', padding: '2px 4px', textAlign: 'right', fontSize: '7px', fontWeight: 'bold', color: '#1e3a8a' },
-  tdEven: { border: '1px solid #e5e7eb', padding: '3px 4px 1px', background: '#fff', fontSize: '8px', verticalAlign: 'top' },
-  tdOdd:  { border: '1px solid #e5e7eb', padding: '3px 4px 1px', background: '#f9fafb', fontSize: '8px', verticalAlign: 'top' },
+  th: { background: '#dbeafe', border: '1px solid #d1d5db', padding: '3px 4px', textAlign: 'right', fontSize: '7px', fontWeight: 'bold', color: '#1e3a8a', verticalAlign: 'middle' },
+  tdEven: { border: '1px solid #e5e7eb', padding: '4px', background: '#fff', fontSize: '8px', verticalAlign: 'middle' },
+  tdOdd:  { border: '1px solid #e5e7eb', padding: '4px', background: '#f9fafb', fontSize: '8px', verticalAlign: 'middle' },
   tdRole: { fontWeight: '700', color: '#1d4ed8' },
   tfootTd: { border: '1px solid #d1d5db', padding: '1px 4px', fontSize: '7px', color: '#6b7280', background: '#f3f4f6' },
 };
@@ -154,7 +154,6 @@ function WorkplaceCard({ group, studentsMap }) {
               <tr key={i}>
                 <td style={i % 2 === 0 ? S.tdEven : S.tdOdd}>
                   {s.student_name}
-                  {cohort ? <span style={{ color: '#6b7280', fontSize: '6.5px', marginRight: '3px' }}>({cohort})</span> : null}
                 </td>
                 <td style={{ ...(i % 2 === 0 ? S.tdEven : S.tdOdd), ...(role ? S.tdRole : {}) }}>{role}</td>
               </tr>
