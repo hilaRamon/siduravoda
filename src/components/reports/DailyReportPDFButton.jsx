@@ -183,44 +183,44 @@ export default function DailyReportPDFButton({ date, assignments }) {
     });
 
     return (
-      <div key={group.workplaceName} style={{ marginBottom: '10px', border: '1px solid #9ca3af', borderRadius: '4px', overflow: 'hidden' }}>
+      <div key={group.workplaceName} style={{ marginBottom: '6px', border: '1px solid #9ca3af', borderRadius: '3px', overflow: 'hidden' }}>
         {/* Header: workplace name */}
-        <div style={{ background: '#1e3a8a', color: '#fff', padding: '5px 8px', fontWeight: 'bold', fontSize: '13px' }}>
+        <div style={{ background: '#1e3a8a', color: '#fff', padding: '3px 6px', fontWeight: 'bold', fontSize: '10px' }}>
           {group.workplaceName}
         </div>
 
-        {/* Logistics row: vehicle + exit time — BIG & prominent */}
-        <div style={{ background: '#fef9c3', borderBottom: '2px solid #ca8a04', padding: '6px 8px', display: 'flex', gap: '16px', alignItems: 'center' }}>
+        {/* Logistics row: vehicle + exit time */}
+        <div style={{ background: '#fef9c3', borderBottom: '1px solid #ca8a04', padding: '2px 6px', display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
           {group.vehicleName && (
-            <div>
-              <div style={{ fontSize: '9px', color: '#78716c' }}>רכב</div>
-              <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#1e3a8a' }}>🚐 {group.vehicleName}</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+              <span style={{ fontSize: '8px', color: '#78716c' }}>רכב:</span>
+              <span style={{ fontSize: '10px', fontWeight: 'bold', color: '#1e3a8a' }}>🚐 {group.vehicleName}</span>
             </div>
           )}
           {group.exitTime && (
-            <div>
-              <div style={{ fontSize: '9px', color: '#78716c' }}>שעת יציאה</div>
-              <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#b91c1c' }}>⏰ {group.exitTime}</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+              <span style={{ fontSize: '8px', color: '#78716c' }}>יציאה:</span>
+              <span style={{ fontSize: '10px', fontWeight: 'bold', color: '#b91c1c' }}>⏰ {group.exitTime}</span>
             </div>
           )}
           {group.notes && (
-            <div style={{ fontSize: '10px', color: '#78350f', marginRight: 'auto' }}>📝 {group.notes}</div>
+            <span style={{ fontSize: '8px', color: '#78350f', marginRight: 'auto' }}>📝 {group.notes}</span>
           )}
         </div>
 
         {/* Students table */}
-        <table style={{ width: '100%', fontSize: '11px', borderCollapse: 'collapse' }}>
+        <table style={{ width: '100%', fontSize: '9px', borderCollapse: 'collapse' }}>
           <thead>
             <tr style={{ background: '#dbeafe' }}>
-              <th style={{ border: '1px solid #d1d5db', padding: '3px 6px', textAlign: 'right' }}>שם תלמיד</th>
-              <th style={{ border: '1px solid #d1d5db', padding: '3px 6px', textAlign: 'right', width: '80px' }}>תפקיד</th>
+              <th style={{ border: '1px solid #d1d5db', padding: '2px 4px', textAlign: 'right' }}>שם תלמיד</th>
+              <th style={{ border: '1px solid #d1d5db', padding: '2px 4px', textAlign: 'right', width: '60px' }}>תפקיד</th>
             </tr>
           </thead>
           <tbody>
             {rows.map((r, i) => (
               <tr key={i} style={{ background: i % 2 === 0 ? '#fff' : '#f9fafb' }}>
-                <td style={{ border: '1px solid #e5e7eb', padding: '3px 6px' }}>{r.name}</td>
-                <td style={{ border: '1px solid #e5e7eb', padding: '3px 6px', fontWeight: r.role ? '700' : 'normal', color: r.role ? '#1d4ed8' : 'inherit' }}>
+                <td style={{ border: '1px solid #e5e7eb', padding: '2px 4px' }}>{r.name}</td>
+                <td style={{ border: '1px solid #e5e7eb', padding: '2px 4px', fontWeight: r.role ? '700' : 'normal', color: r.role ? '#1d4ed8' : 'inherit' }}>
                   {r.role || ''}
                 </td>
               </tr>
@@ -228,7 +228,7 @@ export default function DailyReportPDFButton({ date, assignments }) {
           </tbody>
           <tfoot>
             <tr style={{ background: '#f3f4f6' }}>
-              <td colSpan={2} style={{ border: '1px solid #d1d5db', padding: '3px 6px', fontSize: '10px', color: '#6b7280' }}>
+              <td colSpan={2} style={{ border: '1px solid #d1d5db', padding: '2px 4px', fontSize: '8px', color: '#6b7280' }}>
                 סה"כ: {group.students.length} תלמידים
               </td>
             </tr>
@@ -240,9 +240,9 @@ export default function DailyReportPDFButton({ date, assignments }) {
 
   const reportContent = (
     <div ref={hiddenRef} style={{ display: 'none', width: '794px', background: 'white', padding: '16px', fontFamily: 'Arial, sans-serif' }} dir="rtl">
-      <div style={{ marginBottom: '12px', textAlign: 'center', borderBottom: '2px solid #1e3a8a', paddingBottom: '8px' }}>
-        <h2 style={{ fontSize: '18px', fontWeight: 'bold', margin: 0, color: '#1e3a8a' }}>סידור עבודה</h2>
-        <p style={{ fontSize: '12px', margin: '3px 0 0', color: '#555' }}>{gregDate} — {hebrewDate}</p>
+      <div style={{ marginBottom: '8px', textAlign: 'center', borderBottom: '2px solid #1e3a8a', paddingBottom: '5px' }}>
+        <h2 style={{ fontSize: '14px', fontWeight: 'bold', margin: 0, color: '#1e3a8a' }}>סידור עבודה</h2>
+        <p style={{ fontSize: '10px', margin: '2px 0 0', color: '#555' }}>{gregDate} — {hebrewDate}</p>
       </div>
 
       {/* Two-column layout using a table for reliable PDF rendering */}
