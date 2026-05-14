@@ -1,7 +1,7 @@
 import { Toaster } from "@/components/ui/toaster"
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClientInstance } from '@/lib/query-client'
-import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
+import { BrowserRouter as Router, Route, Routes, MemoryRouter } from 'react-router-dom';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
@@ -63,7 +63,27 @@ const AuthenticatedApp = () => {
   );
 };
 
+// Isolated app for time-reporting — no sidebar, no other routes accessible
+function TimeReportingApp() {
+  return (
+    <QueryClientProvider client={queryClientInstance}>
+      <MemoryRouter initialEntries={['/time-reporting']}>
+        <Routes>
+          <Route path="/time-reporting" element={<TimeReporting />} />
+          <Route path="*" element={<TimeReporting />} />
+        </Routes>
+      </MemoryRouter>
+      <Toaster />
+    </QueryClientProvider>
+  );
+}
+
 function App() {
+  // If the URL path is /time-reporting, render the isolated app
+  if (window.location.pathname === '/time-reporting') {
+    return <TimeReportingApp />;
+  }
+
   return (
     <AuthProvider>
       <QueryClientProvider client={queryClientInstance}>
