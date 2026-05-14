@@ -89,6 +89,18 @@ export default function TimeReportsAdmin() {
     queryFn: () => base44.entities.TimeReport.filter({ date: selectedDate }, 'student_name', 500),
   });
 
+  // Fetch all pending reports to show which dates have unreviewed items
+  const { data: allPending = [] } = useQuery({
+    queryKey: ['time-reports-all-pending'],
+    queryFn: () => base44.entities.TimeReport.filter({ status: 'ממתין' }, 'date', 2000),
+    refetchInterval: 60000,
+  });
+
+  const pendingDates = useMemo(() => {
+    const dates = new Set(allPending.map(r => r.date));
+    return [...dates].sort();
+  }, [allPending]);
+
   const changedReports = reports
     .filter(r => r.start_time !== DEFAULT_START || r.end_time !== DEFAULT_END)
     .sort((a, b) => (a.workplace_name || '').localeCompare(b.workplace_name || '', 'he'));
@@ -198,14 +210,34 @@ export default function TimeReportsAdmin() {
           <h2 className="text-2xl font-bold">עדכון זמנים</h2>
           <p className="text-muted-foreground mt-1">אישור ודחיית דיווחי זמנים</p>
         </div>
-        <div className="flex items-center gap-2">
-          <CalendarDays size={18} className="text-primary" />
-          <input
-            type="date"
-            value={selectedDate}
-            onChange={e => setSelectedDate(e.target.value)}
-            className="border border-border rounded-lg px-3 py-2 text-sm bg-card focus:outline-none focus:ring-2 focus:ring-primary/30"
-          />
+        <div className="flex flex-col items-end gap-2">
+          <div className="flex items-center gap-2">
+            <CalendarDays size={18} className="text-primary" />
+            <input
+              type="date"
+              value={selectedDate}
+              onChange={e => setSelectedDate(e.target.value)}
+              className="border border-border rounded-lg px-3 py-2 text-sm bg-card focus:outline-none focus:ring-2 focus:ring-primary/30"
+            />
+          </div>
+          {pendingDates.length > 0 && (
+            <div className="flex items-center gap-2 flex-wrap justify-end">
+              <span className="text-xs text-yellow-700 font-medium">ממתין לאישור:</span>
+              {pendingDates.map(d => (
+                <button
+                  key={d}
+                  onClick={() => setSelectedDate(d)}
+                  className={`text-xs px-2.5 py-1 rounded-full font-medium border transition-colors ${
+                    d === selectedDate
+                      ? 'bg-yellow-400 text-yellow-900 border-yellow-400'
+                      : 'bg-yellow-100 text-yellow-700 border-yellow-300 hover:bg-yellow-200'
+                  }`}
+                >
+                  {new Date(d + 'T12:00:00').toLocaleDateString('he-IL', { day: 'numeric', month: 'numeric' })}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
