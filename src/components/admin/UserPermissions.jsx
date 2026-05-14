@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
-import { Shield, Clock, UserX, UserCheck, Loader2 } from 'lucide-react';
+import { Shield, Clock, Eye, UserCheck, Loader2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 
 const ROLE_LABELS = { admin: 'מנהל', user: 'משתמש' };
@@ -84,6 +84,9 @@ export default function UserPermissions({ currentUser }) {
                 <th className="text-center px-4 py-3 font-semibold text-muted-foreground">
                   <span className="flex items-center justify-center gap-1"><Clock size={13} /> דיווח זמנים</span>
                 </th>
+                <th className="text-center px-4 py-3 font-semibold text-muted-foreground">
+                  <span className="flex items-center justify-center gap-1"><Eye size={13} /> צפייה בזמנים</span>
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -117,6 +120,20 @@ export default function UserPermissions({ currentUser }) {
                           checked={!!u.can_report_time}
                           onChange={e => handleUpdate(u, { can_report_time: e.target.checked })}
                           className="w-4 h-4 accent-primary cursor-pointer"
+                        />
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      {isUpdating ? (
+                        <Loader2 size={14} className="animate-spin mx-auto text-muted-foreground" />
+                      ) : (
+                        <input
+                          type="checkbox"
+                          checked={!!u.can_view_time_reports}
+                          disabled={u.role === 'admin'}
+                          onChange={e => handleUpdate(u, { can_view_time_reports: e.target.checked })}
+                          className="w-4 h-4 accent-primary cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                          title={u.role === 'admin' ? 'מנהל תמיד יכול לצפות' : ''}
                         />
                       )}
                     </td>

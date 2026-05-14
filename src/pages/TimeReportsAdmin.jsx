@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
-import { CheckCircle2, XCircle, Clock, CalendarDays, Building2, User } from 'lucide-react';
+import { CheckCircle2, XCircle, Clock, CalendarDays, Building2, User, ShieldOff } from 'lucide-react';
 import { format } from 'date-fns';
 
 const STATUS_STYLES = {
@@ -56,7 +56,7 @@ function StatusBadge({ status }) {
   );
 }
 
-function ReportRow({ report, onStatus, isIndividual }) {
+function ReportRow({ report, onStatus, isIndividual, readOnly }) {
   const duration = calcDuration(report.start_time, report.end_time);
   return (
     <tr className={`hover:bg-secondary/20 transition-colors ${isIndividual ? 'bg-yellow-50/40' : ''}`}>
@@ -74,7 +74,7 @@ function ReportRow({ report, onStatus, isIndividual }) {
         {duration !== null ? duration.toFixed(2) : '—'}
       </td>
       <td className="px-4 py-3"><StatusBadge status={report.status} /></td>
-      <td className="px-4 py-3"><ActionButtons report={report} onStatus={onStatus} /></td>
+      <td className="px-4 py-3">{!readOnly && <ActionButtons report={report} onStatus={onStatus} />}</td>
     </tr>
   );
 }
@@ -83,6 +83,16 @@ export default function TimeReportsAdmin() {
   const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [activeTab, setActiveTab] = useState('ממתין');
   const queryClient = useQueryClient();
+
+  const { data: currentUser, isLoading: loadingUser } = useQuery({
+    queryKey: ['current-user-tra'],
+    queryFn: async () => { try { return await base44.auth.me(); } catch { return null; } },
+  });
+
+  const isAdmin = currentUser?.role === 'admin';
+  const canView = isAdmin || !!currentUser?.can_view_time_reports;
+  // Read-only if not admin
+  const readOnly = !isAdmin;
 
   const { data: reports = [], isLoading } = useQuery({
     queryKey: ['time-reports', selectedDate],
@@ -202,6 +212,23 @@ export default function TimeReportsAdmin() {
       <th className="px-4 py-3"></th>
     </tr>
   );
+
+  if (loadingUser) {
+    return (
+      <div className="p-8 flex justify-center items-center">
+        <div className="w-7 h-7 border-4 border-slate-200 border-t-primary rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (!canView) {
+    return (
+      <div className="p-8 flex flex-col items-center justify-center gap-4 text-center text-muted-foreground">
+        <ShieldOff size={48} className="opacity-30" />
+        <p className="font-medium">אין הרשאת גישה לעמוד זה.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="p-8">
@@ -323,26 +350,28 @@ export default function TimeReportsAdmin() {
                           </td>
                           <td className="px-4 py-3"><StatusBadge status={representative.status} /></td>
                           <td className="px-4 py-3">
-                            <div className="flex gap-1 justify-end">
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="h-7 text-xs gap-1 text-green-600 border-green-300 hover:bg-green-50"
-                                onClick={() => handleWorkplaceStatus(workplace_id, 'אושר')}
-                                disabled={tabReports.filter(r => r.workplace_id === workplace_id).every(r => r.status === 'אושר')}
-                              >
-                                <CheckCircle2 size={13} /> אשר הכל
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="h-7 text-xs gap-1 text-red-500 border-red-300 hover:bg-red-50"
-                                onClick={() => handleWorkplaceStatus(workplace_id, 'נדחה')}
-                                disabled={tabReports.filter(r => r.workplace_id === workplace_id).every(r => r.status === 'נדחה')}
-                              >
-                                <XCircle size={13} /> דחה הכל
-                              </Button>
-                            </div>
+                           {!readOnly && (
+                             <div className="flex gap-1 justify-end">
+                               <Button
+                                 size="sm"
+                                 variant="outline"
+                                 className="h-7 text-xs gap-1 text-green-600 border-green-300 hover:bg-green-50"
+                                 onClick={() => handleWorkplaceStatus(workplace_id, 'אושר')}
+                                 disabled={tabReports.filter(r => r.workplace_id === workplace_id).every(r => r.status === 'אושר')}
+                               >
+                                 <CheckCircle2 size={13} /> אשר הכל
+                               </Button>
+                               <Button
+                                 size="sm"
+                                 variant="outline"
+                                 className="h-7 text-xs gap-1 text-red-500 border-red-300 hover:bg-red-50"
+                                 onClick={() => handleWorkplaceStatus(workplace_id, 'נדחה')}
+                                 disabled={tabReports.filter(r => r.workplace_id === workplace_id).every(r => r.status === 'נדחה')}
+                               >
+                                 <XCircle size={13} /> דחה הכל
+                               </Button>
+                             </div>
+                           )}
                           </td>
                         </tr>
                       );
@@ -368,7 +397,7 @@ export default function TimeReportsAdmin() {
                   </thead>
                   <tbody className="divide-y divide-border">
                     {individualRows.map(r => (
-                      <ReportRow key={r.id} report={r} onStatus={handleStatus} isIndividual={true} />
+                      <ReportRow key={r.id} report={r} onStatus={handleStatus} isIndividual={true} readOnly={readOnly} />
                     ))}
                   </tbody>
                 </table>
