@@ -134,7 +134,7 @@ const S = {
   tdEven: { border: '1px solid #e5e7eb', padding: '5px 4px', background: '#fff', fontSize: '8.5px', fontWeight: '500', color: '#1f2937', verticalAlign: 'middle', minHeight: '18px', display: 'table-cell' },
   tdOdd:  { border: '1px solid #e5e7eb', padding: '5px 4px', background: '#f9fafb', fontSize: '8.5px', fontWeight: '500', color: '#1f2937', verticalAlign: 'middle', minHeight: '18px', display: 'table-cell' },
   tdRole: { fontWeight: '700', color: '#1d4ed8' },
-  tfootTd: { border: '1px solid #d1d5db', padding: '2px 4px', fontSize: '7.5px', color: '#374151', background: '#f3f4f6', fontWeight: '600' },
+  tfootTd: { border: '1px solid #d1d5db', padding: '5px 4px', fontSize: '7.5px', color: '#374151', background: '#f3f4f6', fontWeight: '600', minHeight: '18px', verticalAlign: 'middle', display: 'table-cell' },
 };
 
 function WorkplaceCard({ group, studentsMap }) {
