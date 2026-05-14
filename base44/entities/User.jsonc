@@ -1,17 +1,20 @@
 {
+  "name": "User",
+  "type": "object",
   "properties": {
     "role": {
       "type": "string",
-      "description": "The role of the user in the app",
       "enum": [
         "admin",
         "user"
-      ]
+      ],
+      "default": "user",
+      "description": "\u05ea\u05e4\u05e7\u05d9\u05d3 \u05d4\u05de\u05e9\u05ea\u05de\u05e9 \u05d1\u05de\u05e2\u05e8\u05db\u05ea"
+    },
+    "can_report_time": {
+      "type": "boolean",
+      "default": false,
+      "description": "\u05d4\u05e8\u05e9\u05d0\u05d4 \u05dc\u05d3\u05d9\u05d5\u05d5\u05d7 \u05d6\u05de\u05e0\u05d9\u05dd"
     }
-  },
-  "required": [
-    "role"
-  ],
-  "name": "User",
-  "type": "object"
+  }
 }

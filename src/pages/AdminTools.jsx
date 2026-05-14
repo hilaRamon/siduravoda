@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
-import { Shuffle, Loader2, UserCheck, BookOpen, Settings2, HardDriveDownload } from 'lucide-react';
+import { Shuffle, Loader2, UserCheck, BookOpen, Settings2, HardDriveDownload, Shield } from 'lucide-react';
 import { format, eachDayOfInterval, parseISO } from 'date-fns';
 import PublishedScheduleCard from '@/components/reports/PublishedScheduleCard';
 import TimeReportingLink from '@/components/reports/TimeReportingLink';
@@ -11,8 +11,13 @@ import BackupEmailSettings from '@/components/reports/BackupEmailSettings';
 import ImportAssignments from '@/components/reports/ImportAssignments';
 import SRSViewer from '@/components/reports/SRSViewer';
 import DefaultSettings from '@/components/admin/DefaultSettings';
+import UserPermissions from '@/components/admin/UserPermissions';
 
 export default function AdminTools() {
+  const { data: currentUser } = useQuery({
+    queryKey: ['current-user'],
+    queryFn: () => base44.auth.me(),
+  });
   const [randomizing, setRandomizing] = useState(false);
   const [randomStatus, setRandomStatus] = useState('');
   const [assigningRoles, setAssigningRoles] = useState(false);
@@ -127,6 +132,7 @@ export default function AdminTools() {
     { key: 'backup', label: 'גיבוי ושחזור', icon: HardDriveDownload },
     { key: 'random', label: 'שיבוץ אקראי', icon: Shuffle },
     { key: 'settings', label: 'הגדרות ברירות מחדל', icon: Settings2 },
+    { key: 'permissions', label: 'הרשאות משתמשים', icon: Shield },
     { key: 'srs', label: 'מפרט מערכת', icon: BookOpen },
   ];
 
@@ -153,6 +159,7 @@ export default function AdminTools() {
       </div>
 
       {activeTab === 'settings' && <DefaultSettings />}
+      {activeTab === 'permissions' && <UserPermissions currentUser={currentUser} />}
       {activeTab === 'srs' && <SRSViewer />}
 
       {activeTab === 'links' && (

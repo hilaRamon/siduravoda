@@ -4,7 +4,7 @@ import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { format } from 'date-fns';
-import { Send, Clock, CheckCircle2, ChevronDown, ChevronUp, Search, CalendarDays, Check, ChevronRight, ChevronLeft } from 'lucide-react';
+import { Send, Clock, CheckCircle2, ChevronDown, ChevronUp, Search, CalendarDays, Check, ChevronRight, ChevronLeft, ShieldOff } from 'lucide-react';
 
 const DEFAULT_START = '07:00';
 const DEFAULT_END = '11:45';
@@ -150,6 +150,15 @@ function changeDate(dateStr, delta) {
 
 export default function TimeReporting() {
   const today = format(new Date(), 'yyyy-MM-dd');
+
+  const { data: currentUser, isLoading: loadingUser } = useQuery({
+    queryKey: ['current-user-tr'],
+    queryFn: async () => {
+      try { return await base44.auth.me(); } catch { return null; }
+    },
+  });
+
+  const hasAccess = currentUser && (currentUser.role === 'admin' || currentUser.can_report_time === true);
   const [selectedDate, setSelectedDate] = useState(today);
   const [groupTimes, setGroupTimes] = useState({}); // { workplaceId: { start, end } }
   const [overrides, setOverrides] = useState({});   // { studentId: { start, end } }
@@ -335,6 +344,24 @@ export default function TimeReporting() {
   };
 
   const totalStudents = workplacesToShow.reduce((s, wp) => s + (workplaceStudents[wp.workplace_id || wp.id] || []).length, 0);
+
+  if (loadingUser) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center" dir="rtl">
+        <div className="w-8 h-8 border-4 border-slate-200 border-t-primary rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (!hasAccess) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6 gap-4 text-center" dir="rtl">
+        <ShieldOff size={48} className="text-muted-foreground opacity-40" />
+        <h2 className="text-xl font-bold">אין הרשאת גישה</h2>
+        <p className="text-muted-foreground text-sm">אין לך הרשאה לדווח זמנים. אנא פנה למנהל המערכת.</p>
+      </div>
+    );
+  }
 
   if (submitted) {
     return (
