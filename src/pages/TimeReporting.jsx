@@ -356,11 +356,9 @@ export default function TimeReporting() {
           <button onClick={() => setSelectedDate(d => changeDate(d, 1))} className="h-9 w-9 flex items-center justify-center rounded-lg border border-border bg-card hover:bg-secondary transition-colors">
             <ChevronLeft size={16} />
           </button>
-          {selectedDate !== today && (
-            <button onClick={() => setSelectedDate(today)} className="h-9 px-3 text-xs font-medium rounded-lg border border-primary text-primary bg-card hover:bg-primary/10 transition-colors">
-              היום
-            </button>
-          )}
+          <button onClick={() => setSelectedDate(today)} className="h-9 px-3 text-xs font-medium rounded-lg border border-primary text-primary bg-card hover:bg-primary/10 transition-colors">
+            היום
+          </button>
         </div>
         <p className="text-xs text-muted-foreground">בחר תאריך אחר לדיווח חדש</p>
       </div>
@@ -428,11 +426,9 @@ export default function TimeReporting() {
               <button onClick={() => setSelectedDate(d => changeDate(d, 1))} className="h-9 w-9 flex items-center justify-center rounded-lg border border-border bg-card hover:bg-secondary transition-colors">
                 <ChevronLeft size={16} />
               </button>
-              {selectedDate !== today && (
-                <button onClick={() => setSelectedDate(today)} className="h-9 px-3 text-xs font-medium rounded-lg border border-primary text-primary bg-card hover:bg-primary/10 transition-colors">
-                  היום
-                </button>
-              )}
+              <button onClick={() => setSelectedDate(today)} className="h-9 px-3 text-xs font-medium rounded-lg border border-primary text-primary bg-card hover:bg-primary/10 transition-colors">
+                היום
+              </button>
             </div>
             <Button onClick={handleSubmit} disabled={saving || totalStudents === 0} className="gap-2">
               <Send size={16} />
