@@ -2,10 +2,8 @@ import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
-import { Shield, UserCheck, Loader2, ExternalLink, Copy, Check } from 'lucide-react';
+import { Shield, UserCheck, Loader2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
-
-const TIME_REPORTING_URL = 'https://preview-sandbox--69e4a6cee7903b37397ae8fb.base44.app/time-reporting';
 
 // Derive a simple "permission level" from user fields
 function getUserLevel(u) {
@@ -52,7 +50,6 @@ export default function UserPermissions({ currentUser }) {
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviting, setInviting] = useState(false);
   const [updating, setUpdating] = useState(null);
-  const [copied, setCopied] = useState(false);
 
   const { data: users = [], isLoading } = useQuery({
     queryKey: ['users-list'],
@@ -77,11 +74,6 @@ export default function UserPermissions({ currentUser }) {
     setInviting(false);
   };
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText(TIME_REPORTING_URL);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
 
   if (!isAdmin) {
     return (
@@ -116,24 +108,6 @@ export default function UserPermissions({ currentUser }) {
         <p className="text-xs text-muted-foreground mt-2">המשתמש יקבל אימייל הזמנה ויצטרך להירשם.</p>
       </div>
 
-      {/* Time reporting link info */}
-      <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 flex items-center gap-3 flex-wrap">
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium text-blue-800 mb-1">קישור דיווח זמנים</p>
-          <p className="text-xs text-blue-600 truncate" dir="ltr">{TIME_REPORTING_URL}</p>
-        </div>
-        <div className="flex gap-2 shrink-0">
-          <Button size="sm" variant="outline" className="border-blue-300 text-blue-700 hover:bg-blue-100 gap-1" onClick={handleCopy}>
-            {copied ? <Check size={13} /> : <Copy size={13} />}
-            {copied ? 'הועתק!' : 'העתק'}
-          </Button>
-          <a href={TIME_REPORTING_URL} target="_blank" rel="noreferrer">
-            <Button size="sm" variant="outline" className="border-blue-300 text-blue-700 hover:bg-blue-100 gap-1">
-              <ExternalLink size={13} /> פתח
-            </Button>
-          </a>
-        </div>
-      </div>
 
       {/* Users table */}
       <div className="bg-card border border-border rounded-2xl overflow-hidden">
