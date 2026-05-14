@@ -452,6 +452,10 @@ export default function Assignments() {
       const studentById = {};
       freshStudents.forEach(s => { studentById[s.id] = s; });
 
+      // Fetch approved absences for target date
+      const approvedAbsences = await base44.entities.IncomingSMS.filter({ parsed_date: cloneTargetDate, status: 'אושר' }, '-created_date', 2000);
+      const absentStudentIds = new Set(approvedAbsences.map(a => a.student_id).filter(Boolean));
+
       // Fetch existing assignments on the target date
       const targetAssignments = await base44.entities.Assignment.filter({ date: cloneTargetDate }, '-created_date', 2000);
 
@@ -502,7 +506,12 @@ export default function Assignments() {
         // Determine workplace for target
         let targetWp;
 
-        if (isSunday) {
+        // Check if student has an approved absence for the target date → override with "תתת - לא עובד"
+        if (absentStudentIds.has(src.student_id)) {
+          targetWp = notWorkingWp
+            ? { id: notWorkingWp.id, name: notWorkingWp.name }
+            : { id: '', name: 'תתת - לא עובד' };
+        } else if (isSunday) {
           // Sunday: assign by student's distance_status (all students)
           const distanceStatus = student?.distance_status;
           if (distanceStatus && DISTANCE_WORKPLACE_MAP[distanceStatus]) {
