@@ -19,7 +19,7 @@ function toHebrewDate(dateStr) {
 const SKIP_WORKPLACE_NAMES = ['לא עובד', 'לימודים', 'לא יצא', 'תתת - לא עובד', 'קרוב', 'רחוק', 'אאא- לפני שיבוץ'];
 const shouldSkip = (name) => !name || !name.trim() || SKIP_WORKPLACE_NAMES.some(kw => name.trim() === kw);
 
-function buildReportGroups(assignments, logisticsMap, studentsMap) {
+function buildReportGroups(assignments, logisticsMap, logisticsMapByName, studentsMap) {
   // Only include assignments with a real workplace that's not in the skip list
   const filtered = assignments.filter(a =>
     a.workplace_id &&
@@ -49,7 +49,7 @@ function buildReportGroups(assignments, logisticsMap, studentsMap) {
     .filter(g => g.students.length > 0)
     .sort((a, b) => a.name.localeCompare(b.name, 'he'))
     .map(g => {
-      const log = logisticsMap[g.id] || {};
+      const log = logisticsMap[g.id] || logisticsMapByName[g.name] || {};
       const vehicles = [log.vehicle_name, log.vehicle_name_2, log.vehicle_name_3].filter(Boolean).join(' + ');
 
       // Sort students: cohort alphabetically, then name alphabetically
@@ -252,7 +252,11 @@ export default function DailyReportPDFButton({ date, assignments }) {
   });
 
   const logisticsMap = {};
-  logisticsList.forEach(l => { logisticsMap[l.workplace_id] = l; });
+  const logisticsMapByName = {};
+  logisticsList.forEach(l => {
+    if (l.workplace_id) logisticsMap[l.workplace_id] = l;
+    if (l.workplace_name) logisticsMapByName[l.workplace_name] = l;
+  });
 
   // Map student_id → student record (for cohort lookup)
   const studentsMap = {};
@@ -262,7 +266,7 @@ export default function DailyReportPDFButton({ date, assignments }) {
     day: 'numeric', month: 'long', year: 'numeric'
   });
   const hebrewDate = toHebrewDate(date);
-  const reportGroups = buildReportGroups(assignments, logisticsMap, studentsMap);
+  const reportGroups = buildReportGroups(assignments, logisticsMap, logisticsMapByName, studentsMap);
 
   const handleExport = async () => {
     setExporting(true);
