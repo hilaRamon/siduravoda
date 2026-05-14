@@ -4,7 +4,7 @@ import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { format } from 'date-fns';
-import { Send, Clock, CheckCircle2, ChevronDown, ChevronUp, Search, CalendarDays, Check } from 'lucide-react';
+import { Send, Clock, CheckCircle2, ChevronDown, ChevronUp, Search, CalendarDays, Check, ChevronRight, ChevronLeft } from 'lucide-react';
 
 const DEFAULT_START = '07:00';
 const DEFAULT_END = '11:45';
@@ -140,6 +140,12 @@ function WorkplaceGroup({ workplace, students, times, overrides, onGroupTimeChan
       )}
     </div>
   );
+}
+
+function changeDate(dateStr, delta) {
+  const d = new Date(dateStr + 'T12:00:00');
+  d.setDate(d.getDate() + delta);
+  return format(d, 'yyyy-MM-dd');
 }
 
 export default function TimeReporting() {
@@ -337,6 +343,9 @@ export default function TimeReporting() {
         <h2 className="text-2xl font-bold">הדיווח נשלח בהצלחה!</h2>
         <p className="text-muted-foreground">הנתונים לתאריך {selectedDate} נשמרו ומחכים לאישור מנהל.</p>
         <div className="flex items-center gap-2">
+          <button onClick={() => setSelectedDate(d => changeDate(d, -1))} className="h-9 w-9 flex items-center justify-center rounded-lg border border-border bg-card hover:bg-secondary transition-colors">
+            <ChevronRight size={16} />
+          </button>
           <CalendarDays size={16} className="text-primary" />
           <input
             type="date"
@@ -344,6 +353,9 @@ export default function TimeReporting() {
             onChange={e => setSelectedDate(e.target.value)}
             className="border border-border rounded-lg px-3 py-2 text-sm bg-card focus:outline-none focus:ring-2 focus:ring-primary/30"
           />
+          <button onClick={() => setSelectedDate(d => changeDate(d, 1))} className="h-9 w-9 flex items-center justify-center rounded-lg border border-border bg-card hover:bg-secondary transition-colors">
+            <ChevronLeft size={16} />
+          </button>
         </div>
         <p className="text-xs text-muted-foreground">בחר תאריך אחר לדיווח חדש</p>
       </div>
@@ -398,6 +410,9 @@ export default function TimeReporting() {
           </div>
           <div className="flex items-center gap-3 flex-wrap">
             <div className="flex items-center gap-2">
+              <button onClick={() => setSelectedDate(d => changeDate(d, -1))} className="h-9 w-9 flex items-center justify-center rounded-lg border border-border bg-card hover:bg-secondary transition-colors">
+                <ChevronRight size={16} />
+              </button>
               <CalendarDays size={16} className="text-primary" />
               <input
                 type="date"
@@ -405,6 +420,9 @@ export default function TimeReporting() {
                 onChange={e => setSelectedDate(e.target.value)}
                 className="border border-border rounded-lg px-3 py-2 text-sm bg-card focus:outline-none focus:ring-2 focus:ring-primary/30"
               />
+              <button onClick={() => setSelectedDate(d => changeDate(d, 1))} className="h-9 w-9 flex items-center justify-center rounded-lg border border-border bg-card hover:bg-secondary transition-colors">
+                <ChevronLeft size={16} />
+              </button>
             </div>
             <Button onClick={handleSubmit} disabled={saving || totalStudents === 0} className="gap-2">
               <Send size={16} />
