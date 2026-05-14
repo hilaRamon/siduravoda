@@ -114,8 +114,8 @@ const S = {
   subtitle: { fontSize: '9px', color: '#555', margin: '2px 0 0' },
   cols: { display: 'flex', gap: '6px', alignItems: 'flex-start' },
   col: { flex: 1, minWidth: 0 },
-  group: { marginBottom: '5px', border: '1px solid #9ca3af', borderRadius: '3px', overflow: 'hidden' },
-  groupHeader: { background: '#1e3a8a', color: '#fff', padding: '2px 5px', fontWeight: 'bold', fontSize: '8px' },
+  group: { marginBottom: '5px', border: '1px solid #9ca3af', borderRadius: '3px', overflow: 'hidden', pageBreakInside: 'avoid' },
+  groupHeader: { background: '#1e3a8a', color: '#fff', padding: '2px 5px', fontWeight: 'bold', fontSize: '8px', pageBreakInside: 'avoid' },
   logRow: {
     background: '#fef9c3',
     borderBottom: '1px solid #ca8a04',
