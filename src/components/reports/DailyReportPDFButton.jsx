@@ -15,30 +15,55 @@ function toHebrewDate(dateStr) {
   } catch { return ''; }
 }
 
-const SKIP_NAMES = ['לא עובד', 'לימודים', 'לא יצא'];
-const shouldSkip = (name) => !name || SKIP_NAMES.some(kw => name.trim() === kw);
+// Workplaces to exclude from the PDF report
+const SKIP_WORKPLACE_NAMES = ['לא עובד', 'לימודים', 'לא יצא', 'תתת - לא עובד', 'קרוב', 'רחוק', 'אאא- לפני שיבוץ'];
+const shouldSkip = (name) => !name || !name.trim() || SKIP_WORKPLACE_NAMES.some(kw => name.trim() === kw);
 
-function buildReportGroups(assignments, logisticsMap) {
-  const filtered = assignments.filter(a => !shouldSkip(a.workplace_name));
-  const byWorkplace = {};
-  const seenStudents = new Set();
+function buildReportGroups(assignments, logisticsMap, studentsMap) {
+  // Only include assignments with a real workplace that's not in the skip list
+  const filtered = assignments.filter(a =>
+    a.workplace_id &&
+    a.workplace_name &&
+    !shouldSkip(a.workplace_name)
+  );
+
+  // Deduplicate: keep one assignment per student (most recently updated)
+  const bestByStudent = {};
   filtered.forEach(a => {
-    const key = a.workplace_id;
-    if (!byWorkplace[key]) byWorkplace[key] = { id: a.workplace_id, name: a.workplace_name, students: [] };
-    if (!seenStudents.has(a.student_id)) {
-      seenStudents.add(a.student_id);
-      byWorkplace[key].students.push(a);
+    const existing = bestByStudent[a.student_id];
+    if (!existing || (a.updated_date || a.created_date) > (existing.updated_date || existing.created_date)) {
+      bestByStudent[a.student_id] = a;
     }
   });
 
+  // Group by workplace
+  const byWorkplace = {};
+  Object.values(bestByStudent).forEach(a => {
+    const key = a.workplace_id;
+    if (!byWorkplace[key]) byWorkplace[key] = { id: a.workplace_id, name: a.workplace_name, students: [] };
+    byWorkplace[key].students.push(a);
+  });
+
+  // Build result — only workplaces with at least 1 student, sorted alphabetically
   return Object.values(byWorkplace)
+    .filter(g => g.students.length > 0)
     .sort((a, b) => a.name.localeCompare(b.name, 'he'))
     .map(g => {
       const log = logisticsMap[g.id] || {};
       const vehicles = [log.vehicle_name, log.vehicle_name_2, log.vehicle_name_3].filter(Boolean).join(' + ');
+
+      // Sort students: cohort alphabetically, then name alphabetically
+      const sortedStudents = [...g.students].sort((a, b) => {
+        const aCohort = studentsMap[a.student_id]?.cohort || '';
+        const bCohort = studentsMap[b.student_id]?.cohort || '';
+        const cohortCmp = aCohort.localeCompare(bCohort, 'he');
+        if (cohortCmp !== 0) return cohortCmp;
+        return (a.student_name || '').localeCompare(b.student_name || '', 'he');
+      });
+
       return {
         workplaceName: g.name,
-        students: g.students.sort((a, b) => (a.student_name || '').localeCompare(b.student_name || '', 'he')),
+        students: sortedStudents,
         vehicleName: vehicles || '',
         exitTime: log.exit_time || '',
         notes: log.notes || '',
@@ -90,7 +115,7 @@ const S = {
   tfootTd: { border: '1px solid #d1d5db', padding: '1px 4px', fontSize: '7px', color: '#6b7280', background: '#f3f4f6' },
 };
 
-function WorkplaceCard({ group }) {
+function WorkplaceCard({ group, studentsMap }) {
   const roleMap = { 'נהג': 'נהג', 'ראש צוות': 'ראש צוות', 'אחראי פק"ל': 'פק"ל' };
   const hasLog = group.vehicleName || group.exitTime || group.notes;
 
@@ -124,9 +149,13 @@ function WorkplaceCard({ group }) {
         <tbody>
           {group.students.map((s, i) => {
             const role = roleMap[s.role] || '';
+            const cohort = studentsMap[s.student_id]?.cohort || '';
             return (
               <tr key={i}>
-                <td style={i % 2 === 0 ? S.tdEven : S.tdOdd}>{s.student_name}</td>
+                <td style={i % 2 === 0 ? S.tdEven : S.tdOdd}>
+                  {s.student_name}
+                  {cohort ? <span style={{ color: '#6b7280', fontSize: '6.5px', marginRight: '3px' }}>({cohort})</span> : null}
+                </td>
                 <td style={{ ...(i % 2 === 0 ? S.tdEven : S.tdOdd), ...(role ? S.tdRole : {}) }}>{role}</td>
               </tr>
             );
@@ -142,7 +171,7 @@ function WorkplaceCard({ group }) {
   );
 }
 
-function ReportContent({ forwardRef, reportGroups, gregDate, hebrewDate }) {
+function ReportContent({ forwardRef, reportGroups, gregDate, hebrewDate, studentsMap }) {
   const leftCol = reportGroups.filter((_, i) => i % 2 === 0);
   const rightCol = reportGroups.filter((_, i) => i % 2 === 1);
 
@@ -154,10 +183,10 @@ function ReportContent({ forwardRef, reportGroups, gregDate, hebrewDate }) {
       </div>
       <div style={S.cols}>
         <div style={S.col}>
-          {leftCol.map(g => <WorkplaceCard key={g.workplaceName} group={g} />)}
+          {leftCol.map(g => <WorkplaceCard key={g.workplaceName} group={g} studentsMap={studentsMap} />)}
         </div>
         <div style={S.col}>
-          {rightCol.map(g => <WorkplaceCard key={g.workplaceName} group={g} />)}
+          {rightCol.map(g => <WorkplaceCard key={g.workplaceName} group={g} studentsMap={studentsMap} />)}
         </div>
       </div>
     </div>
@@ -217,14 +246,23 @@ export default function DailyReportPDFButton({ date, assignments }) {
     queryFn: () => base44.entities.WorkplaceLogistics.filter({ date }),
   });
 
+  const { data: students = [] } = useQuery({
+    queryKey: ['students'],
+    queryFn: () => base44.entities.Student.list('-created_date'),
+  });
+
   const logisticsMap = {};
   logisticsList.forEach(l => { logisticsMap[l.workplace_id] = l; });
+
+  // Map student_id → student record (for cohort lookup)
+  const studentsMap = {};
+  students.forEach(s => { studentsMap[s.id] = s; });
 
   const gregDate = new Date(date + 'T12:00:00').toLocaleDateString('he-IL', {
     day: 'numeric', month: 'long', year: 'numeric'
   });
   const hebrewDate = toHebrewDate(date);
-  const reportGroups = buildReportGroups(assignments, logisticsMap);
+  const reportGroups = buildReportGroups(assignments, logisticsMap, studentsMap);
 
   const handleExport = async () => {
     setExporting(true);
@@ -276,7 +314,7 @@ export default function DailyReportPDFButton({ date, assignments }) {
         )}
       </div>
 
-      <ReportContent forwardRef={hiddenRef} reportGroups={reportGroups} gregDate={gregDate} hebrewDate={hebrewDate} />
+      <ReportContent forwardRef={hiddenRef} reportGroups={reportGroups} gregDate={gregDate} hebrewDate={hebrewDate} studentsMap={studentsMap} />
     </>
   );
 }
