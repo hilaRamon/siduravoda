@@ -114,7 +114,7 @@ const S = {
   subtitle: { fontSize: '9px', color: '#555', margin: '2px 0 0' },
   cols: { display: 'flex', gap: '6px', alignItems: 'flex-start' },
   col: { flex: 1, minWidth: 0 },
-  group: { marginBottom: '5px', border: '1px solid #9ca3af', borderRadius: '3px', overflow: 'hidden', pageBreakInside: 'avoid' },
+  group: { marginBottom: '12px', border: '1px solid #9ca3af', borderRadius: '3px', overflow: 'hidden', pageBreakInside: 'avoid' },
   groupHeader: { background: '#1e3a8a', color: '#fff', padding: '2px 5px', fontWeight: 'bold', fontSize: '8px', pageBreakInside: 'avoid' },
   logRow: {
     background: '#fef9c3',
@@ -129,7 +129,7 @@ const S = {
   logLabel: { color: '#78716c', fontSize: '7.5px' },
   logVal: { fontWeight: 'bold', color: '#1e3a8a' },
   logValRed: { fontWeight: 'bold', color: '#b91c1c' },
-  table: { width: '100%', fontSize: '8.5px', borderCollapse: 'collapse' },
+  table: { width: '100%', fontSize: '8.5px', borderCollapse: 'collapse', minHeight: '30px', pageBreakInside: 'avoid' },
   th: { background: '#dbeafe', border: '1px solid #d1d5db', padding: '2.5px 4px', textAlign: 'right', fontSize: '7.5px', fontWeight: 'bold', color: '#1e3a8a', verticalAlign: 'middle' },
   tdEven: { border: '1px solid #e5e7eb', padding: '3px 4px', background: '#fff', fontSize: '8.5px', fontWeight: '500', color: '#1f2937', verticalAlign: 'middle' },
   tdOdd:  { border: '1px solid #e5e7eb', padding: '3px 4px', background: '#f9fafb', fontSize: '8.5px', fontWeight: '500', color: '#1f2937', verticalAlign: 'middle' },
