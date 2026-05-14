@@ -39,9 +39,9 @@ function WorkplaceLogisticsCard({ date, workplaceId, workplaceName, studentCount
     onSave(workplaceId, workplaceName, newData);
   };
 
-  const [timeInput, setTimeInput] = useState(localData.exit_time || '06:35');
+  const [timeInput, setTimeInput] = useState(localData.exit_time || '');
   useEffect(() => {
-    setTimeInput(localData.exit_time || '06:35');
+    setTimeInput(localData.exit_time || '');
   }, [localData.exit_time]);
 
   const handleTimeSave = () => {
