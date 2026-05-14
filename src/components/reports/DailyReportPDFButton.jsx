@@ -1,10 +1,9 @@
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import { Download, Loader2, Share2 } from 'lucide-react';
 import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
 
 function toHebrewDate(dateStr) {
   try {
@@ -12,9 +11,7 @@ function toHebrewDate(dateStr) {
     return new Intl.DateTimeFormat('he-IL-u-ca-hebrew', {
       day: 'numeric', month: 'long', year: 'numeric'
     }).format(d);
-  } catch {
-    return '';
-  }
+  } catch { return ''; }
 }
 
 const SKIP_NAMES = ['לא עובד', 'לימודים', 'לא יצא'];
@@ -22,7 +19,6 @@ const shouldSkip = (name) => !name || SKIP_NAMES.some(kw => name.trim() === kw);
 
 function buildReportGroups(assignments, logisticsMap) {
   const filtered = assignments.filter(a => !shouldSkip(a.workplace_name));
-
   const byWorkplace = {};
   const seenStudents = new Set();
   filtered.forEach(a => {
@@ -34,97 +30,246 @@ function buildReportGroups(assignments, logisticsMap) {
     }
   });
 
-  const groups = Object.values(byWorkplace)
-    .sort((a, b) => a.name.localeCompare(b.name, 'he'));
-
-  // Find which workplace each role holder actually belongs to
-  const driverAssignment = assignments.find(a => a.role === 'נהג');
-  const teamLeaderAssignment = assignments.find(a => a.role === 'ראש צוות');
-  const equipAssignment = assignments.find(a => a.role === 'אחראי פק"ל');
-
-  return groups.map(g => {
-    const log = logisticsMap[g.id] || {};
-    const vehicles = [log.vehicle_name, log.vehicle_name_2, log.vehicle_name_3].filter(Boolean).join(' + ');
-    // Only show role in the workplace they are actually assigned to
-    const driverName = driverAssignment?.workplace_id === g.id ? driverAssignment.student_name : '';
-    const teamLeaderName = teamLeaderAssignment?.workplace_id === g.id ? teamLeaderAssignment.student_name : '';
-    const equipName = equipAssignment?.workplace_id === g.id ? equipAssignment.student_name : '';
-    return {
-      workplaceName: g.name,
-      students: g.students.sort((a, b) => (a.student_name || '').localeCompare(b.student_name || '', 'he')),
-      vehicleName: vehicles || '',
-      exitTime: log.exit_time || '06:35',
-      notes: log.notes || '',
-      driverName,
-      teamLeaderName,
-      equipName,
-    };
-  });
+  return Object.values(byWorkplace)
+    .sort((a, b) => a.name.localeCompare(b.name, 'he'))
+    .map(g => {
+      const log = logisticsMap[g.id] || {};
+      const vehicles = [log.vehicle_name, log.vehicle_name_2, log.vehicle_name_3].filter(Boolean).join(' + ');
+      return {
+        workplaceName: g.name,
+        students: g.students.sort((a, b) => (a.student_name || '').localeCompare(b.student_name || '', 'he')),
+        vehicleName: vehicles || '',
+        exitTime: log.exit_time || '',
+        notes: log.notes || '',
+      };
+    });
 }
 
-async function generatePDFBlob(container, date) {
-  container.style.position = 'fixed';
-  container.style.top = '-9999px';
-  container.style.left = '0';
-  container.style.display = 'block';
-  await new Promise(r => setTimeout(r, 150));
+// Mirror Hebrew text for jsPDF RTL rendering
+function rev(str) {
+  return String(str || '').split('').reverse().join('');
+}
 
-  const SCALE = 1.5;
-  const canvas = await html2canvas(container, { scale: SCALE, useCORS: true, backgroundColor: '#ffffff' });
-  container.style.display = 'none';
+function generatePDF(reportGroups, gregDate, hebrewDate) {
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
 
-  const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-  const pageW = pdf.internal.pageSize.getWidth();
-  const pageH = pdf.internal.pageSize.getHeight();
-  const margin = 10;
-  const contentW = pageW - margin * 2;
-  const contentH = pageH - margin * 2;
+  // Page dimensions
+  const pageW = 210;
+  const pageH = 297;
+  const margin = 8;
+  const colGap = 4;
+  const colW = (pageW - margin * 2 - colGap) / 2;
 
-  const pxPerMM = canvas.width / contentW;
-  const pageHeightPx = contentH * pxPerMM;
+  // Fonts & sizes
+  const FONT = 'helvetica';
+  const SZ_TITLE = 13;
+  const SZ_HEADER = 7;    // workplace header
+  const SZ_LOGISTICS = 6; // vehicle/time row
+  const SZ_TABLE = 5.5;   // student rows
+  const SZ_TOTAL = 5;
 
-  const blocks = Array.from(container.children);
-  const safeCutsPx = blocks.map(block => {
-    let top = 0;
-    let el = block;
-    while (el && el !== container) {
-      top += el.offsetTop;
-      el = el.offsetParent;
+  const ROW_H = 4.5;      // student row height
+  const HEADER_H = 5.5;   // workplace name bar
+  const LOG_H = 5;        // logistics bar
+  const TOTAL_H = 4;      // totals footer
+  const TH_H = 4.5;       // table header row
+
+  // Draw title once
+  let titleH = 0;
+  const drawTitle = () => {
+    const titleY = margin;
+    doc.setFont(FONT, 'bold');
+    doc.setFontSize(SZ_TITLE);
+    doc.setTextColor(30, 58, 138);
+    doc.text(rev('סידור עבודה'), pageW / 2, titleY + 4, { align: 'center' });
+    doc.setFont(FONT, 'normal');
+    doc.setFontSize(7);
+    doc.setTextColor(80, 80, 80);
+    doc.text(rev(`${gregDate} — ${hebrewDate}`), pageW / 2, titleY + 8, { align: 'center' });
+    doc.setDrawColor(30, 58, 138);
+    doc.setLineWidth(0.4);
+    doc.line(margin, titleY + 10, pageW - margin, titleY + 10);
+    titleH = 13;
+  };
+
+  // Measure a group's total height
+  const groupHeight = (g) => {
+    const hasLogistics = g.vehicleName || g.exitTime || g.notes;
+    return HEADER_H + (hasLogistics ? LOG_H : 0) + TH_H + g.students.length * ROW_H + TOTAL_H;
+  };
+
+  // Draw one group at (x, y), returns height used
+  const drawGroup = (g, x, y, w) => {
+    const hasLogistics = g.vehicleName || g.exitTime || g.notes;
+    let curY = y;
+
+    // Workplace header bar
+    doc.setFillColor(30, 58, 138);
+    doc.rect(x, curY, w, HEADER_H, 'F');
+    doc.setFont(FONT, 'bold');
+    doc.setFontSize(SZ_HEADER);
+    doc.setTextColor(255, 255, 255);
+    doc.text(rev(g.workplaceName), x + w - 2, curY + HEADER_H - 1.5, { align: 'right' });
+    curY += HEADER_H;
+
+    // Logistics bar
+    if (hasLogistics) {
+      doc.setFillColor(254, 249, 195);
+      doc.rect(x, curY, w, LOG_H, 'F');
+      doc.setDrawColor(202, 138, 4);
+      doc.setLineWidth(0.3);
+      doc.line(x, curY + LOG_H, x + w, curY + LOG_H);
+
+      doc.setFont(FONT, 'normal');
+      doc.setFontSize(SZ_LOGISTICS);
+      doc.setTextColor(30, 58, 138);
+
+      let lx = x + w - 2;
+      if (g.vehicleName) {
+        const txt = rev('רכב: ' + g.vehicleName);
+        doc.setFont(FONT, 'bold');
+        doc.text(txt, lx, curY + LOG_H - 1.5, { align: 'right' });
+        lx -= doc.getTextWidth(txt) + 4;
+      }
+      if (g.exitTime) {
+        doc.setTextColor(185, 28, 28);
+        const txt = rev('יציאה: ' + g.exitTime);
+        doc.setFont(FONT, 'bold');
+        doc.text(txt, lx, curY + LOG_H - 1.5, { align: 'right' });
+        lx -= doc.getTextWidth(txt) + 4;
+      }
+      if (g.notes) {
+        doc.setTextColor(120, 53, 15);
+        doc.setFont(FONT, 'normal');
+        doc.text(rev(g.notes), lx, curY + LOG_H - 1.5, { align: 'right' });
+      }
+      curY += LOG_H;
     }
-    return (top + block.offsetHeight) * SCALE;
-  });
 
-  const pdf_pages = [];
-  let srcY = 0;
+    // Table header
+    doc.setFillColor(219, 234, 254);
+    doc.rect(x, curY, w, TH_H, 'F');
+    doc.setFont(FONT, 'bold');
+    doc.setFontSize(SZ_TABLE);
+    doc.setTextColor(30, 58, 138);
+    doc.setDrawColor(209, 213, 219);
+    doc.setLineWidth(0.2);
+    const roleColW = 22;
+    doc.rect(x, curY, w, TH_H, 'S');
+    doc.line(x + roleColW, curY, x + roleColW, curY + TH_H);
+    doc.text(rev('שם תלמיד'), x + w - 2, curY + TH_H - 1.2, { align: 'right' });
+    doc.text(rev('תפקיד'), x + roleColW - 1, curY + TH_H - 1.2, { align: 'right' });
+    curY += TH_H;
 
-  while (srcY < canvas.height) {
-    const idealEnd = srcY + pageHeightPx;
-    let cutY = idealEnd;
-    for (const safePx of safeCutsPx) {
-      if (safePx <= idealEnd && safePx > srcY) cutY = safePx;
+    // Student rows
+    doc.setFont(FONT, 'normal');
+    g.students.forEach((s, i) => {
+      const bg = i % 2 === 0 ? [255, 255, 255] : [249, 250, 251];
+      doc.setFillColor(...bg);
+      doc.rect(x, curY, w, ROW_H, 'F');
+      doc.setDrawColor(229, 231, 235);
+      doc.rect(x, curY, w, ROW_H, 'S');
+      doc.line(x + roleColW, curY, x + roleColW, curY + ROW_H);
+
+      doc.setFontSize(SZ_TABLE);
+      doc.setTextColor(30, 30, 30);
+      doc.text(rev(s.student_name || ''), x + w - 2, curY + ROW_H - 1.2, { align: 'right' });
+
+      const roleMap = { 'נהג': 'נהג', 'ראש צוות': 'ראש צוות', 'אחראי פק"ל': 'פק"ל' };
+      const roleLabel = roleMap[s.role] || '';
+      if (roleLabel) {
+        doc.setFont(FONT, 'bold');
+        doc.setTextColor(29, 78, 216);
+        doc.text(rev(roleLabel), x + roleColW - 1, curY + ROW_H - 1.2, { align: 'right' });
+        doc.setFont(FONT, 'normal');
+        doc.setTextColor(30, 30, 30);
+      }
+      curY += ROW_H;
+    });
+
+    // Totals footer
+    doc.setFillColor(243, 244, 246);
+    doc.rect(x, curY, w, TOTAL_H, 'F');
+    doc.setDrawColor(209, 213, 219);
+    doc.rect(x, curY, w, TOTAL_H, 'S');
+    doc.setFont(FONT, 'normal');
+    doc.setFontSize(SZ_TOTAL);
+    doc.setTextColor(107, 114, 128);
+    doc.text(rev(`סה"כ: ${g.students.length} תלמידים`), x + w - 2, curY + TOTAL_H - 1, { align: 'right' });
+    curY += TOTAL_H;
+
+    return curY - y;
+  };
+
+  // Layout: two columns, fill left then right greedily per page
+  let page = 0;
+  const newPage = () => {
+    if (page > 0) doc.addPage();
+    drawTitle();
+    page++;
+  };
+
+  newPage();
+
+  const contentTop = margin + titleH;
+  const contentH = pageH - margin - contentTop;
+
+  // Assign groups to columns using a two-pass greedy approach
+  // We want to fill two columns per page
+  const groups = reportGroups;
+  let i = 0;
+
+  while (i < groups.length) {
+    // Left column: fill as many as fit
+    const leftGroups = [];
+    let leftUsed = 0;
+    let j = i;
+    while (j < groups.length) {
+      const h = groupHeight(groups[j]) + 3; // 3mm gap
+      if (leftUsed + h > contentH && leftGroups.length > 0) break;
+      leftGroups.push(groups[j]);
+      leftUsed += h;
+      j++;
     }
-    const sliceH = Math.min(cutY, canvas.height) - srcY;
 
-    const slice = document.createElement('canvas');
-    slice.width = canvas.width;
-    slice.height = sliceH;
-    slice.getContext('2d').drawImage(canvas, 0, srcY, canvas.width, sliceH, 0, 0, canvas.width, sliceH);
+    // Right column: fill as many as fit
+    const rightGroups = [];
+    let rightUsed = 0;
+    let k = j;
+    while (k < groups.length) {
+      const h = groupHeight(groups[k]) + 3;
+      if (rightUsed + h > contentH && rightGroups.length > 0) break;
+      rightGroups.push(groups[k]);
+      rightUsed += h;
+      k++;
+    }
 
-    if (pdf_pages.length > 0) pdf.addPage();
-    pdf.addImage(slice.toDataURL('image/jpeg', 0.85), 'JPEG', margin, margin, contentW, sliceH / pxPerMM);
-    pdf_pages.push(true);
+    // Draw left column (RTL: left in PDF = right side visually = first col)
+    const leftX = margin + colW + colGap;
+    const rightX = margin;
+    let ly = contentTop;
+    leftGroups.forEach(g => {
+      const h = drawGroup(g, leftX, ly, colW);
+      ly += h + 3;
+    });
 
-    srcY += sliceH;
+    let ry = contentTop;
+    rightGroups.forEach(g => {
+      const h = drawGroup(g, rightX, ry, colW);
+      ry += h + 3;
+    });
+
+    i = k;
+    if (i < groups.length) newPage();
   }
 
-  return pdf.output('blob');
+  return doc;
 }
 
 export default function DailyReportPDFButton({ date, assignments }) {
   const [exporting, setExporting] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [publishedOk, setPublishedOk] = useState(false);
-  const hiddenRef = useRef(null);
 
   const { data: logisticsList = [] } = useQuery({
     queryKey: ['workplace-logistics', date],
@@ -142,132 +287,24 @@ export default function DailyReportPDFButton({ date, assignments }) {
 
   const handleExport = async () => {
     setExporting(true);
-    const blob = await generatePDFBlob(hiddenRef.current, date);
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `סידור_עבודה_יומי_${date}.pdf`;
-    a.click();
-    URL.revokeObjectURL(url);
+    const doc = generatePDF(reportGroups, gregDate, hebrewDate);
+    doc.save(`סידור_עבודה_יומי_${date}.pdf`);
     setExporting(false);
   };
 
   const handlePublish = async () => {
     setPublishing(true);
     setPublishedOk(false);
-    const blob = await generatePDFBlob(hiddenRef.current, date);
+    const doc = generatePDF(reportGroups, gregDate, hebrewDate);
+    const blob = doc.output('blob');
     const file = new File([blob], `schedule_${date}.pdf`, { type: 'application/pdf' });
     const { file_url } = await base44.integrations.Core.UploadFile({ file });
-
-    // Delete old published schedule records and create a fresh one
     const existing = await base44.entities.PublishedSchedule.list();
     await Promise.all(existing.map(r => base44.entities.PublishedSchedule.delete(r.id)));
     await base44.entities.PublishedSchedule.create({ date, file_url });
-
     setPublishedOk(true);
     setPublishing(false);
   };
-
-  // Split groups into two columns
-  const leftCol = reportGroups.filter((_, i) => i % 2 === 0);
-  const rightCol = reportGroups.filter((_, i) => i % 2 === 1);
-
-  const renderGroup = (group) => {
-    // Build student rows: show role name next to the student who holds it
-    const rows = group.students.map(s => {
-      let roleLabel = '';
-      if (s.role === 'נהג') roleLabel = 'נהג';
-      else if (s.role === 'ראש צוות') roleLabel = 'ראש צוות';
-      else if (s.role === 'אחראי פק"ל') roleLabel = 'אחראי פק"ל';
-      return { name: s.student_name, role: roleLabel };
-    });
-
-    return (
-      <div key={group.workplaceName} style={{ marginBottom: '6px', border: '1px solid #9ca3af', borderRadius: '3px', overflow: 'hidden' }}>
-        {/* Header: workplace name */}
-        <div style={{ background: '#1e3a8a', color: '#fff', padding: '3px 6px', fontWeight: 'bold', fontSize: '10px' }}>
-          {group.workplaceName}
-        </div>
-
-        {/* Logistics row: vehicle + exit time */}
-        <div style={{ background: '#fef9c3', borderBottom: '1px solid #ca8a04', padding: '2px 6px', display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
-          {group.vehicleName && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
-              <span style={{ fontSize: '8px', color: '#78716c' }}>רכב:</span>
-              <span style={{ fontSize: '10px', fontWeight: 'bold', color: '#1e3a8a' }}>🚐 {group.vehicleName}</span>
-            </div>
-          )}
-          {group.exitTime && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
-              <span style={{ fontSize: '8px', color: '#78716c' }}>יציאה:</span>
-              <span style={{ fontSize: '10px', fontWeight: 'bold', color: '#b91c1c' }}>⏰ {group.exitTime}</span>
-            </div>
-          )}
-          {group.notes && (
-            <span style={{ fontSize: '8px', color: '#78350f', marginRight: 'auto' }}>📝 {group.notes}</span>
-          )}
-        </div>
-
-        {/* Students table */}
-        <table style={{ width: '100%', fontSize: '9px', borderCollapse: 'collapse' }}>
-          <thead>
-            <tr style={{ background: '#dbeafe' }}>
-              <th style={{ border: '1px solid #d1d5db', padding: '2px 4px', textAlign: 'right' }}>שם תלמיד</th>
-              <th style={{ border: '1px solid #d1d5db', padding: '2px 4px', textAlign: 'right', width: '60px' }}>תפקיד</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((r, i) => (
-              <tr key={i} style={{ background: i % 2 === 0 ? '#fff' : '#f9fafb' }}>
-                <td style={{ border: '1px solid #e5e7eb', padding: '2px 4px' }}>{r.name}</td>
-                <td style={{ border: '1px solid #e5e7eb', padding: '2px 4px', fontWeight: r.role ? '700' : 'normal', color: r.role ? '#1d4ed8' : 'inherit' }}>
-                  {r.role || ''}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-          <tfoot>
-            <tr style={{ background: '#f3f4f6' }}>
-              <td colSpan={2} style={{ border: '1px solid #d1d5db', padding: '2px 4px', fontSize: '8px', color: '#6b7280' }}>
-                סה"כ: {group.students.length} תלמידים
-              </td>
-            </tr>
-          </tfoot>
-        </table>
-      </div>
-    );
-  };
-
-  const reportContent = (
-    <div ref={hiddenRef} style={{ display: 'none', width: '794px', background: 'white', padding: '16px', fontFamily: 'Arial, sans-serif' }} dir="rtl">
-      <div style={{ marginBottom: '8px', textAlign: 'center', borderBottom: '2px solid #1e3a8a', paddingBottom: '5px' }}>
-        <h2 style={{ fontSize: '14px', fontWeight: 'bold', margin: 0, color: '#1e3a8a' }}>סידור עבודה</h2>
-        <p style={{ fontSize: '10px', margin: '2px 0 0', color: '#555' }}>{gregDate} — {hebrewDate}</p>
-      </div>
-
-      {/* Two-column layout using a table for reliable PDF rendering */}
-      <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
-        <colgroup>
-          <col style={{ width: '50%' }} />
-          <col style={{ width: '8px' }} />
-          <col style={{ width: '50%' }} />
-        </colgroup>
-        <tbody>
-          {Array.from({ length: Math.max(leftCol.length, rightCol.length) }).map((_, i) => (
-            <tr key={i} style={{ verticalAlign: 'top' }}>
-              <td style={{ padding: '0 4px 0 0', verticalAlign: 'top' }}>
-                {leftCol[i] ? renderGroup(leftCol[i]) : null}
-              </td>
-              <td />
-              <td style={{ padding: '0 0 0 4px', verticalAlign: 'top' }}>
-                {rightCol[i] ? renderGroup(rightCol[i]) : null}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
 
   return (
     <>
@@ -293,8 +330,6 @@ export default function DailyReportPDFButton({ date, assignments }) {
           </div>
         )}
       </div>
-
-      {reportContent}
     </>
   );
 }
