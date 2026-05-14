@@ -109,8 +109,8 @@ const S = {
   logValRed: { fontWeight: 'bold', color: '#b91c1c' },
   table: { width: '100%', fontSize: '8px', borderCollapse: 'collapse' },
   th: { background: '#dbeafe', border: '1px solid #d1d5db', padding: '2px 4px', textAlign: 'right', fontSize: '7px', fontWeight: 'bold', color: '#1e3a8a' },
-  tdEven: { border: '1px solid #e5e7eb', padding: '1px 4px', background: '#fff', fontSize: '8px' },
-  tdOdd:  { border: '1px solid #e5e7eb', padding: '1px 4px', background: '#f9fafb', fontSize: '8px' },
+  tdEven: { border: '1px solid #e5e7eb', padding: '3px 4px 1px', background: '#fff', fontSize: '8px', verticalAlign: 'top' },
+  tdOdd:  { border: '1px solid #e5e7eb', padding: '3px 4px 1px', background: '#f9fafb', fontSize: '8px', verticalAlign: 'top' },
   tdRole: { fontWeight: '700', color: '#1d4ed8' },
   tfootTd: { border: '1px solid #d1d5db', padding: '1px 4px', fontSize: '7px', color: '#6b7280', background: '#f3f4f6' },
 };
