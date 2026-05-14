@@ -205,19 +205,15 @@ export default function TimeReporting() {
     return map;
   }, [assignmentByStudent]);
 
-  // Use workplaces from logistics that actually have students assigned
+  // Use only workplaces that have actual assignments for this date
   const workplacesToShow = useMemo(() => {
-    if (activeWorkplacesFromLogistics.length > 0) {
-      return activeWorkplacesFromLogistics.filter(wp => (workplaceStudents[wp.workplace_id] || []).length > 0);
-    }
-    // fallback: derive from assignments directly
     const seen = new Set();
     return Object.values(assignmentByStudent)
       .filter(a => a.workplace_id && a.workplace_name && !NON_WORK.includes(a.workplace_name?.trim()))
       .filter(a => { if (seen.has(a.workplace_id)) return false; seen.add(a.workplace_id); return true; })
       .map(a => ({ workplace_id: a.workplace_id, workplace_name: a.workplace_name }))
       .sort((a, b) => a.workplace_name.localeCompare(b.workplace_name, 'he'));
-  }, [activeWorkplacesFromLogistics, workplaceStudents, assignmentByStudent]);
+  }, [workplaceStudents, assignmentByStudent]);
 
   // All students for search
   const allStudents = useMemo(() =>
