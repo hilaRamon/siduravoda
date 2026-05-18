@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
@@ -16,6 +16,11 @@ function WorkplaceFormModal({ open, onClose, onSave, workplace, existingFarms })
   });
   const [farmOpen, setFarmOpen] = useState(false);
   const [farmInputValue, setFarmInputValue] = useState('');
+
+  useEffect(() => {
+    setForm(workplace || { name: '', farm_name: '', address: '', company_id: '', contact_phone: '', accounting_phone: '', accounting_email: '' });
+    setFarmInputValue('');
+  }, [open, workplace]);
 
   const set = (field) => (e) => setForm(p => ({ ...p, [field]: e.target.value }));
 

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
@@ -12,6 +12,10 @@ const COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4'
 
 function RoleFormModal({ open, onClose, onSave, role }) {
   const [form, setForm] = useState(role || { name: '', description: '', color: COLORS[0] });
+
+  useEffect(() => {
+    setForm(role || { name: '', description: '', color: COLORS[0] });
+  }, [open, role]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
