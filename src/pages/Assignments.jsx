@@ -506,11 +506,9 @@ export default function Assignments() {
         // Determine workplace for target
         let targetWp;
 
-        // Check if student has an approved absence for the target date → override with "תתת - לא עובד"
+        // Check if student has an approved absence for the target date → leave unassigned (before assignment)
         if (absentStudentIds.has(src.student_id)) {
-          targetWp = notWorkingWp
-            ? { id: notWorkingWp.id, name: notWorkingWp.name }
-            : { id: '', name: 'תתת - לא עובד' };
+          targetWp = { id: '', name: '' };
         } else if (isSunday) {
           // Sunday: assign by student's distance_status (all students)
           const distanceStatus = student?.distance_status;
