@@ -75,15 +75,6 @@ export default function UserPermissions({ currentUser }) {
   };
 
 
-  if (!isAdmin) {
-    return (
-      <div className="bg-card border border-border rounded-2xl p-8 text-center text-muted-foreground">
-        <Shield size={32} className="mx-auto mb-3 opacity-30" />
-        <p>רק מנהלים יכולים לנהל הרשאות משתמשים.</p>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-5 max-w-3xl">
 
