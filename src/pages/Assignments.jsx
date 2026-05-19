@@ -589,7 +589,7 @@ export default function Assignments() {
   const nextDay = () => setDate(format(addDays(new Date(date + 'T12:00:00'), 1), 'yyyy-MM-dd'));
 
   return (
-    <div className="p-8 flex gap-6 items-start">
+    <div className="p-8 flex gap-6 items-start min-h-full">
       <div className="flex-1 min-w-0">
       <div className="flex items-center justify-between mb-6">
         <div>
