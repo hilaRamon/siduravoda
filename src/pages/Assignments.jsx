@@ -383,7 +383,8 @@ export default function Assignments() {
     setBulkSaving(true);
     setBulkProgress(0);
     try {
-      const CHUNK_SIZE = 10;
+      const CHUNK_SIZE = 5;
+      const delay = (ms) => new Promise(r => setTimeout(r, ms));
       const totalOps = Math.ceil(toCreate.length / CHUNK_SIZE) + Math.ceil(toUpdate.length / CHUNK_SIZE);
       let doneOps = 0;
 
@@ -391,11 +392,13 @@ export default function Assignments() {
         await Promise.all(toCreate.slice(i, i + CHUNK_SIZE).map(record => base44.entities.Assignment.create(record)));
         doneOps++;
         setBulkProgress(Math.round((doneOps / Math.max(totalOps, 1)) * 100));
+        if (i + CHUNK_SIZE < toCreate.length) await delay(300);
       }
       for (let i = 0; i < toUpdate.length; i += CHUNK_SIZE) {
         await Promise.all(toUpdate.slice(i, i + CHUNK_SIZE).map(({ id, fullRecord }) => base44.entities.Assignment.update(id, fullRecord)));
         doneOps++;
         setBulkProgress(Math.round((doneOps / Math.max(totalOps, 1)) * 100));
+        if (i + CHUNK_SIZE < toUpdate.length) await delay(300);
       }
       setBulkProgress(100);
       await new Promise(r => setTimeout(r, 400)); // brief moment to show 100%
@@ -562,19 +565,21 @@ export default function Assignments() {
         }
       }
 
-      // Process in chunks directly via SDK (no backend function needed)
-      const CHUNK = 10;
+      // Process sequentially in small chunks to avoid rate limiting
+      const CHUNK = 5;
+      const delay = (ms) => new Promise(r => setTimeout(r, ms));
+
       for (let i = 0; i < toUpdate.length; i += CHUNK) {
         await Promise.all(toUpdate.slice(i, i + CHUNK).map(({ id, fullRecord }) =>
           base44.entities.Assignment.update(id, fullRecord)
         ));
+        if (i + CHUNK < toUpdate.length) await delay(300);
       }
-      if (toCreate.length > 0) {
-        for (let i = 0; i < toCreate.length; i += CHUNK) {
-          await Promise.all(toCreate.slice(i, i + CHUNK).map(record =>
-            base44.entities.Assignment.create(record)
-          ));
-        }
+      for (let i = 0; i < toCreate.length; i += CHUNK) {
+        await Promise.all(toCreate.slice(i, i + CHUNK).map(record =>
+          base44.entities.Assignment.create(record)
+        ));
+        if (i + CHUNK < toCreate.length) await delay(300);
       }
 
       const totalCloned = toCreate.length + toUpdate.length;
