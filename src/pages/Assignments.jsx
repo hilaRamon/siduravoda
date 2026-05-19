@@ -951,7 +951,7 @@ export default function Assignments() {
               const selectKey = ga.id;
               const isSelected = selectedIds.has(selectKey);
               return (
-                <tr key={ga.id} className={`transition-colors border-t-2 border-dashed border-amber-200 ${isSelected ? 'bg-primary/10' : 'bg-amber-50/60 hover:bg-amber-50'}`}>
+                <tr key={ga.id} className={`transition-colors border-t-2 border-dashed border-amber-200 align-middle ${isSelected ? 'bg-primary/10' : 'bg-amber-50/60 hover:bg-amber-50'}`}>
                   <td className="px-3 py-2 border-b border-border">
                     <Checkbox
                       checked={!!isSelected}
@@ -959,7 +959,7 @@ export default function Assignments() {
                     />
                   </td>
                   <td className="px-3 py-2 border-b border-border text-muted-foreground text-xs">{filteredStudents.length + idx + 1}</td>
-                  <td className="px-3 py-2 border-b border-border font-medium">
+                  <td className="px-3 py-2 border-b border-border font-medium align-middle">
                     <span className="flex items-center gap-1">
                       <UserPlus size={12} className="text-amber-500 shrink-0" />
                       {ga.student_name}
