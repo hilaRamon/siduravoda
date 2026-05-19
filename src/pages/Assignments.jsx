@@ -482,8 +482,8 @@ export default function Assignments() {
             seenOnTarget.add(a.student_id);
           }
         });
-      for (let i = 0; i < duplicatesToDelete.length; i += 10) {
-        await Promise.all(duplicatesToDelete.slice(i, i + 10).map(id => base44.entities.Assignment.delete(id)));
+      for (const id of duplicatesToDelete) {
+        await base44.entities.Assignment.delete(id);
       }
 
       // Source: deduped assignments from current date (only real students, not guests)
@@ -565,17 +565,8 @@ export default function Assignments() {
         }
       }
 
-      // Process one-by-one with delay to avoid rate limiting
-      const delay = (ms) => new Promise(r => setTimeout(r, ms));
-
-      for (const { id, fullRecord } of toUpdate) {
-        await base44.entities.Assignment.update(id, fullRecord);
-        await delay(200);
-      }
-      for (const record of toCreate) {
-        await base44.entities.Assignment.create(record);
-        await delay(200);
-      }
+      // Use backend function to avoid client-side rate limiting
+      await base44.functions.invoke('bulkUpdateAssignments', { toCreate, toUpdate });
 
       const totalCloned = toCreate.length + toUpdate.length;
       queryClient.invalidateQueries({ queryKey: ['assignments'] });
