@@ -721,7 +721,7 @@ export default function Assignments() {
           </DialogHeader>
           <div className="space-y-4 mt-2">
             <p className="text-sm text-muted-foreground">
-              שכפל את {assignments.length} השיבוצים מתאריך <strong>{date}</strong> לתאריך:
+              שכפל את {Object.values(assignmentByStudent).filter(a => !a.student_id?.startsWith('guest_')).length} השיבוצים מתאריך <strong>{date}</strong> לתאריך:
             </p>
             <input
               type="date"
