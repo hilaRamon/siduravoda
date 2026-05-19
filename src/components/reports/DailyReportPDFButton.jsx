@@ -119,16 +119,18 @@ const S = {
   logRow: {
     background: '#fef9c3',
     borderBottom: '1px solid #ca8a04',
-    padding: '2.5px 5px',
+    padding: '4px 5px',
     display: 'flex',
     gap: '8px',
     alignItems: 'center',
     fontSize: '8.5px',
     flexWrap: 'wrap',
+    minHeight: '20px',
+    lineHeight: '1.4',
   },
-  logLabel: { color: '#78716c', fontSize: '7.5px' },
-  logVal: { fontWeight: 'bold', color: '#1e3a8a' },
-  logValRed: { fontWeight: 'bold', color: '#b91c1c' },
+  logLabel: { color: '#78716c', fontSize: '7.5px', verticalAlign: 'middle' },
+  logVal: { fontWeight: 'bold', color: '#1e3a8a', verticalAlign: 'middle' },
+  logValRed: { fontWeight: 'bold', color: '#b91c1c', verticalAlign: 'middle' },
   table: { width: '100%', fontSize: '8.5px', borderCollapse: 'collapse', minHeight: '30px', pageBreakInside: 'avoid' },
   th: { background: '#dbeafe', border: '1px solid #d1d5db', padding: '2.5px 4px', textAlign: 'right', fontSize: '7.5px', fontWeight: 'bold', color: '#1e3a8a', verticalAlign: 'middle' },
   tdEven: { border: '1px solid #e5e7eb', padding: '5px 4px', background: '#fff', fontSize: '8.5px', fontWeight: '500', color: '#1f2937', verticalAlign: 'middle', minHeight: '18px', display: 'table-cell' },
@@ -158,7 +160,7 @@ function WorkplaceCard({ group, studentsMap }) {
               <span style={S.logValRed}>⏰ {group.exitTime}</span>
             </span>
           )}
-          {group.notes && <span style={{ fontSize: '7px', color: '#78350f' }}>📝 {group.notes}</span>}
+          {group.notes && <span style={{ fontSize: '7px', color: '#78350f', verticalAlign: 'middle', lineHeight: '1.4' }}>📝 {group.notes}</span>}
         </div>
       )}
       <table style={S.table}>
