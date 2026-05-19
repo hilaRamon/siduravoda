@@ -158,6 +158,8 @@ function EditableNumberCell({ value, defaultValue, assignment, field, onUpdate }
 export default function Assignments() {
   const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [cloning, setCloning] = useState(false);
+  const [cloneProgress, setCloneProgress] = useState(0);
+  const [cloneStep, setCloneStep] = useState('');
   const [showCloneDialog, setShowCloneDialog] = useState(false);
   const [cloneTargetDate, setCloneTargetDate] = useState('');
   const [filterName, setFilterName] = useState('');
@@ -434,13 +436,14 @@ export default function Assignments() {
   const handleCloneDay = async () => {
     if (!cloneTargetDate) return;
     setCloning(true);
+    setCloneProgress(0);
+    setCloneStep('טוען נתונים...');
     try {
       // Check if target date is Sunday (day 0)
       const targetDayOfWeek = new Date(cloneTargetDate + 'T12:00:00').getDay();
       const isSunday = targetDayOfWeek === 0;
 
       // Distance → workplace mapping for Sunday mode
-      // Build map dynamically from actual workplaces to avoid hardcoded IDs
       const DISTANCE_WORKPLACE_MAP = {};
       ['קרוב', 'רחוק', 'תתת - לא עובד', 'אאא- לפני שיבוץ'].forEach(distStatus => {
         const wp = workplaces.find(w => w.name === distStatus);
@@ -449,19 +452,21 @@ export default function Assignments() {
         }
       });
 
-      // Fetch fresh student data to ensure distance_status is up-to-date
+      setCloneProgress(10);
+      setCloneStep('טוען תלמידים...');
       const freshStudents = await base44.entities.Student.list('-created_date', 2000);
       const studentById = {};
       freshStudents.forEach(s => { studentById[s.id] = s; });
 
-      // Fetch approved absences for target date
+      setCloneProgress(25);
+      setCloneStep('בודק היעדרויות...');
       const approvedAbsences = await base44.entities.IncomingSMS.filter({ parsed_date: cloneTargetDate, status: 'אושר' }, '-created_date', 2000);
       const absentStudentIds = new Set(approvedAbsences.map(a => a.student_id).filter(Boolean));
 
-      // Fetch existing assignments on the target date
+      setCloneProgress(40);
+      setCloneStep('טוען שיבוצים קיימים...');
       const targetAssignments = await base44.entities.Assignment.filter({ date: cloneTargetDate }, '-created_date', 2000);
 
-      // Build a map: student_id -> existing assignment on target date
       const targetByStudent = {};
       targetAssignments.forEach(a => {
         const existing = targetByStudent[a.student_id];
@@ -470,7 +475,8 @@ export default function Assignments() {
         }
       });
 
-      // Delete duplicates on target date (keep only the most recent per student)
+      setCloneProgress(50);
+      setCloneStep('מנקה כפילויות...');
       const duplicatesToDelete = [];
       const seenOnTarget = new Set();
       [...targetAssignments]
@@ -486,33 +492,27 @@ export default function Assignments() {
         await base44.entities.Assignment.delete(id);
       }
 
-      // Source: deduped assignments from current date (only real students, not guests)
       const sourceAssignments = Object.values(assignmentByStudent)
         .filter(a => !a.student_id?.startsWith('guest_'));
 
-      // Map day-of-week number → Hebrew letter for free_day comparison
-      // 0=Sun,1=Mon,2=Tue,3=Wed,4=Thu
       const DAY_NUM_TO_HEB = { 0: 'א', 1: 'ב', 2: 'ג', 3: 'ד', 4: 'ה' };
-      const targetDayHeb = DAY_NUM_TO_HEB[targetDayOfWeek]; // will be undefined for Fri/Sat
-
-      // Find the "תתת - לא עובד" workplace for free-day assignment
+      const targetDayHeb = DAY_NUM_TO_HEB[targetDayOfWeek];
       const notWorkingWp = workplaces.find(w => w.name === 'תתת - לא עובד');
 
       const toUpdate = [];
       const toCreate = [];
 
+      setCloneProgress(60);
+      setCloneStep('מכין שיבוצים...');
+
       for (const src of sourceAssignments) {
         const student = studentById[src.student_id];
         const isCrew = student?.cohort?.includes('צוות');
 
-        // Determine workplace for target
         let targetWp;
-
-        // Check if student has an approved absence for the target date → leave unassigned (before assignment)
         if (absentStudentIds.has(src.student_id)) {
           targetWp = { id: '', name: '' };
         } else if (isSunday) {
-          // Sunday: assign by student's distance_status (all students)
           const distanceStatus = student?.distance_status;
           if (distanceStatus && DISTANCE_WORKPLACE_MAP[distanceStatus]) {
             targetWp = DISTANCE_WORKPLACE_MAP[distanceStatus];
@@ -520,22 +520,17 @@ export default function Assignments() {
             targetWp = { id: src.workplace_id, name: src.workplace_name };
           }
         } else if (isCrew && targetDayHeb) {
-          // Crew student on a weekday: check free_day
           const freeDays = Array.isArray(student?.free_day)
             ? student.free_day
             : (student?.free_day ? [student.free_day] : []);
-
           if (freeDays.includes(targetDayHeb)) {
-            // This is a free day → assign "תתת - לא עובד"
             targetWp = notWorkingWp
               ? { id: notWorkingWp.id, name: notWorkingWp.name }
               : { id: src.workplace_id, name: 'תתת - לא עובד' };
           } else {
-            // Not a free day → leave unassigned (empty, like "before assignment")
             targetWp = { id: '', name: '' };
           }
         } else {
-          // Regular day, non-crew student: copy workplace from source
           targetWp = { id: src.workplace_id, name: src.workplace_name };
         }
 
@@ -565,17 +560,21 @@ export default function Assignments() {
         }
       }
 
-      // Use backend function to avoid client-side rate limiting
+      setCloneProgress(75);
+      setCloneStep(`שומר ${toCreate.length + toUpdate.length} שיבוצים...`);
       await base44.functions.invoke('bulkUpdateAssignments', { toCreate, toUpdate });
 
-      const totalCloned = toCreate.length + toUpdate.length;
+      setCloneProgress(100);
+      setCloneStep('הושלם!');
+      await new Promise(r => setTimeout(r, 600));
+
       queryClient.invalidateQueries({ queryKey: ['assignments'] });
-      const modeLabel = isSunday ? 'שיבוץ ראשון לפי מרחק' : 'מקום עבודה בלבד';
-      alert(`✅ הושלם! שוכפלו ${totalCloned} שיבוצים לתאריך ${cloneTargetDate} (${modeLabel})`);
     } catch (error) {
       alert(`❌ שגיאה בשכפול: ${error.message || 'נסה שוב'}`);
     } finally {
       setCloning(false);
+      setCloneProgress(0);
+      setCloneStep('');
       setShowCloneDialog(false);
       setCloneTargetDate('');
     }
@@ -739,8 +738,22 @@ export default function Assignments() {
                 👥 תלמידי <strong>צוות</strong>: אם היום הוא יום חופשי שלהם → יוגדרו "תתת - לא עובד". אחרת → יישארו ללא שיבוץ.
               </div>
             )}
+            {cloning && (
+              <div className="space-y-2 pt-1">
+                <div className="flex justify-between items-center text-xs">
+                  <span className="text-muted-foreground">{cloneStep}</span>
+                  <span className="font-semibold text-primary">{cloneProgress}%</span>
+                </div>
+                <div className="w-full h-3 bg-secondary rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-primary rounded-full transition-all duration-500 ease-out"
+                    style={{ width: `${cloneProgress}%` }}
+                  />
+                </div>
+              </div>
+            )}
             <div className="flex gap-2 justify-end pt-1">
-              <Button variant="outline" onClick={() => setShowCloneDialog(false)}>ביטול</Button>
+              <Button variant="outline" onClick={() => setShowCloneDialog(false)} disabled={cloning}>ביטול</Button>
               <Button onClick={handleCloneDay} disabled={!cloneTargetDate || cloning}>
                 <Copy size={14} className="ml-2" /> {cloning ? 'משכפל...' : 'שכפל'}
               </Button>
