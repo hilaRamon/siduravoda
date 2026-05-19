@@ -1,5 +1,5 @@
 # מפרט דרישות מערכת (SRS) — מערכת "רגבים"
-## Software Requirements Specification — גרסה 1.2
+## Software Requirements Specification — גרסה 1.3
 
 ---
 
@@ -755,29 +755,39 @@ validateTimes(start, end):
 #### 5.1.2 מבנה ה-HTML הנסתר
 
 ```
-div (width=794px, font-family=Arial, dir=rtl)
-  └── כותרת: "סידור עבודה" + תאריך גרגוריאני + עברי
-  └── לכל מחלקה:
-        └── header: שם + הערות + רכב (badge כחול) + שעה (badge ירוק)
-        └── table:
-              thead: שם תלמיד | אחראי פק"ל | נהג | ראש צוות
-              tbody: שורה לכל תלמיד (נהג/ראש צוות בשורה ראשונה בלבד)
-              tfoot: סה"כ תלמידים: N
+div (width=760px, font-family=Heebo/Arial, dir=rtl, hidden)
+  └── כותרת: "סידור עבודה" + תאריך גרגוריאני + עברי (גימטריה)
+  └── שני טורים (flex):
+        └── לכל מחלקה (WorkplaceCard):
+              └── header: שם מקום עבודה (כחול כהה, לבן)
+              └── logRow (שורה צהובה — אם קיימת לוגיסטיקה):
+                    🚐 רכב: [שם] | ⏰ יציאה: [שעה] | 📝 [הערות]
+              └── table:
+                    thead: שם תלמיד | תפקיד
+                    tbody: שורה לכל תלמיד
+                    tfoot: סה"כ: N תלמידים
 ```
+
+**שורת לוגיסטיקה (logRow) — עיצוב:**
+- רקע: `#fef9c3` (צהוב בהיר)
+- גבול תחתון: `1px solid #ca8a04`
+- padding: `4px 5px`, `min-height: 20px`, `line-height: 1.4`
+- כל span: `verticalAlign: 'middle'`
+- תפקידים מוצגים: נהג (רכב), ראש צוות, פק"ל — רק ב-`roleMap` (מיפוי לקיצור)
 
 #### 5.1.3 ייצוא PDF
 
 ```
-scale = 1.5
+scale = 3 (high-res לטקסט חד)
 orientation = portrait
 format = a4
-margin = 10mm
+margin = 8mm
 ```
 
-**אלגוריתם חיתוך חכם (smart page breaks):**
-1. חישוב `safeCutsPx` — y-offset תחתון של כל block
-2. לכל עמוד: מחפש את safeCut האחרון שנמצא לפני גבול העמוד
-3. חתך ב-safeCut ולא באמצע מחלקה
+**אלגוריתם חיתוך לדפים:**
+- חישוב `pageHeightPx` = contentH / mmPerPx
+- לולאה: חיתוך canvas לפרוסות ולהוספת דף לכל פרוסה
+- פורמט תמונה: JPEG 0.92
 
 #### 5.1.4 פרסום
 
@@ -1331,7 +1341,12 @@ src/
 ---
 
 *מסמך זה עודכן ב-2026-05-19 על בסיס קוד המערכת.*  
-*גרסה: 1.2 | שפה: עברית | כיוון: RTL*
+*גרסה: 1.3 | שפה: עברית | כיוון: RTL*
+
+### שינויים בגרסה 1.3 (2026-05-19)
+- **5.1.2:** עדכון מבנה HTML הנסתר — רוחב 760px (לא 794px), פונט Heebo, שני טורים
+- **5.1.2:** תיעוד מלא של שורת הלוגיסטיקה הצהובה (logRow): עיצוב, padding, lineHeight, verticalAlign לכל span
+- **5.1.3:** עדכון פרמטרי PDF — scale=3 (לא 1.5), margin=8mm (לא 10mm), JPEG 0.92
 
 ### שינויים בגרסה 1.2 (2026-05-19)
 - **3.1.1:** הבהרה שמחיקת כפילויות היא סדרתית; שליחה לבקאנד `bulkUpdateAssignments` (לא client-side)
