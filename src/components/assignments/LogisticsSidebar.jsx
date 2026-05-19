@@ -175,8 +175,8 @@ export default function LogisticsSidebar({ date, assignments }) {
   if (activeWorkplaces.length === 0) {
     return (
       <div className="w-64 shrink-0">
-        <div className="fixed top-8 bg-card border border-border rounded-2xl p-4 w-64 z-10">
-          <h3 className="font-semibold text-sm mb-2 flex items-center gap-2">
+        <div className="fixed top-8 bg-card border border-border rounded-2xl p-4 w-64 z-10 flex flex-col gap-2">
+          <h3 className="font-semibold text-sm flex items-center gap-2">
             <Truck size={15} className="text-primary" /> לוגיסטיקה
           </h3>
           <p className="text-xs text-muted-foreground">אין שיבוצים להיום</p>
@@ -187,7 +187,7 @@ export default function LogisticsSidebar({ date, assignments }) {
 
   return (
     <div className="w-64 shrink-0">
-      <div className="fixed top-8 bg-secondary/30 border border-border rounded-2xl p-3 space-y-2 w-64 max-h-[calc(100vh-4rem)] overflow-y-auto z-10">
+      <div className="fixed top-8 bg-secondary/30 border border-border rounded-2xl p-3 space-y-2 w-64 max-h-[calc(100vh-5rem)] overflow-y-auto z-10">
         <h3 className="font-semibold text-sm flex items-center gap-2 px-1">
           <Truck size={15} className="text-primary" /> לוגיסטיקה יומית
         </h3>
