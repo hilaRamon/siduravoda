@@ -1,16 +1,17 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
-import { Truck, Clock, Check } from 'lucide-react';
+import { Truck, Clock, Check, ChevronDown, ChevronUp } from 'lucide-react';
 import VehicleSlot from './VehicleSlot';
 
 function WorkplaceLogisticsCard({ date, workplaceId, workplaceName, studentCount, logistics, allLogistics, onSave }) {
+  const [expanded, setExpanded] = useState(false);
+
   const { data: vehicles = [] } = useQuery({
     queryKey: ['vehicles'],
     queryFn: () => base44.entities.Vehicle.list(),
   });
 
-  // Local state so UI is instant — syncs from DB when logistics prop changes
   const [localData, setLocalData] = useState(logistics || {});
   useEffect(() => {
     setLocalData(logistics || {});
@@ -51,75 +52,69 @@ function WorkplaceLogisticsCard({ date, workplaceId, workplaceName, studentCount
   };
 
   return (
-    <div className="bg-card border border-border rounded-xl p-3 space-y-2">
-      <div className="flex items-center justify-between">
-        <span className="font-semibold text-sm leading-tight">{workplaceName}</span>
-        <span className="text-xs bg-primary/10 text-primary font-medium px-2 py-0.5 rounded-full shrink-0">
-          {studentCount} תלמידים
-        </span>
-      </div>
-
-      <div className="space-y-1">
-        <label className="text-xs text-muted-foreground flex items-center gap-1">
-          <Clock size={11} /> שעת יציאה
-        </label>
-        <div className="flex gap-1">
-          <input
-            type="time"
-            value={timeInput}
-            onChange={e => setTimeInput(e.target.value)}
-            className="flex-1 h-8 text-xs border border-border rounded-md px-2 bg-background focus:outline-none focus:ring-1 focus:ring-primary/40"
-          />
-          <button
-            onClick={handleTimeSave}
-            className="h-8 w-8 flex items-center justify-center bg-primary text-white rounded-md hover:bg-primary/90 transition-colors shrink-0"
-            title="אשר שעה"
-          >
-            <Check size={14} />
-          </button>
+    <div className="bg-card border border-border rounded-xl overflow-hidden">
+      {/* Collapsed header — always visible */}
+      <button
+        onClick={() => setExpanded(v => !v)}
+        className="w-full flex items-center justify-between px-3 py-2.5 hover:bg-secondary/40 transition-colors"
+      >
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="font-semibold text-sm leading-tight truncate">{workplaceName}</span>
+          <span className="text-xs bg-primary/10 text-primary font-medium px-2 py-0.5 rounded-full shrink-0">
+            {studentCount}
+          </span>
         </div>
-      </div>
+        {expanded
+          ? <ChevronUp size={14} className="text-muted-foreground shrink-0" />
+          : <ChevronDown size={14} className="text-muted-foreground shrink-0" />
+        }
+      </button>
 
-      <div className="space-y-1">
-        <label className="text-xs text-muted-foreground">הערות</label>
-        <textarea
-          defaultValue={localData.notes || ''}
-          key={`notes-${localData.notes || 'empty'}`}
-          onBlur={(e) => {
-            const newData = { ...localData, notes: e.target.value };
-            setLocalData(newData);
-            onSave(workplaceId, workplaceName, newData);
-          }}
-          placeholder="הערות למקום עבודה..."
-          rows={2}
-          className="w-full text-xs border border-border rounded-md px-2 py-1.5 bg-background focus:outline-none focus:ring-1 focus:ring-primary/40 resize-none"
-        />
-      </div>
+      {/* Expanded details */}
+      {expanded && (
+        <div className="px-3 pb-3 space-y-2 border-t border-border">
+          <div className="space-y-1 pt-2">
+            <label className="text-xs text-muted-foreground flex items-center gap-1">
+              <Clock size={11} /> שעת יציאה
+            </label>
+            <div className="flex gap-1">
+              <input
+                type="time"
+                value={timeInput}
+                onChange={e => setTimeInput(e.target.value)}
+                className="flex-1 h-8 text-xs border border-border rounded-md px-2 bg-background focus:outline-none focus:ring-1 focus:ring-primary/40"
+              />
+              <button
+                onClick={handleTimeSave}
+                className="h-8 w-8 flex items-center justify-center bg-primary text-white rounded-md hover:bg-primary/90 transition-colors shrink-0"
+                title="אשר שעה"
+              >
+                <Check size={14} />
+              </button>
+            </div>
+          </div>
 
-      <VehicleSlot
-        slotIndex={1}
-        vehicleId={localData.vehicle_id}
-        vehicleName={localData.vehicle_name}
-        availableVehicles={availableVehicles}
-        otherIds={getOtherIds(1)}
-        onSelect={handleVehicleSelect}
-      />
-      <VehicleSlot
-        slotIndex={2}
-        vehicleId={localData.vehicle_id_2}
-        vehicleName={localData.vehicle_name_2}
-        availableVehicles={availableVehicles}
-        otherIds={getOtherIds(2)}
-        onSelect={handleVehicleSelect}
-      />
-      <VehicleSlot
-        slotIndex={3}
-        vehicleId={localData.vehicle_id_3}
-        vehicleName={localData.vehicle_name_3}
-        availableVehicles={availableVehicles}
-        otherIds={getOtherIds(3)}
-        onSelect={handleVehicleSelect}
-      />
+          <div className="space-y-1">
+            <label className="text-xs text-muted-foreground">הערות</label>
+            <textarea
+              defaultValue={localData.notes || ''}
+              key={`notes-${localData.notes || 'empty'}`}
+              onBlur={(e) => {
+                const newData = { ...localData, notes: e.target.value };
+                setLocalData(newData);
+                onSave(workplaceId, workplaceName, newData);
+              }}
+              placeholder="הערות למקום עבודה..."
+              rows={2}
+              className="w-full text-xs border border-border rounded-md px-2 py-1.5 bg-background focus:outline-none focus:ring-1 focus:ring-primary/40 resize-none"
+            />
+          </div>
+
+          <VehicleSlot slotIndex={1} vehicleId={localData.vehicle_id} vehicleName={localData.vehicle_name} availableVehicles={availableVehicles} otherIds={getOtherIds(1)} onSelect={handleVehicleSelect} />
+          <VehicleSlot slotIndex={2} vehicleId={localData.vehicle_id_2} vehicleName={localData.vehicle_name_2} availableVehicles={availableVehicles} otherIds={getOtherIds(2)} onSelect={handleVehicleSelect} />
+          <VehicleSlot slotIndex={3} vehicleId={localData.vehicle_id_3} vehicleName={localData.vehicle_name_3} availableVehicles={availableVehicles} otherIds={getOtherIds(3)} onSelect={handleVehicleSelect} />
+        </div>
+      )}
     </div>
   );
 }
@@ -132,7 +127,6 @@ export default function LogisticsSidebar({ date, assignments }) {
     queryFn: () => base44.entities.WorkplaceLogistics.filter({ date }),
   });
 
-  // De-duplicate: keep only the most recently updated record per workplace
   const logisticsMap = useMemo(() => {
     const map = {};
     logisticsList.forEach(l => {
@@ -145,7 +139,6 @@ export default function LogisticsSidebar({ date, assignments }) {
   }, [logisticsList]);
 
   const activeWorkplaces = useMemo(() => {
-    // Deduplicate: keep only the most recently updated assignment per student
     const assignmentByStudent = {};
     assignments.forEach(a => {
       const existing = assignmentByStudent[a.student_id];
@@ -169,8 +162,6 @@ export default function LogisticsSidebar({ date, assignments }) {
   }, [assignments]);
 
   const handleSave = async (workplaceId, workplaceName, data) => {
-    // Use the deduplicated logisticsMap (keyed by workplace_id) — never the raw list
-    // This prevents accidentally updating a logistics record from a different date
     const existing = logisticsMap[workplaceId];
     if (existing) {
       await base44.entities.WorkplaceLogistics.update(existing.id, data);
@@ -195,7 +186,7 @@ export default function LogisticsSidebar({ date, assignments }) {
 
   return (
     <div className="w-64 shrink-0">
-      <div className="sticky top-4 bg-secondary/30 border border-border rounded-2xl p-3 space-y-3 max-h-[calc(100vh-8rem)] overflow-y-auto">
+      <div className="sticky top-4 bg-secondary/30 border border-border rounded-2xl p-3 space-y-2 max-h-[calc(100vh-2rem)] overflow-y-auto">
         <h3 className="font-semibold text-sm flex items-center gap-2 px-1">
           <Truck size={15} className="text-primary" /> לוגיסטיקה יומית
         </h3>
