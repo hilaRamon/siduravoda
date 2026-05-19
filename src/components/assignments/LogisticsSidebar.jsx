@@ -56,11 +56,11 @@ function WorkplaceLogisticsCard({ date, workplaceId, workplaceName, studentCount
       {/* Collapsed header — always visible */}
       <button
         onClick={() => setExpanded(v => !v)}
-        className="w-full flex items-center justify-between px-3 py-2.5 hover:bg-secondary/40 transition-colors"
+        className="w-full flex items-center justify-between px-3 py-2.5 hover:bg-secondary/40 transition-colors min-h-[40px]"
       >
         <div className="flex items-center gap-2 min-w-0">
-          <span className="font-semibold text-sm leading-tight truncate">{workplaceName}</span>
-          <span className="text-xs bg-primary/10 text-primary font-medium px-2 py-0.5 rounded-full shrink-0">
+          <span className="font-semibold text-sm leading-none truncate">{workplaceName}</span>
+          <span className="text-xs bg-primary/10 text-primary font-medium px-2 py-0.5 rounded-full shrink-0 leading-none">
             {studentCount}
           </span>
         </div>
@@ -77,12 +77,13 @@ function WorkplaceLogisticsCard({ date, workplaceId, workplaceName, studentCount
             <label className="text-xs text-muted-foreground flex items-center gap-1">
               <Clock size={11} /> שעת יציאה
             </label>
-            <div className="flex gap-1">
+            <div className="flex items-center gap-1">
               <input
                 type="time"
                 value={timeInput}
                 onChange={e => setTimeInput(e.target.value)}
-                className="flex-1 h-8 text-xs border border-border rounded-md px-2 bg-background focus:outline-none focus:ring-1 focus:ring-primary/40"
+                dir="ltr"
+                className="flex-1 h-8 text-xs border border-border rounded-md px-2 bg-background focus:outline-none focus:ring-1 focus:ring-primary/40 text-center"
               />
               <button
                 onClick={handleTimeSave}
