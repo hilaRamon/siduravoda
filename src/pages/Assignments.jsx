@@ -565,21 +565,16 @@ export default function Assignments() {
         }
       }
 
-      // Process sequentially in small chunks to avoid rate limiting
-      const CHUNK = 5;
+      // Process one-by-one with delay to avoid rate limiting
       const delay = (ms) => new Promise(r => setTimeout(r, ms));
 
-      for (let i = 0; i < toUpdate.length; i += CHUNK) {
-        await Promise.all(toUpdate.slice(i, i + CHUNK).map(({ id, fullRecord }) =>
-          base44.entities.Assignment.update(id, fullRecord)
-        ));
-        if (i + CHUNK < toUpdate.length) await delay(300);
+      for (const { id, fullRecord } of toUpdate) {
+        await base44.entities.Assignment.update(id, fullRecord);
+        await delay(200);
       }
-      for (let i = 0; i < toCreate.length; i += CHUNK) {
-        await Promise.all(toCreate.slice(i, i + CHUNK).map(record =>
-          base44.entities.Assignment.create(record)
-        ));
-        if (i + CHUNK < toCreate.length) await delay(300);
+      for (const record of toCreate) {
+        await base44.entities.Assignment.create(record);
+        await delay(200);
       }
 
       const totalCloned = toCreate.length + toUpdate.length;
