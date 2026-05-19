@@ -383,20 +383,19 @@ export default function Assignments() {
     setBulkSaving(true);
     setBulkProgress(0);
     try {
-      const CHUNK_SIZE = 40;
-      const totalOps = (toCreate.length > 0 ? 1 : 0) + Math.ceil(toUpdate.length / CHUNK_SIZE);
+      const CHUNK_SIZE = 10;
+      const totalOps = Math.ceil(toCreate.length / CHUNK_SIZE) + Math.ceil(toUpdate.length / CHUNK_SIZE);
       let doneOps = 0;
 
-      if (toCreate.length > 0) {
-        await base44.functions.invoke('bulkUpdateAssignments', { toCreate, toUpdate: [] });
+      for (let i = 0; i < toCreate.length; i += CHUNK_SIZE) {
+        await Promise.all(toCreate.slice(i, i + CHUNK_SIZE).map(record => base44.entities.Assignment.create(record)));
         doneOps++;
-        setBulkProgress(Math.round((doneOps / totalOps) * 100));
+        setBulkProgress(Math.round((doneOps / Math.max(totalOps, 1)) * 100));
       }
       for (let i = 0; i < toUpdate.length; i += CHUNK_SIZE) {
-        const chunk = toUpdate.slice(i, i + CHUNK_SIZE);
-        await base44.functions.invoke('bulkUpdateAssignments', { toCreate: [], toUpdate: chunk });
+        await Promise.all(toUpdate.slice(i, i + CHUNK_SIZE).map(({ id, fullRecord }) => base44.entities.Assignment.update(id, fullRecord)));
         doneOps++;
-        setBulkProgress(Math.round((doneOps / totalOps) * 100));
+        setBulkProgress(Math.round((doneOps / Math.max(totalOps, 1)) * 100));
       }
       setBulkProgress(100);
       await new Promise(r => setTimeout(r, 400)); // brief moment to show 100%
@@ -563,13 +562,19 @@ export default function Assignments() {
         }
       }
 
-      // Process in chunks
-      const CHUNK = 40;
+      // Process in chunks directly via SDK (no backend function needed)
+      const CHUNK = 10;
       for (let i = 0; i < toUpdate.length; i += CHUNK) {
-        await base44.functions.invoke('bulkUpdateAssignments', { toCreate: [], toUpdate: toUpdate.slice(i, i + CHUNK) });
+        await Promise.all(toUpdate.slice(i, i + CHUNK).map(({ id, fullRecord }) =>
+          base44.entities.Assignment.update(id, fullRecord)
+        ));
       }
       if (toCreate.length > 0) {
-        await base44.functions.invoke('bulkUpdateAssignments', { toCreate, toUpdate: [] });
+        for (let i = 0; i < toCreate.length; i += CHUNK) {
+          await Promise.all(toCreate.slice(i, i + CHUNK).map(record =>
+            base44.entities.Assignment.create(record)
+          ));
+        }
       }
 
       const totalCloned = toCreate.length + toUpdate.length;
