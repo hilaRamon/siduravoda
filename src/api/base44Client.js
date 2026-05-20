@@ -1,9 +1,7 @@
-/** @typedef {{ env?: { VITE_API_BASE_URL?: string } }} ImportMetaWithEnv */
 /** @typedef {Error & { status?: number, data?: unknown }} ApiError */
 
 const API_BASE_URL =
-  /** @type {ImportMetaWithEnv} */ (import.meta).env?.VITE_API_BASE_URL ||
-  "http://localhost:4000";
+  import.meta.env.VITE_API_BASE_URL || "http://localhost:4000";
 
 async function request(path, options = {}) {
   const response = await fetch(`${API_BASE_URL}${path}`, options);

@@ -64,7 +64,7 @@ export const AuthProvider = ({ children }) => {
   const navigateToLogin = () => {
     // In the real Base44 integration, this should redirect to the Base44 auth flow.
     // For now we use the configured app base URL when available.
-    const base44AppBaseUrl = import.meta?.env?.VITE_BASE44_APP_BASE_URL;
+    const base44AppBaseUrl = import.meta.env.VITE_BASE44_APP_BASE_URL;
     if (base44AppBaseUrl) {
       window.location.href = base44AppBaseUrl;
       return;
