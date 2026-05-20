@@ -1,47 +1,106 @@
-import { useState, useMemo } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { base44 } from '@/api/base44Client';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Checkbox } from '@/components/ui/checkbox';
-import { ChevronRight, ChevronLeft, Copy, CalendarDays, X, ChevronsUpDown, Pencil, UserPlus } from 'lucide-react';
-import DailyReportPDFButton from '@/components/reports/DailyReportPDFButton';
-import LogisticsSidebar from '@/components/assignments/LogisticsSidebar';
-import { format, addDays, subDays } from 'date-fns';
+import { useState, useMemo } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { base44 } from "@/api/base44Client";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  ChevronRight,
+  ChevronLeft,
+  Copy,
+  CalendarDays,
+  X,
+  ChevronsUpDown,
+  Pencil,
+  UserPlus,
+} from "lucide-react";
+import DailyReportPDFButton from "@/components/reports/DailyReportPDFButton";
+import LogisticsSidebar from "@/components/assignments/LogisticsSidebar";
+import { format, addDays, subDays } from "date-fns";
 
-function WorkplaceCell({ student, assignment, workplaces, onAssign, onRemove }) {
+async function bulkUpdateAssignments({ toCreate = [], toUpdate = [] }) {
+  await Promise.all(
+    toUpdate.map(({ id, fullRecord }) =>
+      base44.entities.Assignment.update(id, fullRecord),
+    ),
+  );
+  if (toCreate.length > 0) {
+    await base44.entities.Assignment.bulkCreate(toCreate);
+  }
+}
+
+function WorkplaceCell({
+  student,
+  assignment,
+  workplaces,
+  onAssign,
+  onRemove,
+}) {
   const [open, setOpen] = useState(false);
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState("");
 
-  const filteredWorkplaces = workplaces.filter(w =>
-    !search || w.name.includes(search)
+  const filteredWorkplaces = workplaces.filter(
+    (w) => !search || w.name.includes(search),
   );
 
   const handleSelect = async (workplace) => {
     setOpen(false);
-    setSearch('');
+    setSearch("");
     if (!workplace) return;
     const canAssign = await onAssign(student, workplace, assignment);
     if (!canAssign) setOpen(true);
   };
 
-  const selectedName = assignment ? workplaces.find(w => w.id === assignment.workplace_id)?.name || assignment.workplace_name : null;
+  const selectedName = assignment
+    ? workplaces.find((w) => w.id === assignment.workplace_id)?.name ||
+      assignment.workplace_name
+    : null;
 
   return (
     <td className="px-3 py-2 border-b border-border">
       <div className="flex items-center gap-1">
-        <Popover open={open} onOpenChange={(v) => { setOpen(v); if (!v) setSearch(''); }}>
+        <Popover
+          open={open}
+          onOpenChange={(v) => {
+            setOpen(v);
+            if (!v) setSearch("");
+          }}
+        >
           <PopoverTrigger asChild>
-            <button className={`h-8 text-xs w-full border rounded-md px-2 flex items-center justify-between transition-colors ${
-              assignment
-                ? 'bg-primary/10 border-primary/30 text-primary font-medium hover:bg-primary/20'
-                : 'bg-secondary/50 border-dashed text-muted-foreground hover:bg-secondary hover:border-border'
-            }`}>
-              <span className="truncate">{selectedName || '+ שבץ'}</span>
+            <button
+              className={`h-8 text-xs w-full border rounded-md px-2 flex items-center justify-between transition-colors ${
+                assignment
+                  ? "bg-primary/10 border-primary/30 text-primary font-medium hover:bg-primary/20"
+                  : "bg-secondary/50 border-dashed text-muted-foreground hover:bg-secondary hover:border-border"
+              }`}
+            >
+              <span className="truncate">{selectedName || "+ שבץ"}</span>
               <ChevronsUpDown size={12} className="shrink-0 opacity-50 mr-1" />
             </button>
           </PopoverTrigger>
@@ -56,9 +115,13 @@ function WorkplaceCell({ student, assignment, workplaces, onAssign, onRemove }) 
               <CommandList>
                 <CommandEmpty>לא נמצא</CommandEmpty>
                 <CommandGroup>
-                  {filteredWorkplaces.map(w => (
-                    <CommandItem key={w.id} value={w.name} onSelect={() => handleSelect(w)}
-                      className="text-xs cursor-pointer">
+                  {filteredWorkplaces.map((w) => (
+                    <CommandItem
+                      key={w.id}
+                      value={w.name}
+                      onSelect={() => handleSelect(w)}
+                      className="text-xs cursor-pointer"
+                    >
                       {w.name}
                     </CommandItem>
                   ))}
@@ -68,8 +131,10 @@ function WorkplaceCell({ student, assignment, workplaces, onAssign, onRemove }) 
           </PopoverContent>
         </Popover>
         {assignment && (
-          <button onClick={() => onRemove(assignment.id)}
-            className="shrink-0 p-1 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors">
+          <button
+            onClick={() => onRemove(assignment.id)}
+            className="shrink-0 p-1 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+          >
             <X size={12} />
           </button>
         )}
@@ -87,17 +152,21 @@ function RoleCell({ assignment, roles, onUpdateRole }) {
   return (
     <td className="px-3 py-2 border-b border-border">
       <Select
-        value={assignment?.role || ''}
+        value={assignment?.role || ""}
         onValueChange={handleRoleChange}
         disabled={!assignment}
       >
-        <SelectTrigger className={`h-8 text-xs w-full border ${assignment ? 'bg-secondary/50 border-border' : 'bg-transparent border-dashed text-muted-foreground opacity-50'}`}>
+        <SelectTrigger
+          className={`h-8 text-xs w-full border ${assignment ? "bg-secondary/50 border-border" : "bg-transparent border-dashed text-muted-foreground opacity-50"}`}
+        >
           <SelectValue placeholder="— בחר תפקיד —" />
         </SelectTrigger>
         <SelectContent align="start">
           <SelectItem value="none">— ללא תפקיד —</SelectItem>
-          {roles.map(r => (
-            <SelectItem key={r.id} value={r.name}>{r.name}</SelectItem>
+          {roles.map((r) => (
+            <SelectItem key={r.id} value={r.name}>
+              {r.name}
+            </SelectItem>
           ))}
         </SelectContent>
       </Select>
@@ -105,28 +174,39 @@ function RoleCell({ assignment, roles, onUpdateRole }) {
   );
 }
 
-function EditableNumberCell({ value, defaultValue, assignment, field, onUpdate }) {
+function EditableNumberCell({
+  value,
+  defaultValue,
+  assignment,
+  field,
+  onUpdate,
+}) {
   const [editing, setEditing] = useState(false);
-  const [localVal, setLocalVal] = useState('');
+  const [localVal, setLocalVal] = useState("");
 
-  const displayValue = (value != null && value !== '' && value !== undefined) ? value : defaultValue;
+  const displayValue =
+    value != null && value !== "" && value !== undefined ? value : defaultValue;
 
   const startEdit = () => {
     if (!assignment) return;
-    setLocalVal(displayValue != null ? String(displayValue) : '');
+    setLocalVal(displayValue != null ? String(displayValue) : "");
     setEditing(true);
   };
 
   const commit = async () => {
     setEditing(false);
-    const num = localVal === '' ? null : parseFloat(localVal);
+    const num = localVal === "" ? null : parseFloat(localVal);
     if (num !== displayValue) {
       await onUpdate(assignment, field, num);
     }
   };
 
   if (!assignment) {
-    return <td className="px-3 py-2 border-b border-border text-muted-foreground text-xs text-center">—</td>;
+    return (
+      <td className="px-3 py-2 border-b border-border text-muted-foreground text-xs text-center">
+        —
+      </td>
+    );
   }
 
   return (
@@ -136,9 +216,12 @@ function EditableNumberCell({ value, defaultValue, assignment, field, onUpdate }
           autoFocus
           type="number"
           value={localVal}
-          onChange={e => setLocalVal(e.target.value)}
+          onChange={(e) => setLocalVal(e.target.value)}
           onBlur={commit}
-          onKeyDown={e => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') setEditing(false); }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") commit();
+            if (e.key === "Escape") setEditing(false);
+          }}
           className="w-full h-8 border border-primary rounded-md px-2 text-xs focus:outline-none focus:ring-1 focus:ring-primary bg-card"
           step="0.5"
         />
@@ -147,8 +230,11 @@ function EditableNumberCell({ value, defaultValue, assignment, field, onUpdate }
           onClick={startEdit}
           className="w-full h-8 text-xs text-right px-2 rounded-md hover:bg-secondary/60 transition-colors flex items-center justify-between group"
         >
-          <span>{displayValue ?? '—'}</span>
-          <Pencil size={10} className="opacity-0 group-hover:opacity-40 transition-opacity" />
+          <span>{displayValue ?? "—"}</span>
+          <Pencil
+            size={10}
+            className="opacity-0 group-hover:opacity-40 transition-opacity"
+          />
         </button>
       )}
     </td>
@@ -156,116 +242,155 @@ function EditableNumberCell({ value, defaultValue, assignment, field, onUpdate }
 }
 
 export default function Assignments() {
-  const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [date, setDate] = useState(format(new Date(), "yyyy-MM-dd"));
   const [cloning, setCloning] = useState(false);
   const [cloneProgress, setCloneProgress] = useState(0);
-  const [cloneStep, setCloneStep] = useState('');
+  const [cloneStep, setCloneStep] = useState("");
   const [showCloneDialog, setShowCloneDialog] = useState(false);
-  const [cloneTargetDate, setCloneTargetDate] = useState('');
-  const [filterName, setFilterName] = useState('');
-  const [filterCohort, setFilterCohort] = useState('');
-  const [filterWorkplace, setFilterWorkplace] = useState('');
-  const [filterRole, setFilterRole] = useState('');
-  const [filterAssigned, setFilterAssigned] = useState('');
+  const [cloneTargetDate, setCloneTargetDate] = useState("");
+  const [filterName, setFilterName] = useState("");
+  const [filterCohort, setFilterCohort] = useState("");
+  const [filterWorkplace, setFilterWorkplace] = useState("");
+  const [filterRole, setFilterRole] = useState("");
+  const [filterAssigned, setFilterAssigned] = useState("");
 
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [lastSelectedIdx, setLastSelectedIdx] = useState(null);
   const [showBulkDialog, setShowBulkDialog] = useState(false);
-  const [bulkWorkplace, setBulkWorkplace] = useState('');
-  const [bulkHours, setBulkHours] = useState('');
-  const [bulkRate, setBulkRate] = useState('');
+  const [bulkWorkplace, setBulkWorkplace] = useState("");
+  const [bulkHours, setBulkHours] = useState("");
+  const [bulkRate, setBulkRate] = useState("");
   const [bulkWorkplaceOpen, setBulkWorkplaceOpen] = useState(false);
   const [bulkSaving, setBulkSaving] = useState(false);
   const [bulkProgress, setBulkProgress] = useState(0); // 0-100
 
   const [showAddGuestDialog, setShowAddGuestDialog] = useState(false);
-  const [guestName, setGuestName] = useState('');
+  const [guestName, setGuestName] = useState("");
   const [showCohortSelectDialog, setShowCohortSelectDialog] = useState(false);
   const [cohortDialogSelected, setCohortDialogSelected] = useState([]);
 
   const queryClient = useQueryClient();
 
   const { data: assignments = [] } = useQuery({
-    queryKey: ['assignments', date],
-    queryFn: () => base44.entities.Assignment.filter({ date }, '-created_date', 2000),
+    queryKey: ["assignments", date],
+    queryFn: () =>
+      base44.entities.Assignment.filter({ date }, "-created_date", 2000),
   });
 
   const { data: students = [] } = useQuery({
-    queryKey: ['students'],
-    queryFn: () => base44.entities.Student.list('-created_date'),
+    queryKey: ["students"],
+    queryFn: () => base44.entities.Student.list("-created_date"),
   });
 
   const { data: workplaces = [] } = useQuery({
-    queryKey: ['workplaces'],
-    queryFn: () => base44.entities.Workplace.list('name', 1000),
-    select: (data) => [...data].sort((a, b) => (a.name || '').localeCompare(b.name || '', 'he')),
+    queryKey: ["workplaces"],
+    queryFn: () => base44.entities.Workplace.list("name", 1000),
+    select: (data) =>
+      [...data].sort((a, b) =>
+        (a.name || "").localeCompare(b.name || "", "he"),
+      ),
   });
 
   const { data: roles = [] } = useQuery({
-    queryKey: ['roles'],
+    queryKey: ["roles"],
     queryFn: () => base44.entities.Role.list(),
   });
 
   const assignmentByStudent = useMemo(() => {
     const map = {};
-    assignments.forEach(a => {
+    assignments.forEach((a) => {
       const existing = map[a.student_id];
       // Keep the most recently updated record to avoid stale duplicates overwriting fresh data
-      if (!existing || (a.updated_date || a.created_date) > (existing.updated_date || existing.created_date)) {
+      if (
+        !existing ||
+        (a.updated_date || a.created_date) >
+          (existing.updated_date || existing.created_date)
+      ) {
         map[a.student_id] = a;
       }
     });
     return map;
   }, [assignments]);
 
-  const cohorts = useMemo(() => [...new Set(students.map(s => s.cohort).filter(Boolean))], [students]);
+  const cohorts = useMemo(
+    () => [...new Set(students.map((s) => s.cohort).filter(Boolean))],
+    [students],
+  );
 
   // Guest assignments (student_id starts with "guest_") — shown as virtual rows
-  const guestAssignments = useMemo(() =>
-    assignments.filter(a => a.student_id?.startsWith('guest_')),
-  [assignments]);
+  const guestAssignments = useMemo(
+    () => assignments.filter((a) => a.student_id?.startsWith("guest_")),
+    [assignments],
+  );
 
-  const filteredStudents = useMemo(() => students.filter(s => {
-    const a = assignmentByStudent[s.id];
-    if (s.is_active === false && !a) return false;
-    // Hide students added after the selected date (unless they already have an assignment)
-    if (!a && s.created_date && s.created_date.slice(0, 10) > date) return false;
-    if (filterName && !s.full_name?.includes(filterName)) return false;
-    if (filterCohort && filterCohort !== 'all' && s.cohort !== filterCohort) return false;
-    if (filterWorkplace && filterWorkplace !== 'all') {
-      if (!a || a.workplace_id !== filterWorkplace) return false;
-    }
-    if (filterRole && filterRole !== 'all') {
-      if (!a || a.role !== filterRole) return false;
-    }
-    if (filterAssigned === 'assigned' && !a) return false;
-    if (filterAssigned === 'unassigned' && a) return false;
-    return true;
-  }).sort((a, b) => {
-    const aAssign = assignmentByStudent[a.id];
-    const bAssign = assignmentByStudent[b.id];
-    const aWp = aAssign?.workplace_name || '';
-    const bWp = bAssign?.workplace_name || '';
-    if (aWp !== bWp) return aWp.localeCompare(bWp, 'he');
-    const aCohort = a.cohort || '';
-    const bCohort = b.cohort || '';
-    if (aCohort !== bCohort) return aCohort.localeCompare(bCohort, 'he');
-    return (a.full_name || '').localeCompare(b.full_name || '', 'he');
-  }), [students, assignmentByStudent, filterName, filterCohort, filterWorkplace, filterRole, filterAssigned]);
+  const filteredStudents = useMemo(
+    () =>
+      students
+        .filter((s) => {
+          const a = assignmentByStudent[s.id];
+          if (s.is_active === false && !a) return false;
+          // Hide students added after the selected date (unless they already have an assignment)
+          if (!a && s.created_date && s.created_date.slice(0, 10) > date)
+            return false;
+          if (filterName && !s.full_name?.includes(filterName)) return false;
+          if (
+            filterCohort &&
+            filterCohort !== "all" &&
+            s.cohort !== filterCohort
+          )
+            return false;
+          if (filterWorkplace && filterWorkplace !== "all") {
+            if (!a || a.workplace_id !== filterWorkplace) return false;
+          }
+          if (filterRole && filterRole !== "all") {
+            if (!a || a.role !== filterRole) return false;
+          }
+          if (filterAssigned === "assigned" && !a) return false;
+          if (filterAssigned === "unassigned" && a) return false;
+          return true;
+        })
+        .sort((a, b) => {
+          const aAssign = assignmentByStudent[a.id];
+          const bAssign = assignmentByStudent[b.id];
+          const aWp = aAssign?.workplace_name || "";
+          const bWp = bAssign?.workplace_name || "";
+          if (aWp !== bWp) return aWp.localeCompare(bWp, "he");
+          const aCohort = a.cohort || "";
+          const bCohort = b.cohort || "";
+          if (aCohort !== bCohort) return aCohort.localeCompare(bCohort, "he");
+          return (a.full_name || "").localeCompare(b.full_name || "", "he");
+        }),
+    [
+      students,
+      assignmentByStudent,
+      filterName,
+      filterCohort,
+      filterWorkplace,
+      filterRole,
+      filterAssigned,
+    ],
+  );
 
-  const allVisibleSelected = filteredStudents.length > 0 &&
-    filteredStudents.every(s => selectedIds.has(assignmentByStudent[s.id]?.id || s.id));
+  const allVisibleSelected =
+    filteredStudents.length > 0 &&
+    filteredStudents.every((s) =>
+      selectedIds.has(assignmentByStudent[s.id]?.id || s.id),
+    );
 
   const toggleSelectAll = () => {
     if (allVisibleSelected) {
       setSelectedIds(new Set());
     } else {
-      setSelectedIds(new Set(filteredStudents.map(s => assignmentByStudent[s.id]?.id || s.id)));
+      setSelectedIds(
+        new Set(
+          filteredStudents.map((s) => assignmentByStudent[s.id]?.id || s.id),
+        ),
+      );
     }
   };
 
   const toggleSelect = (studentId, rowIdx, shiftKey) => {
-    setSelectedIds(prev => {
+    setSelectedIds((prev) => {
       const next = new Set(prev);
       if (shiftKey && lastSelectedIdx !== null) {
         const from = Math.min(lastSelectedIdx, rowIdx);
@@ -285,17 +410,23 @@ export default function Assignments() {
 
   const handleAssign = async (student, workplace, existingAssignment) => {
     if (student.forbidden_workplaces?.includes(workplace.id)) {
-      alert(`⛔ לא ניתן לשבץ את ${student.full_name} ל-${workplace.name} — זה מקום עבודה אסור`);
+      alert(
+        `⛔ לא ניתן לשבץ את ${student.full_name} ל-${workplace.name} — זה מקום עבודה אסור`,
+      );
       return false;
     }
 
     // Find ALL assignments for this student on this date (there may be duplicates)
-    const allForStudent = assignments.filter(a => a.student_id === student.id);
+    const allForStudent = assignments.filter(
+      (a) => a.student_id === student.id,
+    );
 
     if (allForStudent.length > 1) {
       // Delete all duplicates, keep only the first, update it
       const [keep, ...extras] = allForStudent;
-      await Promise.all(extras.map(a => base44.entities.Assignment.delete(a.id)));
+      await Promise.all(
+        extras.map((a) => base44.entities.Assignment.delete(a.id)),
+      );
       await base44.entities.Assignment.update(keep.id, {
         workplace_id: workplace.id,
         workplace_name: workplace.name,
@@ -316,55 +447,67 @@ export default function Assignments() {
         hours: 4.75,
       });
     }
-    queryClient.invalidateQueries({ queryKey: ['assignments', date] });
+    queryClient.invalidateQueries({ queryKey: ["assignments", date] });
     return true;
   };
 
   const handleRemove = async (id) => {
     await base44.entities.Assignment.delete(id);
-    queryClient.invalidateQueries({ queryKey: ['assignments', date] });
+    queryClient.invalidateQueries({ queryKey: ["assignments", date] });
   };
 
   const handleUpdateRole = async (assignment, roleName) => {
-    await base44.entities.Assignment.update(assignment.id, { role: roleName === 'none' ? '' : roleName });
-    queryClient.invalidateQueries({ queryKey: ['assignments', date] });
+    await base44.entities.Assignment.update(assignment.id, {
+      role: roleName === "none" ? "" : roleName,
+    });
+    queryClient.invalidateQueries({ queryKey: ["assignments", date] });
   };
-
-
 
   const handleUpdateField = async (assignment, field, value) => {
     await base44.entities.Assignment.update(assignment.id, { [field]: value });
-    queryClient.invalidateQueries({ queryKey: ['assignments', date] });
+    queryClient.invalidateQueries({ queryKey: ["assignments", date] });
   };
 
   const handleBulkSave = async () => {
     if (bulkSaving) return;
-    const wp = bulkWorkplace ? workplaces.find(w => w.id === bulkWorkplace) : null;
-    const hasChanges = wp || bulkHours !== '' || bulkRate !== '';
-    if (!hasChanges) { setShowBulkDialog(false); return; }
+    const wp = bulkWorkplace
+      ? workplaces.find((w) => w.id === bulkWorkplace)
+      : null;
+    const hasChanges = wp || bulkHours !== "" || bulkRate !== "";
+    if (!hasChanges) {
+      setShowBulkDialog(false);
+      return;
+    }
 
     // Build a map: assignmentId -> assignment, and studentId -> assignment
     const assignmentById = {};
     const assignmentByStudentId = {};
-    assignments.forEach(a => {
+    assignments.forEach((a) => {
       assignmentById[a.id] = a;
       assignmentByStudentId[a.student_id] = a;
     });
     const studentById = {};
-    students.forEach(s => { studentById[s.id] = s; });
+    students.forEach((s) => {
+      studentById[s.id] = s;
+    });
 
     const toCreate = [];
     const toUpdate = []; // { id, updates }
 
     for (const selId of selectedIds) {
-      const existingAssignment = assignmentById[selId] || assignmentByStudentId[selId];
+      const existingAssignment =
+        assignmentById[selId] || assignmentByStudentId[selId];
 
       if (existingAssignment) {
-        const { id, created_date, updated_date, created_by, ...rest } = existingAssignment;
+        const { id, created_date, updated_date, created_by, ...rest } =
+          existingAssignment;
         const fullRecord = { ...rest };
-        if (wp) { fullRecord.workplace_id = wp.id; fullRecord.workplace_name = wp.name; }
-        if (bulkHours !== '') fullRecord.hours = parseFloat(bulkHours);
-        if (bulkRate !== '') fullRecord.rate = parseFloat(bulkRate);
+        if (wp) {
+          fullRecord.workplace_id = wp.id;
+          fullRecord.workplace_name = wp.name;
+        }
+        if (bulkHours !== "") fullRecord.hours = parseFloat(bulkHours);
+        if (bulkRate !== "") fullRecord.rate = parseFloat(bulkRate);
         toUpdate.push({ id, fullRecord });
       } else if (wp) {
         const student = studentById[selId];
@@ -375,8 +518,8 @@ export default function Assignments() {
             student_name: student.full_name,
             workplace_id: wp.id,
             workplace_name: wp.name,
-            rate: bulkRate !== '' ? parseFloat(bulkRate) : 40,
-            hours: bulkHours !== '' ? parseFloat(bulkHours) : 4.75,
+            rate: bulkRate !== "" ? parseFloat(bulkRate) : 40,
+            hours: bulkHours !== "" ? parseFloat(bulkHours) : 4.75,
           });
         }
       }
@@ -386,30 +529,42 @@ export default function Assignments() {
     setBulkProgress(0);
     try {
       const CHUNK_SIZE = 5;
-      const delay = (ms) => new Promise(r => setTimeout(r, ms));
-      const totalOps = Math.ceil(toCreate.length / CHUNK_SIZE) + Math.ceil(toUpdate.length / CHUNK_SIZE);
+      const delay = (ms) => new Promise((r) => setTimeout(r, ms));
+      const totalOps =
+        Math.ceil(toCreate.length / CHUNK_SIZE) +
+        Math.ceil(toUpdate.length / CHUNK_SIZE);
       let doneOps = 0;
 
       for (let i = 0; i < toCreate.length; i += CHUNK_SIZE) {
-        await Promise.all(toCreate.slice(i, i + CHUNK_SIZE).map(record => base44.entities.Assignment.create(record)));
+        await Promise.all(
+          toCreate
+            .slice(i, i + CHUNK_SIZE)
+            .map((record) => base44.entities.Assignment.create(record)),
+        );
         doneOps++;
         setBulkProgress(Math.round((doneOps / Math.max(totalOps, 1)) * 100));
         if (i + CHUNK_SIZE < toCreate.length) await delay(300);
       }
       for (let i = 0; i < toUpdate.length; i += CHUNK_SIZE) {
-        await Promise.all(toUpdate.slice(i, i + CHUNK_SIZE).map(({ id, fullRecord }) => base44.entities.Assignment.update(id, fullRecord)));
+        await Promise.all(
+          toUpdate
+            .slice(i, i + CHUNK_SIZE)
+            .map(({ id, fullRecord }) =>
+              base44.entities.Assignment.update(id, fullRecord),
+            ),
+        );
         doneOps++;
         setBulkProgress(Math.round((doneOps / Math.max(totalOps, 1)) * 100));
         if (i + CHUNK_SIZE < toUpdate.length) await delay(300);
       }
       setBulkProgress(100);
-      await new Promise(r => setTimeout(r, 400)); // brief moment to show 100%
-      queryClient.invalidateQueries({ queryKey: ['assignments', date] });
+      await new Promise((r) => setTimeout(r, 400)); // brief moment to show 100%
+      queryClient.invalidateQueries({ queryKey: ["assignments", date] });
       setSelectedIds(new Set());
       setShowBulkDialog(false);
-      setBulkWorkplace('');
-      setBulkHours('');
-      setBulkRate('');
+      setBulkWorkplace("");
+      setBulkHours("");
+      setBulkRate("");
       setBulkProgress(0);
     } finally {
       setBulkSaving(false);
@@ -423,13 +578,13 @@ export default function Assignments() {
       date,
       student_id: guestId,
       student_name: guestName.trim(),
-      workplace_id: '',
-      workplace_name: '',
+      workplace_id: "",
+      workplace_name: "",
       rate: 40,
       hours: 4.75,
     });
-    queryClient.invalidateQueries({ queryKey: ['assignments', date] });
-    setGuestName('');
+    queryClient.invalidateQueries({ queryKey: ["assignments", date] });
+    setGuestName("");
     setShowAddGuestDialog(false);
   };
 
@@ -437,51 +592,77 @@ export default function Assignments() {
     if (!cloneTargetDate) return;
     setCloning(true);
     setCloneProgress(0);
-    setCloneStep('טוען נתונים...');
+    setCloneStep("טוען נתונים...");
     try {
       // Check if target date is Sunday (day 0)
-      const targetDayOfWeek = new Date(cloneTargetDate + 'T12:00:00').getDay();
+      const targetDayOfWeek = new Date(cloneTargetDate + "T12:00:00").getDay();
       const isSunday = targetDayOfWeek === 0;
 
       // Distance → workplace mapping for Sunday mode
       const DISTANCE_WORKPLACE_MAP = {};
-      ['קרוב', 'רחוק', 'תתת - לא עובד', 'אאא- לפני שיבוץ'].forEach(distStatus => {
-        const wp = workplaces.find(w => w.name === distStatus);
-        if (wp) {
-          DISTANCE_WORKPLACE_MAP[distStatus] = { id: wp.id, name: wp.name };
-        }
-      });
+      ["קרוב", "רחוק", "תתת - לא עובד", "אאא- לפני שיבוץ"].forEach(
+        (distStatus) => {
+          const wp = workplaces.find((w) => w.name === distStatus);
+          if (wp) {
+            DISTANCE_WORKPLACE_MAP[distStatus] = { id: wp.id, name: wp.name };
+          }
+        },
+      );
 
       setCloneProgress(10);
-      setCloneStep('טוען תלמידים...');
-      const freshStudents = await base44.entities.Student.list('-created_date', 2000);
+      setCloneStep("טוען תלמידים...");
+      const freshStudents = await base44.entities.Student.list(
+        "-created_date",
+        2000,
+      );
       const studentById = {};
-      freshStudents.forEach(s => { studentById[s.id] = s; });
+      freshStudents.forEach((s) => {
+        studentById[s.id] = s;
+      });
 
       setCloneProgress(25);
-      setCloneStep('בודק היעדרויות...');
-      const approvedAbsences = await base44.entities.IncomingSMS.filter({ parsed_date: cloneTargetDate, status: 'אושר' }, '-created_date', 2000);
-      const absentStudentIds = new Set(approvedAbsences.map(a => a.student_id).filter(Boolean));
+      setCloneStep("בודק היעדרויות...");
+      const approvedAbsences = await base44.entities.IncomingSMS.filter(
+        { parsed_date: cloneTargetDate, status: "אושר" },
+        "-created_date",
+        2000,
+      );
+      const absentStudentIds = new Set(
+        approvedAbsences.map((a) => a.student_id).filter(Boolean),
+      );
 
       setCloneProgress(40);
-      setCloneStep('טוען שיבוצים קיימים...');
-      const targetAssignments = await base44.entities.Assignment.filter({ date: cloneTargetDate }, '-created_date', 2000);
+      setCloneStep("טוען שיבוצים קיימים...");
+      const targetAssignments = await base44.entities.Assignment.filter(
+        { date: cloneTargetDate },
+        "-created_date",
+        2000,
+      );
 
       const targetByStudent = {};
-      targetAssignments.forEach(a => {
+      targetAssignments.forEach((a) => {
         const existing = targetByStudent[a.student_id];
-        if (!existing || (a.updated_date || a.created_date) > (existing.updated_date || existing.created_date)) {
+        if (
+          !existing ||
+          (a.updated_date || a.created_date) >
+            (existing.updated_date || existing.created_date)
+        ) {
           targetByStudent[a.student_id] = a;
         }
       });
 
       setCloneProgress(50);
-      setCloneStep('מנקה כפילויות...');
+      setCloneStep("מנקה כפילויות...");
       const duplicatesToDelete = [];
       const seenOnTarget = new Set();
       [...targetAssignments]
-        .sort((a, b) => ((b.updated_date || b.created_date) > (a.updated_date || a.created_date) ? 1 : -1))
-        .forEach(a => {
+        .sort((a, b) =>
+          (b.updated_date || b.created_date) >
+          (a.updated_date || a.created_date)
+            ? 1
+            : -1,
+        )
+        .forEach((a) => {
           if (seenOnTarget.has(a.student_id)) {
             duplicatesToDelete.push(a.id);
           } else {
@@ -492,26 +673,27 @@ export default function Assignments() {
         await base44.entities.Assignment.delete(id);
       }
 
-      const sourceAssignments = Object.values(assignmentByStudent)
-        .filter(a => !a.student_id?.startsWith('guest_'));
+      const sourceAssignments = Object.values(assignmentByStudent).filter(
+        (a) => !a.student_id?.startsWith("guest_"),
+      );
 
-      const DAY_NUM_TO_HEB = { 0: 'א', 1: 'ב', 2: 'ג', 3: 'ד', 4: 'ה' };
+      const DAY_NUM_TO_HEB = { 0: "א", 1: "ב", 2: "ג", 3: "ד", 4: "ה" };
       const targetDayHeb = DAY_NUM_TO_HEB[targetDayOfWeek];
-      const notWorkingWp = workplaces.find(w => w.name === 'תתת - לא עובד');
+      const notWorkingWp = workplaces.find((w) => w.name === "תתת - לא עובד");
 
       const toUpdate = [];
       const toCreate = [];
 
       setCloneProgress(60);
-      setCloneStep('מכין שיבוצים...');
+      setCloneStep("מכין שיבוצים...");
 
       for (const src of sourceAssignments) {
         const student = studentById[src.student_id];
-        const isCrew = student?.cohort?.includes('צוות');
+        const isCrew = student?.cohort?.includes("צוות");
 
         let targetWp;
         if (absentStudentIds.has(src.student_id)) {
-          targetWp = { id: '', name: '' };
+          targetWp = { id: "", name: "" };
         } else if (isSunday) {
           const distanceStatus = student?.distance_status;
           if (distanceStatus && DISTANCE_WORKPLACE_MAP[distanceStatus]) {
@@ -522,13 +704,15 @@ export default function Assignments() {
         } else if (isCrew && targetDayHeb) {
           const freeDays = Array.isArray(student?.free_day)
             ? student.free_day
-            : (student?.free_day ? [student.free_day] : []);
+            : student?.free_day
+              ? [student.free_day]
+              : [];
           if (freeDays.includes(targetDayHeb)) {
             targetWp = notWorkingWp
               ? { id: notWorkingWp.id, name: notWorkingWp.name }
-              : { id: src.workplace_id, name: 'תתת - לא עובד' };
+              : { id: src.workplace_id, name: "תתת - לא עובד" };
           } else {
-            targetWp = { id: '', name: '' };
+            targetWp = { id: "", name: "" };
           }
         } else {
           targetWp = { id: src.workplace_id, name: src.workplace_name };
@@ -560,437 +744,748 @@ export default function Assignments() {
         }
       }
 
-      setCloneProgress(75);
-      setCloneStep(`שומר ${toCreate.length + toUpdate.length} שיבוצים...`);
-      await base44.functions.invoke('bulkUpdateAssignments', { toCreate, toUpdate });
+      // Process in chunks
+      const CHUNK = 40;
+      for (let i = 0; i < toUpdate.length; i += CHUNK) {
+        await bulkUpdateAssignments({
+          toCreate: [],
+          toUpdate: toUpdate.slice(i, i + CHUNK),
+        });
+      }
+      if (toCreate.length > 0) {
+        await bulkUpdateAssignments({ toCreate, toUpdate: [] });
+      }
 
-      setCloneProgress(100);
-      setCloneStep('הושלם!');
-      await new Promise(r => setTimeout(r, 600));
-
-      queryClient.invalidateQueries({ queryKey: ['assignments'] });
+      const totalCloned = toCreate.length + toUpdate.length;
+      queryClient.invalidateQueries({ queryKey: ["assignments"] });
     } catch (error) {
-      alert(`❌ שגיאה בשכפול: ${error.message || 'נסה שוב'}`);
+      alert(`❌ שגיאה בשכפול: ${error.message || "נסה שוב"}`);
     } finally {
       setCloning(false);
       setCloneProgress(0);
-      setCloneStep('');
+      setCloneStep("");
       setShowCloneDialog(false);
-      setCloneTargetDate('');
+      setCloneTargetDate("");
     }
   };
 
-  const prevDay = () => setDate(format(subDays(new Date(date + 'T12:00:00'), 1), 'yyyy-MM-dd'));
-  const nextDay = () => setDate(format(addDays(new Date(date + 'T12:00:00'), 1), 'yyyy-MM-dd'));
+  const prevDay = () =>
+    setDate(format(subDays(new Date(date + "T12:00:00"), 1), "yyyy-MM-dd"));
+  const nextDay = () =>
+    setDate(format(addDays(new Date(date + "T12:00:00"), 1), "yyyy-MM-dd"));
 
   return (
     <div className="p-8 flex gap-6 items-start min-h-full">
       <div className="flex-1 min-w-0">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h2 className="text-2xl font-bold">שיבוצים יומיים</h2>
-          <p className="text-muted-foreground mt-1">
-            {new Set(assignments.filter(a => a.workplace_name && !['לא עובד','לימודים','לא יצא'].some(kw => a.workplace_name.trim() === kw)).map(a => a.student_id)).size} משובצים מתוך {students.filter(s => s.is_active !== false && (!s.created_date || s.created_date.slice(0, 10) <= date)).length} תלמידים
-          </p>
-        </div>
-        <div className="flex gap-2 flex-wrap">
-          <DailyReportPDFButton date={date} assignments={assignments} />
-          <Button variant="outline" onClick={() => { setCohortDialogSelected([]); setShowCohortSelectDialog(true); }}>
-            בחירה לפי מחזור
-          </Button>
-          <Button variant="outline" onClick={() => setShowAddGuestDialog(true)}>
-            <UserPlus size={16} className="ml-2" /> הוסף תלמיד יומי
-          </Button>
-          <Button variant="outline" onClick={() => { setCloneTargetDate(format(addDays(new Date(date + 'T12:00:00'), 1), 'yyyy-MM-dd')); setShowCloneDialog(true); }}>
-            <Copy size={16} className="ml-2" /> שכפל שיבוצים
-          </Button>
-        </div>
-      </div>
-
-      <div className="flex items-center gap-3 mb-5">
-        <Button variant="outline" size="icon" onClick={prevDay}><ChevronRight size={18} /></Button>
-        <div className="flex items-center gap-2">
-          <CalendarDays size={18} className="text-primary" />
-          <input
-            type="date"
-            value={date}
-            onChange={e => setDate(e.target.value)}
-            className="border border-border rounded-lg px-3 py-2 text-sm bg-card focus:outline-none focus:ring-2 focus:ring-primary/30"
-          />
-        </div>
-        <Button variant="outline" size="icon" onClick={nextDay}><ChevronLeft size={18} /></Button>
-        <Button variant="outline" onClick={() => setDate(format(new Date(), 'yyyy-MM-dd'))} className="text-xs">
-          היום
-        </Button>
-        <span className="text-sm text-muted-foreground">
-          {new Date(date + 'T12:00:00').toLocaleDateString('he-IL', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-        </span>
-      </div>
-
-      {/* Floating Bulk Edit Toolbar */}
-      {selectedIds.size > 0 && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-card border border-border shadow-2xl rounded-2xl px-4 py-3 flex items-center gap-3">
-          <span className="text-sm font-medium text-primary">{selectedIds.size} שורות נבחרו</span>
-          <div className="w-px h-5 bg-border" />
-          <Button size="sm" onClick={() => setShowBulkDialog(true)}>
-            <Pencil size={14} className="ml-1" /> עריכה מרובה
-          </Button>
-          <Button size="sm" variant="ghost" onClick={() => setSelectedIds(new Set())} className="text-muted-foreground">
-            ביטול
-          </Button>
-        </div>
-      )}
-
-      {/* Cohort Select Dialog */}
-      <Dialog open={showCohortSelectDialog} onOpenChange={setShowCohortSelectDialog}>
-        <DialogContent className="max-w-sm" dir="rtl">
-          <DialogHeader>
-            <DialogTitle>בחירה לפי מחזור</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3 mt-2">
-            <p className="text-xs text-muted-foreground">בחר מחזורים — כל תלמידי המחזור יסומנו בטבלה.</p>
-            <div className="grid grid-cols-2 gap-1">
-              {cohorts.map(c => (
-                <label key={c} className="flex items-center gap-2 cursor-pointer hover:bg-secondary/30 rounded-lg px-3 py-2 transition-colors">
-                  <Checkbox
-                    checked={cohortDialogSelected.includes(c)}
-                    onCheckedChange={(checked) => {
-                      setCohortDialogSelected(prev =>
-                        checked ? [...prev, c] : prev.filter(x => x !== c)
-                      );
-                    }}
-                  />
-                  <span className="text-sm font-medium truncate">{c}</span>
-                </label>
-              ))}
-            </div>
-            <div className="flex gap-2 justify-end pt-2">
-              <Button variant="outline" onClick={() => setShowCohortSelectDialog(false)}>ביטול</Button>
-              <Button
-                disabled={cohortDialogSelected.length === 0}
-                onClick={() => {
-                  const ids = new Set();
-                  filteredStudents.forEach(s => {
-                    if (cohortDialogSelected.includes(s.cohort)) {
-                      ids.add(assignmentByStudent[s.id]?.id || s.id);
-                    }
-                  });
-                  setSelectedIds(ids);
-                  setShowCohortSelectDialog(false);
-                }}
-              >
-                אשר ({cohortDialogSelected.length > 0 ? filteredStudents.filter(s => cohortDialogSelected.includes(s.cohort)).length : 0} תלמידים)
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Add Guest Dialog */}
-      <Dialog open={showAddGuestDialog} onOpenChange={setShowAddGuestDialog}>
-        <DialogContent className="max-w-sm" dir="rtl">
-          <DialogHeader>
-            <DialogTitle>הוספת תלמיד יומי</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 mt-2">
-            <p className="text-xs text-muted-foreground">תלמיד זה יופיע רק ביום {date} ולא יועתק בשכפול שיבוצים.</p>
-            <Input
-              autoFocus
-              placeholder="שם התלמיד..."
-              value={guestName}
-              onChange={e => setGuestName(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') handleAddGuest(); }}
-              className="h-9 text-sm"
-            />
-            <div className="flex gap-2 justify-end pt-1">
-              <Button variant="outline" onClick={() => { setShowAddGuestDialog(false); setGuestName(''); }}>ביטול</Button>
-              <Button onClick={handleAddGuest} disabled={!guestName.trim()}>
-                <UserPlus size={14} className="ml-2" /> הוסף
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Clone Dialog */}
-      <Dialog open={showCloneDialog} onOpenChange={(v) => { setShowCloneDialog(v); if (!v) setCloning(false); }}>
-        <DialogContent className="max-w-sm" dir="rtl">
-          <DialogHeader>
-            <DialogTitle>שכפול שיבוצים</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 mt-2">
-            <p className="text-sm text-muted-foreground">
-              שכפל את {Object.values(assignmentByStudent).filter(a => !a.student_id?.startsWith('guest_')).length} השיבוצים מתאריך <strong>{date}</strong> לתאריך:
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h2 className="text-2xl font-bold">שיבוצים יומיים</h2>
+            <p className="text-muted-foreground mt-1">
+              {
+                new Set(
+                  assignments
+                    .filter(
+                      (a) =>
+                        a.workplace_name &&
+                        !["לא עובד", "לימודים", "לא יצא"].some(
+                          (kw) => a.workplace_name.trim() === kw,
+                        ),
+                    )
+                    .map((a) => a.student_id),
+                ).size
+              }{" "}
+              משובצים מתוך{" "}
+              {
+                students.filter(
+                  (s) =>
+                    s.is_active !== false &&
+                    (!s.created_date || s.created_date.slice(0, 10) <= date),
+                ).length
+              }{" "}
+              תלמידים
             </p>
+          </div>
+          <div className="flex gap-2 flex-wrap">
+            <DailyReportPDFButton date={date} assignments={assignments} />
+            <Button
+              variant="outline"
+              onClick={() => {
+                setCohortDialogSelected([]);
+                setShowCohortSelectDialog(true);
+              }}
+            >
+              בחירה לפי מחזור
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => setShowAddGuestDialog(true)}
+            >
+              <UserPlus size={16} className="ml-2" /> הוסף תלמיד יומי
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setCloneTargetDate(
+                  format(
+                    addDays(new Date(date + "T12:00:00"), 1),
+                    "yyyy-MM-dd",
+                  ),
+                );
+                setShowCloneDialog(true);
+              }}
+            >
+              <Copy size={16} className="ml-2" /> שכפל שיבוצים
+            </Button>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3 mb-5">
+          <Button variant="outline" size="icon" onClick={prevDay}>
+            <ChevronRight size={18} />
+          </Button>
+          <div className="flex items-center gap-2">
+            <CalendarDays size={18} className="text-primary" />
             <input
               type="date"
-              value={cloneTargetDate}
-              onChange={e => setCloneTargetDate(e.target.value)}
-              className="w-full border border-border rounded-lg px-3 py-2 text-sm bg-card focus:outline-none focus:ring-2 focus:ring-primary/30"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+              className="border border-border rounded-lg px-3 py-2 text-sm bg-card focus:outline-none focus:ring-2 focus:ring-primary/30"
             />
-            {cloneTargetDate && new Date(cloneTargetDate + 'T12:00:00').getDay() === 0 && (
-              <div className="bg-primary/10 border border-primary/30 rounded-lg px-3 py-2 text-xs text-primary">
-                📅 יום ראשון — שיבוץ אוטומטי לפי <strong>סטטוס מרחק</strong> (קרוב / רחוק)
-              </div>
-            )}
-            {cloneTargetDate && new Date(cloneTargetDate + 'T12:00:00').getDay() !== 0 && (
-              <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-800">
-                👥 תלמידי <strong>צוות</strong>: אם היום הוא יום חופשי שלהם → יוגדרו "תתת - לא עובד". אחרת → יישארו ללא שיבוץ.
-              </div>
-            )}
-            {cloning && (
-              <div className="space-y-2 pt-1">
-                <div className="flex justify-between items-center text-xs">
-                  <span className="text-muted-foreground">{cloneStep}</span>
-                  <span className="font-semibold text-primary">{cloneProgress}%</span>
-                </div>
-                <div className="w-full h-3 bg-secondary rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-primary rounded-full transition-all duration-500 ease-out"
-                    style={{ width: `${cloneProgress}%` }}
-                  />
-                </div>
-              </div>
-            )}
-            <div className="flex gap-2 justify-end pt-1">
-              <Button variant="outline" onClick={() => setShowCloneDialog(false)} disabled={cloning}>ביטול</Button>
-              <Button onClick={handleCloneDay} disabled={!cloneTargetDate || cloning}>
-                <Copy size={14} className="ml-2" /> {cloning ? 'משכפל...' : 'שכפל'}
-              </Button>
-            </div>
           </div>
-        </DialogContent>
-      </Dialog>
+          <Button variant="outline" size="icon" onClick={nextDay}>
+            <ChevronLeft size={18} />
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => setDate(format(new Date(), "yyyy-MM-dd"))}
+            className="text-xs"
+          >
+            היום
+          </Button>
+          <span className="text-sm text-muted-foreground">
+            {new Date(date + "T12:00:00").toLocaleDateString("he-IL", {
+              weekday: "long",
+              year: "numeric",
+              month: "long",
+              day: "numeric",
+            })}
+          </span>
+        </div>
 
-      {/* Bulk Edit Dialog */}
-      <Dialog open={showBulkDialog} onOpenChange={setShowBulkDialog}>
-        <DialogContent className="max-w-sm" dir="rtl">
-          <DialogHeader>
-            <DialogTitle>עריכה מרובה — {selectedIds.size} שורות</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 mt-2">
-            <p className="text-xs text-muted-foreground">השדות שתמלא יעודכנו בכל השורות הנבחרות. שדה ריק לא ישתנה.</p>
+        {/* Floating Bulk Edit Toolbar */}
+        {selectedIds.size > 0 && (
+          <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-card border border-border shadow-2xl rounded-2xl px-4 py-3 flex items-center gap-3">
+            <span className="text-sm font-medium text-primary">
+              {selectedIds.size} שורות נבחרו
+            </span>
+            <div className="w-px h-5 bg-border" />
+            <Button size="sm" onClick={() => setShowBulkDialog(true)}>
+              <Pencil size={14} className="ml-1" /> עריכה מרובה
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setSelectedIds(new Set())}
+              className="text-muted-foreground"
+            >
+              ביטול
+            </Button>
+          </div>
+        )}
 
-            <div>
-              <label className="text-xs font-medium text-muted-foreground mb-1 block">מקום עבודה</label>
-              <Popover open={bulkWorkplaceOpen} onOpenChange={setBulkWorkplaceOpen}>
-                <PopoverTrigger asChild>
-                  <button className="h-9 w-full border border-border rounded-md px-3 text-sm flex items-center justify-between bg-card hover:bg-secondary/40 transition-colors">
-                    <span className={bulkWorkplace ? '' : 'text-muted-foreground'}>
-                      {bulkWorkplace ? workplaces.find(w => w.id === bulkWorkplace)?.name : '— ללא שינוי —'}
+        {/* Cohort Select Dialog */}
+        <Dialog
+          open={showCohortSelectDialog}
+          onOpenChange={setShowCohortSelectDialog}
+        >
+          <DialogContent className="max-w-sm" dir="rtl">
+            <DialogHeader>
+              <DialogTitle>בחירה לפי מחזור</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-3 mt-2">
+              <p className="text-xs text-muted-foreground">
+                בחר מחזורים — כל תלמידי המחזור יסומנו בטבלה.
+              </p>
+              <div className="grid grid-cols-2 gap-1">
+                {cohorts.map((c) => (
+                  <label
+                    key={c}
+                    className="flex items-center gap-2 cursor-pointer hover:bg-secondary/30 rounded-lg px-3 py-2 transition-colors"
+                  >
+                    <Checkbox
+                      checked={cohortDialogSelected.includes(c)}
+                      onCheckedChange={(checked) => {
+                        setCohortDialogSelected((prev) =>
+                          checked ? [...prev, c] : prev.filter((x) => x !== c),
+                        );
+                      }}
+                    />
+                    <span className="text-sm font-medium truncate">{c}</span>
+                  </label>
+                ))}
+              </div>
+              <div className="flex gap-2 justify-end pt-2">
+                <Button
+                  variant="outline"
+                  onClick={() => setShowCohortSelectDialog(false)}
+                >
+                  ביטול
+                </Button>
+                <Button
+                  disabled={cohortDialogSelected.length === 0}
+                  onClick={() => {
+                    const ids = new Set();
+                    filteredStudents.forEach((s) => {
+                      if (cohortDialogSelected.includes(s.cohort)) {
+                        ids.add(assignmentByStudent[s.id]?.id || s.id);
+                      }
+                    });
+                    setSelectedIds(ids);
+                    setShowCohortSelectDialog(false);
+                  }}
+                >
+                  אשר (
+                  {cohortDialogSelected.length > 0
+                    ? filteredStudents.filter((s) =>
+                        cohortDialogSelected.includes(s.cohort),
+                      ).length
+                    : 0}{" "}
+                  תלמידים)
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Add Guest Dialog */}
+        <Dialog open={showAddGuestDialog} onOpenChange={setShowAddGuestDialog}>
+          <DialogContent className="max-w-sm" dir="rtl">
+            <DialogHeader>
+              <DialogTitle>הוספת תלמיד יומי</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 mt-2">
+              <p className="text-xs text-muted-foreground">
+                תלמיד זה יופיע רק ביום {date} ולא יועתק בשכפול שיבוצים.
+              </p>
+              <Input
+                autoFocus
+                placeholder="שם התלמיד..."
+                value={guestName}
+                onChange={(e) => setGuestName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleAddGuest();
+                }}
+                className="h-9 text-sm"
+              />
+              <div className="flex gap-2 justify-end pt-1">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setShowAddGuestDialog(false);
+                    setGuestName("");
+                  }}
+                >
+                  ביטול
+                </Button>
+                <Button onClick={handleAddGuest} disabled={!guestName.trim()}>
+                  <UserPlus size={14} className="ml-2" /> הוסף
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Clone Dialog */}
+        <Dialog
+          open={showCloneDialog}
+          onOpenChange={(v) => {
+            setShowCloneDialog(v);
+            if (!v) setCloning(false);
+          }}
+        >
+          <DialogContent className="max-w-sm" dir="rtl">
+            <DialogHeader>
+              <DialogTitle>שכפול שיבוצים</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 mt-2">
+              <p className="text-sm text-muted-foreground">
+                שכפל את{" "}
+                {
+                  Object.values(assignmentByStudent).filter(
+                    (a) => !a.student_id?.startsWith("guest_"),
+                  ).length
+                }{" "}
+                השיבוצים מתאריך <strong>{date}</strong> לתאריך:
+              </p>
+              <input
+                type="date"
+                value={cloneTargetDate}
+                onChange={(e) => setCloneTargetDate(e.target.value)}
+                className="w-full border border-border rounded-lg px-3 py-2 text-sm bg-card focus:outline-none focus:ring-2 focus:ring-primary/30"
+              />
+              {cloneTargetDate &&
+                new Date(cloneTargetDate + "T12:00:00").getDay() === 0 && (
+                  <div className="bg-primary/10 border border-primary/30 rounded-lg px-3 py-2 text-xs text-primary">
+                    📅 יום ראשון — שיבוץ אוטומטי לפי <strong>סטטוס מרחק</strong>{" "}
+                    (קרוב / רחוק)
+                  </div>
+                )}
+              {cloneTargetDate &&
+                new Date(cloneTargetDate + "T12:00:00").getDay() !== 0 && (
+                  <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-800">
+                    👥 תלמידי <strong>צוות</strong>: אם היום הוא יום חופשי שלהם
+                    → יוגדרו "תתת - לא עובד". אחרת → יישארו ללא שיבוץ.
+                  </div>
+                )}
+              {cloning && (
+                <div className="space-y-2 pt-1">
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-muted-foreground">{cloneStep}</span>
+                    <span className="font-semibold text-primary">
+                      {cloneProgress}%
                     </span>
-                    <ChevronsUpDown size={14} className="opacity-50" />
-                  </button>
-                </PopoverTrigger>
-                <PopoverContent className="w-72 p-0" align="start">
-                  <Command>
-                    <CommandInput placeholder="חיפוש..." className="h-8 text-xs" />
-                    <CommandList>
-                      <CommandEmpty>לא נמצא</CommandEmpty>
-                      <CommandGroup>
-                        <CommandItem value="__clear__" onSelect={() => { setBulkWorkplace(''); setBulkWorkplaceOpen(false); }} className="text-xs text-muted-foreground">
-                          — ללא שינוי —
-                        </CommandItem>
-                        {workplaces.map(w => (
-                          <CommandItem key={w.id} value={w.name} onSelect={() => { setBulkWorkplace(w.id); setBulkWorkplaceOpen(false); }} className="text-xs">
-                            {w.name}
-                          </CommandItem>
-                        ))}
-                      </CommandGroup>
-                    </CommandList>
-                  </Command>
-                </PopoverContent>
-              </Popover>
-            </div>
-
-            <div>
-              <label className="text-xs font-medium text-muted-foreground mb-1 block">כמות שעות</label>
-              <Input
-                type="number"
-                step="0.5"
-                value={bulkHours}
-                onChange={e => setBulkHours(e.target.value)}
-                placeholder="— ללא שינוי —"
-                className="h-9 text-sm"
-              />
-            </div>
-
-            <div>
-              <label className="text-xs font-medium text-muted-foreground mb-1 block">תעריף</label>
-              <Input
-                type="number"
-                value={bulkRate}
-                onChange={e => setBulkRate(e.target.value)}
-                placeholder="— ללא שינוי —"
-                className="h-9 text-sm"
-              />
-            </div>
-
-            {bulkSaving && (
-              <div className="space-y-2">
-                <div className="flex justify-between text-xs text-muted-foreground">
-                  <span>מעדכן שורות...</span>
-                  <span className="font-medium text-primary">{bulkProgress}%</span>
+                  </div>
+                  <div className="w-full h-3 bg-secondary rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-primary rounded-full transition-all duration-500 ease-out"
+                      style={{ width: `${cloneProgress}%` }}
+                    />
+                  </div>
                 </div>
-                <div className="w-full h-3 bg-secondary rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-primary rounded-full transition-all duration-500 ease-out"
-                    style={{ width: `${bulkProgress}%` }}
-                  />
-                </div>
+              )}
+              <div className="flex gap-2 justify-end pt-1">
+                <Button
+                  variant="outline"
+                  onClick={() => setShowCloneDialog(false)}
+                  disabled={cloning}
+                >
+                  ביטול
+                </Button>
+                <Button
+                  onClick={handleCloneDay}
+                  disabled={!cloneTargetDate || cloning}
+                >
+                  <Copy size={14} className="ml-2" />{" "}
+                  {cloning ? "משכפל..." : "שכפל"}
+                </Button>
               </div>
-            )}
-
-            <div className="flex gap-2 justify-end pt-1">
-              <Button variant="outline" onClick={() => setShowBulkDialog(false)} disabled={bulkSaving}>ביטול</Button>
-              <Button onClick={handleBulkSave} disabled={bulkSaving}>
-                {bulkSaving ? 'מעדכן...' : 'שמור שינויים'}
-              </Button>
             </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+          </DialogContent>
+        </Dialog>
 
-      {/* Main Table */}
-      <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-secondary/60 border-b border-border">
-            <tr>
-              <th className="px-3 py-2 w-8">
-                <Checkbox checked={allVisibleSelected} onCheckedChange={toggleSelectAll} />
-              </th>
-              <th className="px-3 py-2 text-right font-semibold text-muted-foreground w-8 text-xs">#</th>
-              <th className="px-3 py-2 text-right font-semibold text-muted-foreground">
-                <div className="flex flex-col gap-1">
-                  <span className="text-xs">שם תלמיד</span>
-                  <Input value={filterName} onChange={e => setFilterName(e.target.value)} placeholder="חיפוש..." className="h-7 text-xs" />
+        {/* Bulk Edit Dialog */}
+        <Dialog open={showBulkDialog} onOpenChange={setShowBulkDialog}>
+          <DialogContent className="max-w-sm" dir="rtl">
+            <DialogHeader>
+              <DialogTitle>עריכה מרובה — {selectedIds.size} שורות</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 mt-2">
+              <p className="text-xs text-muted-foreground">
+                השדות שתמלא יעודכנו בכל השורות הנבחרות. שדה ריק לא ישתנה.
+              </p>
+
+              <div>
+                <label className="text-xs font-medium text-muted-foreground mb-1 block">
+                  מקום עבודה
+                </label>
+                <Popover
+                  open={bulkWorkplaceOpen}
+                  onOpenChange={setBulkWorkplaceOpen}
+                >
+                  <PopoverTrigger asChild>
+                    <button className="h-9 w-full border border-border rounded-md px-3 text-sm flex items-center justify-between bg-card hover:bg-secondary/40 transition-colors">
+                      <span
+                        className={bulkWorkplace ? "" : "text-muted-foreground"}
+                      >
+                        {bulkWorkplace
+                          ? workplaces.find((w) => w.id === bulkWorkplace)?.name
+                          : "— ללא שינוי —"}
+                      </span>
+                      <ChevronsUpDown size={14} className="opacity-50" />
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-72 p-0" align="start">
+                    <Command>
+                      <CommandInput
+                        placeholder="חיפוש..."
+                        className="h-8 text-xs"
+                      />
+                      <CommandList>
+                        <CommandEmpty>לא נמצא</CommandEmpty>
+                        <CommandGroup>
+                          <CommandItem
+                            value="__clear__"
+                            onSelect={() => {
+                              setBulkWorkplace("");
+                              setBulkWorkplaceOpen(false);
+                            }}
+                            className="text-xs text-muted-foreground"
+                          >
+                            — ללא שינוי —
+                          </CommandItem>
+                          {workplaces.map((w) => (
+                            <CommandItem
+                              key={w.id}
+                              value={w.name}
+                              onSelect={() => {
+                                setBulkWorkplace(w.id);
+                                setBulkWorkplaceOpen(false);
+                              }}
+                              className="text-xs"
+                            >
+                              {w.name}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+              </div>
+
+              <div>
+                <label className="text-xs font-medium text-muted-foreground mb-1 block">
+                  כמות שעות
+                </label>
+                <Input
+                  type="number"
+                  step="0.5"
+                  value={bulkHours}
+                  onChange={(e) => setBulkHours(e.target.value)}
+                  placeholder="— ללא שינוי —"
+                  className="h-9 text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-medium text-muted-foreground mb-1 block">
+                  תעריף
+                </label>
+                <Input
+                  type="number"
+                  value={bulkRate}
+                  onChange={(e) => setBulkRate(e.target.value)}
+                  placeholder="— ללא שינוי —"
+                  className="h-9 text-sm"
+                />
+              </div>
+
+              {bulkSaving && (
+                <div className="space-y-2">
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>מעדכן שורות...</span>
+                    <span className="font-medium text-primary">
+                      {bulkProgress}%
+                    </span>
+                  </div>
+                  <div className="w-full h-3 bg-secondary rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-primary rounded-full transition-all duration-500 ease-out"
+                      style={{ width: `${bulkProgress}%` }}
+                    />
+                  </div>
                 </div>
-              </th>
-              <th className="px-3 py-2 text-right font-semibold text-muted-foreground">
-                <div className="flex flex-col gap-1">
-                  <span className="text-xs">מחזור</span>
-                  <Select value={filterCohort} onValueChange={setFilterCohort}>
-                    <SelectTrigger className="h-7 text-xs w-full"><SelectValue placeholder="הכל" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">הכל</SelectItem>
-                      {cohorts.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </th>
-              <th className="px-3 py-2 text-right font-semibold text-muted-foreground w-56">
-                <div className="flex flex-col gap-1">
-                  <span className="text-xs">מקום עבודה</span>
-                  <Select value={filterWorkplace} onValueChange={setFilterWorkplace}>
-                    <SelectTrigger className="h-7 text-xs w-full"><SelectValue placeholder="הכל" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">הכל</SelectItem>
-                      {workplaces.filter(w => assignments.some(a => a.workplace_id === w.id)).map(w => <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </th>
-              <th className="px-3 py-2 text-right font-semibold text-muted-foreground w-40">
-                <div className="flex flex-col gap-1">
-                  <span className="text-xs">תפקיד</span>
-                  <Select value={filterRole} onValueChange={setFilterRole}>
-                    <SelectTrigger className="h-7 text-xs w-full"><SelectValue placeholder="הכל" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">הכל</SelectItem>
-                      {roles.map(r => <SelectItem key={r.id} value={r.name}>{r.name}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </th>
-              <th className="px-3 py-2 text-right font-semibold text-muted-foreground w-20"><span className="text-xs">תעריף</span></th>
-              <th className="px-3 py-2 text-right font-semibold text-muted-foreground w-20"><span className="text-xs">שעות</span></th>
-              <th className="px-3 py-2 text-right font-semibold text-muted-foreground w-24"><span className="text-xs">תשלום נוסף</span></th>
-              <th className="px-3 py-2 text-right font-semibold text-muted-foreground">
-                <div className="flex flex-col gap-1">
-                  <span className="text-xs">שיבוץ</span>
-                  <Select value={filterAssigned} onValueChange={setFilterAssigned}>
-                    <SelectTrigger className="h-7 text-xs w-full"><SelectValue placeholder="הכל" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">הכל</SelectItem>
-                      <SelectItem value="assigned">משובצים</SelectItem>
-                      <SelectItem value="unassigned">לא משובצים</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredStudents.length === 0 ? (
+              )}
+
+              <div className="flex gap-2 justify-end pt-1">
+                <Button
+                  variant="outline"
+                  onClick={() => setShowBulkDialog(false)}
+                  disabled={bulkSaving}
+                >
+                  ביטול
+                </Button>
+                <Button onClick={handleBulkSave} disabled={bulkSaving}>
+                  {bulkSaving ? "מעדכן..." : "שמור שינויים"}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Main Table */}
+        <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden">
+          <table className="w-full text-sm">
+            <thead className="bg-secondary/60 border-b border-border">
               <tr>
-                <td colSpan={10} className="text-center py-12 text-muted-foreground">
-                  {students.length === 0 ? 'אין תלמידים במערכת' : 'לא נמצאו תוצאות לסינון'}
-                </td>
+                <th className="px-3 py-2 w-8">
+                  <Checkbox
+                    checked={allVisibleSelected}
+                    onCheckedChange={toggleSelectAll}
+                  />
+                </th>
+                <th className="px-3 py-2 text-right font-semibold text-muted-foreground w-8 text-xs">
+                  #
+                </th>
+                <th className="px-3 py-2 text-right font-semibold text-muted-foreground">
+                  <div className="flex flex-col gap-1">
+                    <span className="text-xs">שם תלמיד</span>
+                    <Input
+                      value={filterName}
+                      onChange={(e) => setFilterName(e.target.value)}
+                      placeholder="חיפוש..."
+                      className="h-7 text-xs"
+                    />
+                  </div>
+                </th>
+                <th className="px-3 py-2 text-right font-semibold text-muted-foreground">
+                  <div className="flex flex-col gap-1">
+                    <span className="text-xs">מחזור</span>
+                    <Select
+                      value={filterCohort}
+                      onValueChange={setFilterCohort}
+                    >
+                      <SelectTrigger className="h-7 text-xs w-full">
+                        <SelectValue placeholder="הכל" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">הכל</SelectItem>
+                        {cohorts.map((c) => (
+                          <SelectItem key={c} value={c}>
+                            {c}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </th>
+                <th className="px-3 py-2 text-right font-semibold text-muted-foreground w-56">
+                  <div className="flex flex-col gap-1">
+                    <span className="text-xs">מקום עבודה</span>
+                    <Select
+                      value={filterWorkplace}
+                      onValueChange={setFilterWorkplace}
+                    >
+                      <SelectTrigger className="h-7 text-xs w-full">
+                        <SelectValue placeholder="הכל" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">הכל</SelectItem>
+                        {workplaces
+                          .filter((w) =>
+                            assignments.some((a) => a.workplace_id === w.id),
+                          )
+                          .map((w) => (
+                            <SelectItem key={w.id} value={w.id}>
+                              {w.name}
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </th>
+                <th className="px-3 py-2 text-right font-semibold text-muted-foreground w-40">
+                  <div className="flex flex-col gap-1">
+                    <span className="text-xs">תפקיד</span>
+                    <Select value={filterRole} onValueChange={setFilterRole}>
+                      <SelectTrigger className="h-7 text-xs w-full">
+                        <SelectValue placeholder="הכל" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">הכל</SelectItem>
+                        {roles.map((r) => (
+                          <SelectItem key={r.id} value={r.name}>
+                            {r.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </th>
+                <th className="px-3 py-2 text-right font-semibold text-muted-foreground w-20">
+                  <span className="text-xs">תעריף</span>
+                </th>
+                <th className="px-3 py-2 text-right font-semibold text-muted-foreground w-20">
+                  <span className="text-xs">שעות</span>
+                </th>
+                <th className="px-3 py-2 text-right font-semibold text-muted-foreground w-24">
+                  <span className="text-xs">תשלום נוסף</span>
+                </th>
+                <th className="px-3 py-2 text-right font-semibold text-muted-foreground">
+                  <div className="flex flex-col gap-1">
+                    <span className="text-xs">שיבוץ</span>
+                    <Select
+                      value={filterAssigned}
+                      onValueChange={setFilterAssigned}
+                    >
+                      <SelectTrigger className="h-7 text-xs w-full">
+                        <SelectValue placeholder="הכל" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">הכל</SelectItem>
+                        <SelectItem value="assigned">משובצים</SelectItem>
+                        <SelectItem value="unassigned">לא משובצים</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </th>
               </tr>
-            ) : (
-              filteredStudents.map((student, idx) => {
-                const assignment = assignmentByStudent[student.id];
-                const selectKey = assignment?.id || student.id;
+            </thead>
+            <tbody>
+              {filteredStudents.length === 0 ? (
+                <tr>
+                  <td
+                    colSpan={10}
+                    className="text-center py-12 text-muted-foreground"
+                  >
+                    {students.length === 0
+                      ? "אין תלמידים במערכת"
+                      : "לא נמצאו תוצאות לסינון"}
+                  </td>
+                </tr>
+              ) : (
+                filteredStudents.map((student, idx) => {
+                  const assignment = assignmentByStudent[student.id];
+                  const selectKey = assignment?.id || student.id;
+                  const isSelected = selectedIds.has(selectKey);
+                  return (
+                    <tr
+                      key={student.id}
+                      className={`transition-colors ${isSelected ? "bg-primary/10" : assignment ? "bg-primary/5" : "hover:bg-secondary/20"}`}
+                    >
+                      <td className="px-3 py-2 border-b border-border">
+                        <Checkbox
+                          checked={!!isSelected}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            toggleSelect(selectKey, idx, e.shiftKey);
+                          }}
+                        />
+                      </td>
+                      <td className="px-3 py-2 border-b border-border text-muted-foreground text-xs">
+                        {idx + 1}
+                      </td>
+                      <td className="px-3 py-2 border-b border-border font-medium">
+                        {student.full_name}
+                      </td>
+                      <td className="px-3 py-2 border-b border-border text-muted-foreground text-xs">
+                        {student.cohort || "—"}
+                      </td>
+                      <WorkplaceCell
+                        student={student}
+                        assignment={assignment}
+                        workplaces={workplaces}
+                        onAssign={handleAssign}
+                        onRemove={handleRemove}
+                      />
+                      <RoleCell
+                        assignment={assignment}
+                        roles={roles}
+                        onUpdateRole={handleUpdateRole}
+                      />
+                      <EditableNumberCell
+                        value={assignment?.rate}
+                        defaultValue={40}
+                        assignment={assignment}
+                        field="rate"
+                        onUpdate={handleUpdateField}
+                      />
+                      <EditableNumberCell
+                        value={assignment?.hours}
+                        defaultValue={4.75}
+                        assignment={assignment}
+                        field="hours"
+                        onUpdate={handleUpdateField}
+                      />
+                      <EditableNumberCell
+                        value={assignment?.bonus}
+                        defaultValue={null}
+                        assignment={assignment}
+                        field="bonus"
+                        onUpdate={handleUpdateField}
+                      />
+                      <td className="px-3 py-2 border-b border-border text-muted-foreground text-xs">
+                        {assignment?.notes || "—"}
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+              {/* Guest rows */}
+              {guestAssignments.map((ga, idx) => {
+                const guestStudent = {
+                  id: ga.student_id,
+                  full_name: ga.student_name,
+                  cohort: null,
+                  forbidden_workplaces: [],
+                };
+                const selectKey = ga.id;
                 const isSelected = selectedIds.has(selectKey);
                 return (
-                  <tr key={student.id} className={`transition-colors ${isSelected ? 'bg-primary/10' : assignment ? 'bg-primary/5' : 'hover:bg-secondary/20'}`}>
+                  <tr
+                    key={ga.id}
+                    className={`transition-colors border-t-2 border-dashed border-amber-200 align-middle ${isSelected ? "bg-primary/10" : "bg-amber-50/60 hover:bg-amber-50"}`}
+                  >
                     <td className="px-3 py-2 border-b border-border">
                       <Checkbox
                         checked={!!isSelected}
                         onClick={(e) => {
                           e.preventDefault();
-                          toggleSelect(selectKey, idx, e.shiftKey);
+                          toggleSelect(
+                            selectKey,
+                            filteredStudents.length + idx,
+                            e.shiftKey,
+                          );
                         }}
                       />
                     </td>
-                    <td className="px-3 py-2 border-b border-border text-muted-foreground text-xs">{idx + 1}</td>
-                    <td className="px-3 py-2 border-b border-border font-medium">{student.full_name}</td>
-                    <td className="px-3 py-2 border-b border-border text-muted-foreground text-xs">{student.cohort || '—'}</td>
-                    <WorkplaceCell student={student} assignment={assignment} workplaces={workplaces} onAssign={handleAssign} onRemove={handleRemove} />
-                    <RoleCell assignment={assignment} roles={roles} onUpdateRole={handleUpdateRole} />
-                    <EditableNumberCell value={assignment?.rate} defaultValue={40} assignment={assignment} field="rate" onUpdate={handleUpdateField} />
-                    <EditableNumberCell value={assignment?.hours} defaultValue={4.75} assignment={assignment} field="hours" onUpdate={handleUpdateField} />
-                    <EditableNumberCell value={assignment?.bonus} defaultValue={null} assignment={assignment} field="bonus" onUpdate={handleUpdateField} />
                     <td className="px-3 py-2 border-b border-border text-muted-foreground text-xs">
-                      {assignment?.notes || '—'}
+                      {filteredStudents.length + idx + 1}
+                    </td>
+                    <td className="px-3 py-2 border-b border-border font-medium align-middle">
+                      <span className="flex items-center gap-1">
+                        <UserPlus
+                          size={12}
+                          className="text-amber-500 shrink-0"
+                        />
+                        {ga.student_name}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2 border-b border-border text-muted-foreground text-xs">
+                      —
+                    </td>
+                    <WorkplaceCell
+                      student={guestStudent}
+                      assignment={ga}
+                      workplaces={workplaces}
+                      onAssign={handleAssign}
+                      onRemove={(id) => handleRemove(id)}
+                    />
+                    <RoleCell
+                      assignment={ga}
+                      roles={roles}
+                      onUpdateRole={handleUpdateRole}
+                    />
+                    <EditableNumberCell
+                      value={ga.rate}
+                      defaultValue={40}
+                      assignment={ga}
+                      field="rate"
+                      onUpdate={handleUpdateField}
+                    />
+                    <EditableNumberCell
+                      value={ga.hours}
+                      defaultValue={4.75}
+                      assignment={ga}
+                      field="hours"
+                      onUpdate={handleUpdateField}
+                    />
+                    <EditableNumberCell
+                      value={ga.bonus}
+                      defaultValue={null}
+                      assignment={ga}
+                      field="bonus"
+                      onUpdate={handleUpdateField}
+                    />
+                    <td className="px-3 py-2 border-b border-border text-muted-foreground text-xs">
+                      {ga.notes || "—"}
                     </td>
                   </tr>
                 );
-              })
-            )}
-            {/* Guest rows */}
-            {guestAssignments.map((ga, idx) => {
-              const guestStudent = { id: ga.student_id, full_name: ga.student_name, cohort: null, forbidden_workplaces: [] };
-              const selectKey = ga.id;
-              const isSelected = selectedIds.has(selectKey);
-              return (
-                <tr key={ga.id} className={`transition-colors border-t-2 border-dashed border-amber-200 align-middle ${isSelected ? 'bg-primary/10' : 'bg-amber-50/60 hover:bg-amber-50'}`}>
-                  <td className="px-3 py-2 border-b border-border">
-                    <Checkbox
-                      checked={!!isSelected}
-                      onClick={(e) => { e.preventDefault(); toggleSelect(selectKey, filteredStudents.length + idx, e.shiftKey); }}
-                    />
-                  </td>
-                  <td className="px-3 py-2 border-b border-border text-muted-foreground text-xs">{filteredStudents.length + idx + 1}</td>
-                  <td className="px-3 py-2 border-b border-border font-medium align-middle">
-                    <span className="flex items-center gap-1">
-                      <UserPlus size={12} className="text-amber-500 shrink-0" />
-                      {ga.student_name}
-                    </span>
-                  </td>
-                  <td className="px-3 py-2 border-b border-border text-muted-foreground text-xs">—</td>
-                  <WorkplaceCell student={guestStudent} assignment={ga} workplaces={workplaces} onAssign={handleAssign} onRemove={(id) => handleRemove(id)} />
-                  <RoleCell assignment={ga} roles={roles} onUpdateRole={handleUpdateRole} />
-                  <EditableNumberCell value={ga.rate} defaultValue={40} assignment={ga} field="rate" onUpdate={handleUpdateField} />
-                  <EditableNumberCell value={ga.hours} defaultValue={4.75} assignment={ga} field="hours" onUpdate={handleUpdateField} />
-                  <EditableNumberCell value={ga.bonus} defaultValue={null} assignment={ga} field="bonus" onUpdate={handleUpdateField} />
-                  <td className="px-3 py-2 border-b border-border text-muted-foreground text-xs">{ga.notes || '—'}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+              })}
+            </tbody>
+          </table>
+        </div>
       </div>
       <LogisticsSidebar date={date} assignments={assignments} />
     </div>

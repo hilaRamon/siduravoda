@@ -1,51 +1,68 @@
-import { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Checkbox } from '@/components/ui/checkbox';
+import { useState, useEffect } from "react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 
 const FREE_DAYS = [
-  { value: 'א', label: 'ראשון' },
-  { value: 'ב', label: 'שני' },
-  { value: 'ג', label: 'שלישי' },
-  { value: 'ד', label: 'רביעי' },
-  { value: 'ה', label: 'חמישי' },
+  { value: "א", label: "ראשון" },
+  { value: "ב", label: "שני" },
+  { value: "ג", label: "שלישי" },
+  { value: "ד", label: "רביעי" },
+  { value: "ה", label: "חמישי" },
 ];
-const DISTANCES = ['קרוב', 'רחוק', 'אאא- לפני שיבוץ', 'תתת - לא עובד'];
+const DISTANCES = ["קרוב", "רחוק", "אאא- לפני שיבוץ", "תתת - לא עובד"];
 
 export default function StudentFormModal({ open, onClose, onSave, student }) {
   const [form, setForm] = useState({
-    full_name: '',
-    phone: '',
-    cohort: '',
+    full_name: "",
+    phone: "",
+    cohort: "",
     free_day: [],
-    distance_status: '',
+    distance_status: "",
   });
 
   useEffect(() => {
     if (student) {
       // Support legacy string value migration
       const fd = student.free_day;
-      const freeDayArr = Array.isArray(fd) ? fd : (fd ? [fd] : []);
+      const freeDayArr = Array.isArray(fd) ? fd : fd ? [fd] : [];
       setForm({
-        full_name: student.full_name || '',
-        phone: student.phone || '',
-        cohort: student.cohort || '',
+        full_name: student.full_name || "",
+        phone: student.phone || "",
+        cohort: student.cohort || "",
         free_day: freeDayArr,
-        distance_status: student.distance_status || '',
+        distance_status: student.distance_status || "",
       });
     } else {
-      setForm({ full_name: '', phone: '', cohort: '', free_day: [], distance_status: '' });
+      setForm({
+        full_name: "",
+        phone: "",
+        cohort: "",
+        free_day: [],
+        distance_status: "",
+      });
     }
   }, [student, open]);
 
   const toggleFreeDay = (day) => {
-    setForm(p => ({
+    setForm((p) => ({
       ...p,
       free_day: p.free_day.includes(day)
-        ? p.free_day.filter(d => d !== day)
+        ? p.free_day.filter((d) => d !== day)
         : [...p.free_day, day],
     }));
   };
@@ -64,14 +81,18 @@ export default function StudentFormModal({ open, onClose, onSave, student }) {
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-md" dir="rtl">
         <DialogHeader>
-          <DialogTitle>{student ? 'עריכת תלמיד' : 'הוספת תלמיד חדש'}</DialogTitle>
+          <DialogTitle>
+            {student ? "עריכת תלמיד" : "הוספת תלמיד חדש"}
+          </DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4 mt-2">
           <div>
             <Label>שם מלא *</Label>
             <Input
               value={form.full_name}
-              onChange={e => setForm(p => ({ ...p, full_name: e.target.value }))}
+              onChange={(e) =>
+                setForm((p) => ({ ...p, full_name: e.target.value }))
+              }
               placeholder="שם מלא"
               required
               className="mt-1"
@@ -81,7 +102,9 @@ export default function StudentFormModal({ open, onClose, onSave, student }) {
             <Label>טלפון (במקום 0 בתחילה יש לרשום 972)</Label>
             <Input
               value={form.phone}
-              onChange={e => setForm(p => ({ ...p, phone: e.target.value }))}
+              onChange={(e) =>
+                setForm((p) => ({ ...p, phone: e.target.value }))
+              }
               placeholder="9725X-XXXXXXX"
               className="mt-1"
               type="tel"
@@ -92,7 +115,9 @@ export default function StudentFormModal({ open, onClose, onSave, student }) {
               <Label>מחזור</Label>
               <Input
                 value={form.cohort}
-                onChange={e => setForm(p => ({ ...p, cohort: e.target.value }))}
+                onChange={(e) =>
+                  setForm((p) => ({ ...p, cohort: e.target.value }))
+                }
                 placeholder="לדוג׳ 2024א"
                 className="mt-1"
               />
@@ -100,8 +125,11 @@ export default function StudentFormModal({ open, onClose, onSave, student }) {
             <div>
               <Label>ימי חופש</Label>
               <div className="mt-1 flex flex-wrap gap-2">
-                {FREE_DAYS.map(d => (
-                  <label key={d.value} className="flex items-center gap-1.5 cursor-pointer select-none">
+                {FREE_DAYS.map((d) => (
+                  <label
+                    key={d.value}
+                    className="flex items-center gap-1.5 cursor-pointer select-none"
+                  >
                     <Checkbox
                       checked={form.free_day.includes(d.value)}
                       onCheckedChange={() => toggleFreeDay(d.value)}
@@ -114,20 +142,31 @@ export default function StudentFormModal({ open, onClose, onSave, student }) {
           </div>
           <div>
             <Label>סטטוס מרחק</Label>
-            <Select value={form.distance_status} onValueChange={v => setForm(p => ({ ...p, distance_status: v }))}>
+            <Select
+              value={form.distance_status}
+              onValueChange={(v) =>
+                setForm((p) => ({ ...p, distance_status: v }))
+              }
+            >
               <SelectTrigger className="mt-1">
                 <SelectValue placeholder="בחר סטטוס" />
               </SelectTrigger>
               <SelectContent>
-                {DISTANCES.map(d => (
-                  <SelectItem key={d} value={d}>{d}</SelectItem>
+                {DISTANCES.map((d) => (
+                  <SelectItem key={d} value={d}>
+                    {d}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
           <div className="flex gap-2 justify-end pt-2">
-            <Button type="button" variant="outline" onClick={onClose}>ביטול</Button>
-            <Button type="submit">{student ? 'שמור שינויים' : 'הוסף תלמיד'}</Button>
+            <Button type="button" variant="outline" onClick={onClose}>
+              ביטול
+            </Button>
+            <Button type="submit">
+              {student ? "שמור שינויים" : "הוסף תלמיד"}
+            </Button>
           </div>
         </form>
       </DialogContent>

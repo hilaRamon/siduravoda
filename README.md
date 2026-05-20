@@ -1,39 +1,28 @@
-**Welcome to your Base44 project** 
+# Siduravoda
 
-**About**
+This project now includes a local Node.js backend that mirrors the `base44` entities with MongoDB collections.
 
-View and Edit  your app on [Base44.com](http://Base44.com) 
+## Setup
 
-This project contains everything you need to run your app locally.
+1. Install dependencies:
+   `npm install`
+2. Copy `.env.example` to `.env`
+3. Set `MONGODB_URI` to your MongoDB connection string
+4. Start the API:
+   `npm run server`
+5. In another terminal, start the frontend:
+   `npm run dev`
 
-**Edit the code in your local development environment**
+The frontend talks to the API through `VITE_API_BASE_URL` and defaults to `http://localhost:4000`.
 
-Any change pushed to the repo will also be reflected in the Base44 Builder.
+## Backend
 
-**Prerequisites:** 
+The Express server lives in `server/` and exposes:
 
-1. Clone the repository using the project's Git URL 
-2. Navigate to the project directory
-3. Install dependencies: `npm install`
-4. Create an `.env.local` file and set the right environment variables
+- `GET /api/health`
+- `GET/POST/PATCH/DELETE /api/entities/:entityName`
+- `POST /api/entities/:entityName/filter`
+- `POST /api/entities/:entityName/bulk`
+- `POST /api/integrations/core/upload-file`
 
-```
-VITE_BASE44_APP_ID=your_app_id
-VITE_BASE44_APP_BASE_URL=your_backend_url
-
-e.g.
-VITE_BASE44_APP_ID=cbef744a8545c389ef439ea6
-VITE_BASE44_APP_BASE_URL=https://my-to-do-list-81bfaad7.base44.app
-```
-
-Run the app: `npm run dev`
-
-**Publish your changes**
-
-Open [Base44.com](http://Base44.com) and click on Publish.
-
-**Docs & Support**
-
-Documentation: [https://docs.base44.com/Integrations/Using-GitHub](https://docs.base44.com/Integrations/Using-GitHub)
-
-Support: [https://app.base44.com/support](https://app.base44.com/support)
+Uploaded PDFs are stored in the local `uploads/` directory and served back as static files.
