@@ -69,11 +69,16 @@ export default function StudentFormModal({ open, onClose, onSave, student }) {
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    const free_day =
+      Array.isArray(form.free_day) && form.free_day.length > 0
+        ? form.free_day
+        : null;
+    const payload = { ...form, free_day };
     if (student) {
       // Merge with existing student data to preserve fields not in this form
-      onSave({ ...student, ...form });
+      onSave({ ...student, ...payload });
     } else {
-      onSave({ ...form, is_active: true });
+      onSave({ ...payload, is_active: true });
     }
   };
 
