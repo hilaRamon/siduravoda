@@ -11,10 +11,13 @@ export const entityDefinitions = {
       full_name: { type: String, required: true, trim: true },
       phone: { type: String, trim: true },
       cohort: { type: String, trim: true },
-      free_day: { type: String, enum: ["א", "ב", "ג", "ד", "ה", null] },
+      free_day: {
+        type: [{ type: String, enum: ["א", "ב", "ג", "ד", "ה"] }],
+        default: null,
+      },
       distance_status: {
         type: String,
-        enum: ["קרוב", "רחוק", "אאא - לפני שיבוץ", "תתת - לא עובד", null],
+        enum: ["קרוב", "רחוק", "אאא- לפני שיבוץ", "תתת - לא עובד", null],
       },
       is_active: { type: Boolean, default: true },
       forbidden_workplaces: [{ type: String }],

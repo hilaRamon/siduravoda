@@ -77,10 +77,55 @@ const FREE_DAY_MAP = {
   ה: "ה",
 };
 
+const VALID_FREE_DAYS = new Set(["א", "ב", "ג", "ד", "ה"]);
+
+/** @param {string | undefined} raw */
+function parseFreeDayTokens(raw) {
+  if (!raw?.trim()) return [];
+  return raw
+    .split(/[,;|/、]+/)
+    .flatMap((part) => part.split(/\s+/))
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+/** @param {string | undefined} raw @returns {string[] | null} */
+function toFreeDayArray(raw) {
+  const tokens = parseFreeDayTokens(raw);
+  if (tokens.length === 0) return null;
+  /** @type {string[]} */
+  const out = [];
+  const seen = new Set();
+  for (const token of tokens) {
+    const day = FREE_DAY_MAP[token] || token;
+    if (VALID_FREE_DAYS.has(day) && !seen.has(day)) {
+      seen.add(day);
+      out.push(day);
+    }
+  }
+  return out.length > 0 ? out : null;
+}
+
+/** @param {string | undefined} raw @returns {string | null} first invalid token, or null if valid */
+function findInvalidFreeDayToken(raw) {
+  if (!raw?.trim()) return null;
+  for (const token of parseFreeDayTokens(raw)) {
+    const mapped = FREE_DAY_MAP[token] || token;
+    if (
+      !Object.prototype.hasOwnProperty.call(FREE_DAY_MAP, token) &&
+      !VALID_FREE_DAYS.has(mapped)
+    ) {
+      return token;
+    }
+  }
+  return null;
+}
+
 const DISTANCE_STATUS_MAP = {
   קרוב: "קרוב",
-  בינוני: "בינוני",
   רחוק: "רחוק",
+  "אאא- לפני שיבוץ": "אאא- לפני שיבוץ",
+  "תתת - לא עובד": "תתת - לא עובד",
 };
 
 /** @type {SystemField[]} */
@@ -190,13 +235,11 @@ export default function ImportModal({ open, onClose, onImported }) {
         : "";
       if (!name?.trim())
         errs.push({ row: i + 2, msg: `שורה ${i + 2}: שם מלא חסר` });
-      if (
-        freeDay &&
-        !Object.prototype.hasOwnProperty.call(FREE_DAY_MAP, freeDay)
-      ) {
+      const invalidFreeDay = findInvalidFreeDayToken(freeDay);
+      if (invalidFreeDay) {
         errs.push({
           row: i + 2,
-          msg: `שורה ${i + 2}: יום חופש לא תקין: "${freeDay}"`,
+          msg: `שורה ${i + 2}: יום חופש לא תקין: "${invalidFreeDay}"`,
         });
       }
       if (
@@ -241,7 +284,7 @@ export default function ImportModal({ open, onClose, onImported }) {
         const rawFreeDay = cleanOptionalValue(
           mapping.free_day ? row[mapping.free_day] : undefined,
         );
-        const free_day = FREE_DAY_MAP[rawFreeDay] || rawFreeDay || undefined;
+        const free_day = toFreeDayArray(rawFreeDay);
         const distance_status = cleanOptionalValue(
           mapping.distance_status ? row[mapping.distance_status] : undefined,
         );
@@ -251,7 +294,7 @@ export default function ImportModal({ open, onClose, onImported }) {
           cohort: cleanOptionalValue(
             mapping.cohort ? row[mapping.cohort] : undefined,
           ),
-          free_day: free_day || undefined,
+          free_day: free_day ?? undefined,
           distance_status,
           notes: cleanOptionalValue(
             mapping.notes ? row[mapping.notes] : undefined,

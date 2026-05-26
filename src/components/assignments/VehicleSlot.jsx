@@ -43,7 +43,7 @@ export default function VehicleSlot({ slotIndex, vehicleId, vehicleName, availab
                   .map(v => (
                     <CommandItem
                       key={v.id}
-                      value={v.name}
+                      value={`${v.id} ${v.name}${v.license_plate ? ` ${v.license_plate}` : ''}`}
                       onSelect={() => handleSelect(v.id, v.name)}
                       className="text-xs cursor-pointer"
                     >

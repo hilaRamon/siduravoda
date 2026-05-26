@@ -255,10 +255,10 @@ export default function Students() {
                       <SelectContent>
                         <SelectItem value="קרוב">קרוב</SelectItem>
                         <SelectItem value="רחוק">רחוק</SelectItem>
-                        <SelectItem value="אאא - לפני שיבוץ">
-                          אאא - לפני שיבוץ
+                        <SelectItem value="אאא- לפני שיבוץ">
+                          אאא- לפני שיבוץ
                         </SelectItem>
-                        <SelectItem value="תתת - לא עובד">
+                        <SelectItem value="תתת- לא עובד">
                           תתת - לא עובד
                         </SelectItem>
                       </SelectContent>

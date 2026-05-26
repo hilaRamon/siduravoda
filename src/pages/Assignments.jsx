@@ -574,12 +574,15 @@ export default function Assignments() {
   const handleAddGuest = async () => {
     if (!guestName.trim()) return;
     const guestId = `guest_${Date.now()}`;
+    const defaultGuestWp = workplaces.find(
+      (w) => w.name === "אאא- לפני שיבוץ",
+    );
     await base44.entities.Assignment.create({
       date,
       student_id: guestId,
       student_name: guestName.trim(),
-      workplace_id: "",
-      workplace_name: "",
+      workplace_id: defaultGuestWp?.id ?? "",
+      workplace_name: defaultGuestWp?.name ?? "אאא- לפני שיבוץ",
       rate: 40,
       hours: 4.75,
     });
