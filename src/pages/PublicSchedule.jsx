@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
+import { resolveUploadUrl } from '@/lib/uploads';
 import { Loader2 } from 'lucide-react';
 
 export default function PublicSchedule() {
@@ -15,6 +16,8 @@ export default function PublicSchedule() {
       </div>
     );
   }
+
+  const fileUrl = resolveUploadUrl(latest?.file_url);
 
   if (isError || !latest) {
     return (
@@ -37,7 +40,7 @@ export default function PublicSchedule() {
           <p className="text-sm text-gray-500">תאריך: {latest.date}</p>
         </div>
         <a
-          href={latest.file_url}
+          href={fileUrl}
           download
           className="bg-primary text-white text-sm px-4 py-2 rounded-lg hover:opacity-90 transition-opacity"
         >
@@ -46,7 +49,7 @@ export default function PublicSchedule() {
       </div>
       <div className="flex-1">
         <iframe
-          src={latest.file_url}
+          src={fileUrl}
           className="w-full h-full min-h-screen border-0"
           title="סידור עבודה"
         />

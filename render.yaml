@@ -1,0 +1,28 @@
+# Render Blueprint — adjust service names to match your dashboard.
+#
+# Frontend (Static Site): siduravoda.onrender.com
+# API (Web Service): siduravoda-server.onrender.com
+
+services:
+  - type: web
+    name: siduravoda
+    runtime: static
+    buildCommand: npm install && npm run build
+    staticPublishPath: ./dist
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+
+  - type: web
+    name: siduravoda-server
+    runtime: node
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: CLIENT_ORIGIN
+        value: https://siduravoda.onrender.com
+      - key: VITE_API_BASE_URL
+        value: https://siduravoda-server.onrender.com
