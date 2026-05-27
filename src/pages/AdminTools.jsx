@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
+import { useAuth } from '@/lib/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Shuffle, Loader2, UserCheck, BookOpen, Settings2, HardDriveDownload, Shield } from 'lucide-react';
 import { format, eachDayOfInterval, parseISO } from 'date-fns';
@@ -14,10 +14,7 @@ import DefaultSettings from '@/components/admin/DefaultSettings';
 import UserPermissions from '@/components/admin/UserPermissions';
 
 export default function AdminTools() {
-  const { data: currentUser } = useQuery({
-    queryKey: ['current-user'],
-    queryFn: () => base44.auth.me(),
-  });
+  const { user: currentUser } = useAuth();
   const [randomizing, setRandomizing] = useState(false);
   const [randomStatus, setRandomStatus] = useState('');
   const [assigningRoles, setAssigningRoles] = useState(false);

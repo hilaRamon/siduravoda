@@ -58,9 +58,11 @@ export default function UserPermissions({ currentUser }) {
 
   const isAdmin = currentUser?.role === 'admin';
 
+  const [inviteResult, setInviteResult] = useState(null);
+
   const handleSetLevel = async (user, level) => {
     setUpdating(user.id);
-    await base44.entities.User.update(user.id, levelToFields(level));
+    await base44.auth.updateUser(user.id, { level });
     queryClient.invalidateQueries({ queryKey: ['users-list'] });
     setUpdating(null);
   };
@@ -68,10 +70,18 @@ export default function UserPermissions({ currentUser }) {
   const handleInvite = async () => {
     if (!inviteEmail.trim()) return;
     setInviting(true);
-    await base44.users.inviteUser(inviteEmail.trim(), 'user');
-    setInviteEmail('');
-    queryClient.invalidateQueries({ queryKey: ['users-list'] });
-    setInviting(false);
+    setInviteResult(null);
+    try {
+      const result = await base44.auth.inviteUser(inviteEmail.trim(), 'user');
+      setInviteResult({
+        email: inviteEmail.trim(),
+        password: result.temporaryPassword,
+      });
+      setInviteEmail('');
+      queryClient.invalidateQueries({ queryKey: ['users-list'] });
+    } finally {
+      setInviting(false);
+    }
   };
 
 
@@ -96,7 +106,23 @@ export default function UserPermissions({ currentUser }) {
             {inviting ? <Loader2 size={15} className="animate-spin" /> : 'הזמן'}
           </Button>
         </div>
-        <p className="text-xs text-muted-foreground mt-2">המשתמש יקבל אימייל הזמנה ויצטרך להירשם.</p>
+        {inviteResult && (
+          <div className="mt-3 p-3 bg-primary/10 rounded-lg text-sm border border-primary/20">
+            <p className="font-medium">משתמש נוצר בהצלחה</p>
+            <p className="text-muted-foreground mt-1" dir="ltr">
+              {inviteResult.email}
+            </p>
+            <p className="mt-2">
+              סיסמה זמנית:{' '}
+              <code className="bg-secondary px-2 py-0.5 rounded font-mono" dir="ltr">
+                {inviteResult.password}
+              </code>
+            </p>
+            <p className="text-xs text-muted-foreground mt-2">
+              העבר את הסיסמה למשתמש — לא תוצג שוב.
+            </p>
+          </div>
+        )}
       </div>
 
 

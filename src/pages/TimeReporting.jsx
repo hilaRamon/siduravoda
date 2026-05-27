@@ -1,6 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
+import { useAuth } from '@/lib/AuthContext';
+import { canReportTime } from '@/lib/permissions';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { format } from 'date-fns';
@@ -151,14 +153,8 @@ function changeDate(dateStr, delta) {
 export default function TimeReporting() {
   const today = format(new Date(), 'yyyy-MM-dd');
 
-  const { data: currentUser, isLoading: loadingUser } = useQuery({
-    queryKey: ['current-user-tr'],
-    queryFn: async () => {
-      try { return await base44.auth.me(); } catch { return null; }
-    },
-  });
-
-  const hasAccess = currentUser && (currentUser.role === 'admin' || currentUser.can_report_time === true);
+  const { user: currentUser, isLoadingAuth: loadingUser } = useAuth();
+  const hasAccess = canReportTime(currentUser);
   const [selectedDate, setSelectedDate] = useState(today);
   const [groupTimes, setGroupTimes] = useState({}); // { workplaceId: { start, end } }
   const [overrides, setOverrides] = useState({});   // { studentId: { start, end } }

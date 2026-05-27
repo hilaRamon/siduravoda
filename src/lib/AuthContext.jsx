@@ -1,46 +1,40 @@
-import React, { createContext, useState, useContext, useEffect } from 'react';
-import { base44 } from '@/api/base44Client';
+import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
+import { base44, getAuthToken, setAuthToken } from '@/api/base44Client';
 
-const AuthContext = createContext();
+const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
-  const [isLoadingPublicSettings, setIsLoadingPublicSettings] = useState(true);
   const [authError, setAuthError] = useState(null);
   const [authChecked, setAuthChecked] = useState(false);
-  const [appPublicSettings, setAppPublicSettings] = useState({ auth_required: false });
 
-  useEffect(() => {
-    checkAppState();
-  }, []);
-
-  const checkAppState = async () => {
-    setIsLoadingPublicSettings(true);
-    setAuthError(null);
-    setAppPublicSettings({ auth_required: false });
-    setIsLoadingPublicSettings(false);
-    await checkUserAuth();
-  };
-
-  const checkUserAuth = async () => {
+  const checkUserAuth = useCallback(async () => {
     setIsLoadingAuth(true);
-    setUser(null);
     setAuthError(null);
+
+    if (!getAuthToken()) {
+      setUser(null);
+      setIsAuthenticated(false);
+      setAuthError({ type: 'auth_required' });
+      setIsLoadingAuth(false);
+      setAuthChecked(true);
+      return;
+    }
 
     try {
-      const user = await base44.auth.me();
-      setUser(user);
+      const currentUser = await base44.auth.me();
+      setUser(currentUser);
       setIsAuthenticated(true);
+      setAuthError(null);
     } catch (error) {
-      // `request()` in `base44Client` throws an error with { status, data }.
-      const status = error?.status;
-      if (status === 401) {
-        setIsAuthenticated(false);
+      setAuthToken(null);
+      setUser(null);
+      setIsAuthenticated(false);
+      if (error?.status === 401) {
         setAuthError({ type: 'auth_required' });
       } else {
-        setIsAuthenticated(false);
         setAuthError({
           type: 'auth_error',
           message: error?.message || 'Authentication failed',
@@ -50,42 +44,55 @@ export const AuthProvider = ({ children }) => {
       setIsLoadingAuth(false);
       setAuthChecked(true);
     }
-  };
+  }, []);
 
-  const logout = (_shouldRedirect = true) => {
-    setUser(null);
-    setIsAuthenticated(false);
+  useEffect(() => {
+    checkUserAuth();
+  }, [checkUserAuth]);
+
+  const login = useCallback(async (email, password) => {
+    const loggedInUser = await base44.auth.login(email, password);
+    setUser(loggedInUser);
+    setIsAuthenticated(true);
     setAuthError(null);
+    setIsLoadingAuth(false);
     setAuthChecked(true);
-    // No backend logout endpoint yet; we still update local auth state.
-    base44.auth.logout?.();
-  };
+    return loggedInUser;
+  }, []);
 
-  const navigateToLogin = () => {
-    // In the real Base44 integration, this should redirect to the Base44 auth flow.
-    // For now we use the configured app base URL when available.
-    const base44AppBaseUrl = import.meta.env.VITE_BASE44_APP_BASE_URL;
-    if (base44AppBaseUrl) {
-      window.location.href = base44AppBaseUrl;
-      return;
+  const logout = useCallback(async () => {
+    try {
+      await base44.auth.logout();
+    } finally {
+      setUser(null);
+      setIsAuthenticated(false);
+      setAuthError({ type: 'auth_required' });
+      setAuthChecked(true);
     }
-    window.location.href = '/';
-  };
+  }, []);
+
+  const navigateToLogin = useCallback(() => {
+    if (window.location.pathname !== '/login') {
+      window.location.href = '/login';
+    }
+  }, []);
 
   return (
-    <AuthContext.Provider value={{ 
-      user, 
-      isAuthenticated, 
-      isLoadingAuth,
-      isLoadingPublicSettings,
-      authError,
-      appPublicSettings,
-      authChecked,
-      logout,
-      navigateToLogin,
-      checkUserAuth,
-      checkAppState
-    }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        isAuthenticated,
+        isLoadingAuth,
+        isLoadingPublicSettings: false,
+        authError,
+        authChecked,
+        appPublicSettings: { auth_required: true },
+        logout,
+        login,
+        navigateToLogin,
+        checkUserAuth,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

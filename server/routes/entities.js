@@ -7,8 +7,12 @@ import {
   normalizeData,
   sortInMemory,
 } from "../lib/query.js";
+import { attachUser } from "../middleware/auth.js";
+import { checkEntityAccess } from "../middleware/entityAccess.js";
 
 const router = express.Router();
+
+router.use(attachUser);
 
 function requireEntity(req, res, next) {
   const { entityName } = req.params;
@@ -19,7 +23,7 @@ function requireEntity(req, res, next) {
 
   req.entityName = entityName;
   req.model = getModel(entityName);
-  return next();
+  return checkEntityAccess(req, res, next);
 }
 
 router.get("/:entityName", requireEntity, async (req, res, next) => {

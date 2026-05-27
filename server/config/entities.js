@@ -1,9 +1,16 @@
 export const entityDefinitions = {
   User: {
-    required: ["role"],
+    required: ["email", "role"],
     schema: {
-      role: { type: String, enum: ["admin", "user"], required: true },
+      email: { type: String, required: true, trim: true, lowercase: true },
+      password_hash: { type: String, required: true, select: false },
+      full_name: { type: String, trim: true, default: "" },
+      role: { type: String, enum: ["admin", "user"], required: true, default: "user" },
+      can_report_time: { type: Boolean, default: false },
+      can_view_time_reports: { type: Boolean, default: false },
+      is_active: { type: Boolean, default: true },
     },
+    indexes: [{ fields: { email: 1 }, options: { unique: true } }],
   },
   Student: {
     required: ["full_name"],
@@ -130,6 +137,34 @@ export const entityDefinitions = {
       requested_volunteers: { type: Number, default: null },
     },
     indexes: [{ fields: { date: 1 } }],
+  },
+  TimeReport: {
+    required: ["date", "student_id", "workplace_id"],
+    schema: {
+      date: { type: String, required: true },
+      student_id: { type: String, required: true },
+      student_name: { type: String },
+      workplace_id: { type: String, required: true },
+      workplace_name: { type: String },
+      start_time: { type: String },
+      end_time: { type: String },
+      status: {
+        type: String,
+        enum: ["ממתין", "אושר", "נדחה"],
+        default: "ממתין",
+      },
+      notes: { type: String },
+    },
+    indexes: [{ fields: { date: 1, student_id: 1 } }],
+  },
+  AppSettings: {
+    required: [],
+    schema: {
+      default_rate: { type: Number },
+      default_hours: { type: Number },
+      default_start_time: { type: String },
+      default_end_time: { type: String },
+    },
   },
 };
 
