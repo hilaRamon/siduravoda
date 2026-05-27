@@ -156,7 +156,7 @@ export default function AdminTools() {
       </div>
 
       {activeTab === 'settings' && <DefaultSettings />}
-      {activeTab === 'permissions' && <UserPermissions currentUser={currentUser} />}
+      {activeTab === 'permissions' && <UserPermissions />}
       {activeTab === 'srs' && <SRSViewer />}
 
       {activeTab === 'links' && (

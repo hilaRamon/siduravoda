@@ -1,8 +1,4 @@
-import {
-  canReportTime,
-  canViewTimeReports,
-  isAdmin,
-} from "../config/permissions.js";
+import { isAdmin } from "../config/permissions.js";
 
 /** Public entity reads (no login) */
 function isPublicRead(entityName, req) {
@@ -14,7 +10,7 @@ function isReadMethod(method) {
   return method === "GET" || method === "POST"; // POST used for /filter
 }
 
-/** Time reporters: submit times only; read assignments/logistics for the form */
+/** Reporters: can_report_time users with no broader role access */
 function isReporterOnly(user) {
   return (
     user?.role === "user" &&
@@ -42,6 +38,21 @@ export function checkEntityAccess(req, res, next) {
     return res.status(401).json({ message: "Authentication required" });
   }
 
+  // User entity: admin only
+  if (entityName === "User") {
+    if (!isAdmin(req.user)) {
+      return res.status(403).json({ message: "Admin access required" });
+    }
+    return next();
+  }
+
+  // Admins and regular users (role=user, no reporter flag): full access to all other entities
+  const isRegularUser = req.user.role === "user" && !req.user.can_report_time;
+  if (isAdmin(req.user) || isRegularUser) {
+    return next();
+  }
+
+  // Reporter-only users get limited access
   if (isReporterOnly(req.user)) {
     if (entityName === "TimeReport") {
       if (method === "DELETE") {
@@ -55,33 +66,6 @@ export function checkEntityAccess(req, res, next) {
     return res.status(403).json({ message: "Reporters can only access time reporting" });
   }
 
-  if (entityName === "User") {
-    if (!isAdmin(req.user)) {
-      return res.status(403).json({ message: "Admin access required" });
-    }
-    return next();
-  }
-
-  if (entityName === "TimeReport") {
-    if (isAdmin(req.user)) return next();
-
-    if (isReadMethod(method)) {
-      if (canViewTimeReports(req.user) || canReportTime(req.user)) {
-        return next();
-      }
-      return res.status(403).json({ message: "No permission to view time reports" });
-    }
-
-    if (method === "PATCH" || method === "POST") {
-      if (canReportTime(req.user)) return next();
-      return res.status(403).json({ message: "No permission to submit time reports" });
-    }
-
-    if (method === "DELETE") {
-      return res.status(403).json({ message: "Admin access required" });
-    }
-  }
-
-  // All other entities: any active authenticated user
+  // Admin (already handled above)
   return next();
 }

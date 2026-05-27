@@ -9,11 +9,12 @@ export function canReportTime(user) {
 }
 
 export function canViewTimeReports(user) {
-  return isAdmin(user) || user?.can_view_time_reports === true;
+  return isAdmin(user) || user?.role === 'user' || user?.can_view_time_reports === true;
 }
 
+/** Admin tools: admin gets full user management; regular user gets reporter-invite only */
 export function canAccessAdminTools(user) {
-  return isAdmin(user);
+  return isAdmin(user) || user?.role === 'user';
 }
 
 export function canAccessMainApp(user) {
@@ -22,25 +23,21 @@ export function canAccessMainApp(user) {
 
 /** Nav items visible per user */
 export function getVisibleNavItems(user) {
+  const isRegularUser = user?.role === 'user';
+
   const all = [
-    { to: '/', label: 'שיבוצים יומיים', requires: 'main' },
-    { to: '/calendar', label: 'יומן', requires: 'main' },
-    { to: '/students', label: 'תלמידים וצוות', requires: 'main' },
-    { to: '/workplaces', label: 'מקומות עבודה', requires: 'main' },
-    { to: '/roles', label: 'תפקידים', requires: 'main' },
-    { to: '/vehicles', label: 'רכבים', requires: 'main' },
-    { to: '/reports', label: 'דוחות', requires: 'main' },
-    { to: '/admin-tools', label: 'כלי ניהול', requires: 'admin' },
-    { to: '/absence-requests', label: 'בקשות היעדרות', requires: 'main' },
-    { to: '/time-reports', label: 'עדכון זמנים', requires: 'time_reports_view' },
+    { to: '/', label: 'שיבוצים יומיים' },
+    { to: '/calendar', label: 'יומן' },
+    { to: '/students', label: 'תלמידים וצוות' },
+    { to: '/workplaces', label: 'מקומות עבודה' },
+    { to: '/roles', label: 'תפקידים' },
+    { to: '/vehicles', label: 'רכבים' },
+    { to: '/reports', label: 'דוחות' },
+    { to: '/absence-requests', label: 'בקשות היעדרות' },
+    { to: '/time-reports', label: 'עדכון זמנים' },
+    { to: '/admin-tools', label: 'כלי ניהול' },
   ];
 
-  return all.filter((item) => {
-    if (item.requires === 'admin') return canAccessAdminTools(user);
-    if (item.requires === 'time_reports_view') return canViewTimeReports(user);
-    if (item.requires === 'main') {
-      return isAdmin(user) || (user?.role === 'user' && !user?.can_report_time);
-    }
-    return true;
-  });
+  if (isAdmin(user) || isRegularUser) return all;
+  return [];
 }

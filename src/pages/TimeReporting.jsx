@@ -6,7 +6,7 @@ import { canReportTime } from '@/lib/permissions';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { format } from 'date-fns';
-import { Send, Clock, CheckCircle2, ChevronDown, ChevronUp, Search, CalendarDays, Check, ChevronRight, ChevronLeft, ShieldOff } from 'lucide-react';
+import { Send, Clock, CheckCircle2, ChevronDown, ChevronUp, Search, CalendarDays, Check, ChevronRight, ChevronLeft, ShieldOff, LogOut } from 'lucide-react';
 
 const DEFAULT_START = '07:00';
 const DEFAULT_END = '11:45';
@@ -153,7 +153,7 @@ function changeDate(dateStr, delta) {
 export default function TimeReporting() {
   const today = format(new Date(), 'yyyy-MM-dd');
 
-  const { user: currentUser, isLoadingAuth: loadingUser } = useAuth();
+  const { user: currentUser, isLoadingAuth: loadingUser, logout } = useAuth();
   const hasAccess = canReportTime(currentUser);
   const [selectedDate, setSelectedDate] = useState(today);
   const [groupTimes, setGroupTimes] = useState({}); // { workplaceId: { start, end } }
@@ -341,6 +341,11 @@ export default function TimeReporting() {
 
   const totalStudents = workplacesToShow.reduce((s, wp) => s + (workplaceStudents[wp.workplace_id || wp.id] || []).length, 0);
 
+  const handleLogout = async () => {
+    await logout();
+    window.location.href = '/login';
+  };
+
   if (loadingUser) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center" dir="rtl">
@@ -382,6 +387,10 @@ export default function TimeReporting() {
           <button onClick={() => setSelectedDate(today)} className="h-9 px-3 text-xs font-medium rounded-lg border border-primary text-primary bg-card hover:bg-primary/10 transition-colors">
             היום
           </button>
+          <Button variant="outline" onClick={handleLogout} className="gap-2">
+            <LogOut size={14} />
+            התנתקות
+          </Button>
         </div>
         <p className="text-xs text-muted-foreground">בחר תאריך אחר לדיווח חדש</p>
       </div>
@@ -456,6 +465,10 @@ export default function TimeReporting() {
             <Button onClick={handleSubmit} disabled={saving || totalStudents === 0} className="gap-2">
               <Send size={16} />
               {saving ? 'שולח...' : 'שלח דיווח'}
+            </Button>
+            <Button variant="outline" onClick={handleLogout} className="gap-2">
+              <LogOut size={14} />
+              התנתקות
             </Button>
           </div>
         </div>

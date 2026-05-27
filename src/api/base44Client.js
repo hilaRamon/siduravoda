@@ -161,6 +161,9 @@ export const base44 = {
     me() {
       return request("/api/auth/me");
     },
+    listUsers() {
+      return request("/api/auth/users");
+    },
     inviteUser(email, level = "user", fullName = "") {
       return request("/api/auth/invite", {
         method: "POST",
@@ -172,6 +175,9 @@ export const base44 = {
         method: "PATCH",
         body: JSON.stringify(data),
       });
+    },
+    deleteUser(id) {
+      return request(`/api/auth/users/${id}`, { method: "DELETE" });
     },
     changePassword(currentPassword, newPassword) {
       return request("/api/auth/me/password", {

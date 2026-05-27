@@ -14,7 +14,7 @@ export function canReportTime(user) {
 }
 
 export function canViewTimeReports(user) {
-  return isAdmin(user) || user?.can_view_time_reports === true;
+  return isAdmin(user) || user?.role === "user" || user?.can_view_time_reports === true;
 }
 
 export function canAccessMainApp(user) {
