@@ -261,6 +261,57 @@ router.delete("/users/:id", requireAuth, async (req, res, next) => {
   }
 });
 
+// ─── Update own profile ───────────────────────────────────────────────────────
+
+router.patch("/me", requireAuth, async (req, res, next) => {
+  try {
+    const User = getModel("User");
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    const hasFullName = req.body.full_name !== undefined;
+    const hasEmail = req.body.email !== undefined;
+    if (!hasFullName && !hasEmail) {
+      return res.status(400).json({ message: "No valid fields to update" });
+    }
+
+    if (hasFullName) {
+      user.full_name = String(req.body.full_name || "").trim();
+    }
+
+    if (hasEmail) {
+      const email = String(req.body.email || "").trim().toLowerCase();
+      if (!email) {
+        return res.status(400).json({ message: "Email is required" });
+      }
+
+      // Env-admin email is fixed
+      if (callerIsEnvAdmin(req)) {
+        return res.status(403).json({ message: "Admin email is managed via server environment config" });
+      }
+
+      const envAdmin = getEnvAdmin();
+      if (email === envAdmin.email) {
+        return res.status(409).json({ message: "This email is reserved for the system administrator" });
+      }
+
+      const existing = await User.findOne({ email });
+      if (existing && String(existing._id) !== String(user._id)) {
+        return res.status(409).json({ message: "A user with this email already exists" });
+      }
+
+      user.email = email;
+    }
+
+    await user.save();
+    return res.json(sanitizeUser(user));
+  } catch (error) {
+    return next(error);
+  }
+});
+
 // ─── Change own password ──────────────────────────────────────────────────────
 
 router.patch("/me/password", requireAuth, async (req, res, next) => {

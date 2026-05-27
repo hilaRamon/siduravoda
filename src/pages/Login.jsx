@@ -4,6 +4,7 @@ import { useAuth } from '@/lib/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Loader2, LogIn } from 'lucide-react';
+import { PasswordField } from '@/components/ui/password-field';
 import { canReportTime } from '@/lib/permissions';
 
 export default function Login() {
@@ -86,12 +87,13 @@ export default function Login() {
           </div>
           <div>
             <label className="text-sm font-medium mb-1.5 block">סיסמה</label>
-            <Input
-              type="password"
-              autoComplete="current-password"
+            <PasswordField
+              id="login-password"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onValueChange={setPassword}
+              autoComplete="current-password"
               required
+              showLengthValidation
             />
           </div>
 
