@@ -64,35 +64,9 @@ function InviteBox({ allowedLevel, label }) {
       <h3 className="font-semibold mb-3 flex items-center gap-2">
         <UserCheck size={16} className="text-primary" /> {label}
       </h3>
-      <div className="space-y-2">
-        <Input
-          placeholder="שם מלא (אופציונלי)"
-          value={fullName}
-          onChange={e => setFullName(e.target.value)}
-        />
-        <div className="flex gap-2">
-          <Input
-            placeholder="כתובת אימייל..."
-            value={email}
-            onChange={e => setEmail(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && handleInvite()}
-            className="flex-1"
-            dir="ltr"
-          />
-          <Button onClick={handleInvite} disabled={inviting || !email.trim()}>
-            {inviting ? <Loader2 size={15} className="animate-spin" /> : 'הוסף'}
-          </Button>
-        </div>
-      </div>
 
-      {error && (
-        <p className="mt-2 text-xs text-destructive bg-destructive/10 rounded-lg px-3 py-2">
-          {error}
-        </p>
-      )}
-
-      {result && (
-        <div className="mt-3 p-3 bg-primary/10 rounded-lg text-sm border border-primary/20">
+      {result ? (
+        <div className="p-3 bg-primary/10 rounded-lg text-sm border border-primary/20">
           <p className="font-medium">משתמש נוצר בהצלחה</p>
           <p className="text-muted-foreground mt-1" dir="ltr">{result.email}</p>
           <p className="mt-2">
@@ -104,7 +78,39 @@ function InviteBox({ allowedLevel, label }) {
           <p className="text-xs text-muted-foreground mt-2">
             העבר את הסיסמה למשתמש — לא תוצג שוב.
           </p>
+          <Button className="mt-4" onClick={() => setResult(null)}>
+            הבנתי
+          </Button>
         </div>
+      ) : (
+        <>
+          <div className="space-y-2">
+            <Input
+              placeholder="שם מלא (אופציונלי)"
+              value={fullName}
+              onChange={e => setFullName(e.target.value)}
+            />
+            <div className="flex gap-2">
+              <Input
+                placeholder="כתובת אימייל..."
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleInvite()}
+                className="flex-1"
+                dir="ltr"
+              />
+              <Button onClick={handleInvite} disabled={inviting || !email.trim()}>
+                {inviting ? <Loader2 size={15} className="animate-spin" /> : 'הוסף'}
+              </Button>
+            </div>
+          </div>
+
+          {error && (
+            <p className="mt-2 text-xs text-destructive bg-destructive/10 rounded-lg px-3 py-2">
+              {error}
+            </p>
+          )}
+        </>
       )}
     </div>
   );
