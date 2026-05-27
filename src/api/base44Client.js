@@ -122,6 +122,11 @@ async function uploadFile({ file }) {
 }
 
 export const base44 = {
+  public: {
+    getPublishedSchedule() {
+      return request("/api/public/schedule");
+    },
+  },
   entities: {
     User: createEntityClient("User"),
     Student: createEntityClient("Student"),

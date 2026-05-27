@@ -84,6 +84,20 @@ function AppRoutes() {
   );
 }
 
+function ScheduleApp() {
+  return (
+    <QueryClientProvider client={queryClientInstance}>
+      <MemoryRouter initialEntries={['/schedule']}>
+        <Routes>
+          <Route path="/schedule" element={<PublicSchedule />} />
+          <Route path="*" element={<Navigate to="/schedule" replace />} />
+        </Routes>
+      </MemoryRouter>
+      <Toaster />
+    </QueryClientProvider>
+  );
+}
+
 function TimeReportingApp() {
   return (
     <AuthProvider>
@@ -111,7 +125,13 @@ function TimeReportingApp() {
 }
 
 function App() {
-  if (window.location.pathname === '/time-reporting') {
+  const pathname = window.location.pathname.replace(/\/$/, '') || '/';
+
+  if (pathname === '/schedule') {
+    return <ScheduleApp />;
+  }
+
+  if (pathname === '/time-reporting') {
     return <TimeReportingApp />;
   }
 

@@ -8,6 +8,7 @@ import { entityNames } from "./config/entities.js";
 import entitiesRouter from "./routes/entities.js";
 import uploadsRouter from "./routes/uploads.js";
 import authRouter from "./routes/auth.js";
+import publicRouter from "./routes/public.js";
 import { ensureAdminUser } from "./lib/bootstrap.js";
 
 dotenv.config();
@@ -36,6 +37,7 @@ app.get("/api/health", (_req, res) => {
 });
 
 app.use("/api/auth", authRouter);
+app.use("/api/public", publicRouter);
 app.use("/api/entities", entitiesRouter);
 app.use("/api/integrations", uploadsRouter);
 

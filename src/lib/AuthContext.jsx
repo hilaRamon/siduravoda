@@ -1,5 +1,6 @@
 import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
 import { base44, getAuthToken, setAuthToken } from '@/api/base44Client';
+import { isPublicPath } from '@/lib/publicRoutes';
 
 const AuthContext = createContext(null);
 
@@ -11,6 +12,15 @@ export const AuthProvider = ({ children }) => {
   const [authChecked, setAuthChecked] = useState(false);
 
   const checkUserAuth = useCallback(async () => {
+    if (isPublicPath(window.location.pathname)) {
+      setUser(null);
+      setIsAuthenticated(false);
+      setAuthError(null);
+      setIsLoadingAuth(false);
+      setAuthChecked(true);
+      return;
+    }
+
     setIsLoadingAuth(true);
     setAuthError(null);
 

@@ -48,6 +48,6 @@ The Express server lives in `server/` and exposes:
 - `POST /api/entities/:entityName/bulk`
 - `POST /api/integrations/core/upload-file` (authenticated)
 
-`GET /api/entities/PublishedSchedule` is public (for `/schedule`).
+`GET /api/public/schedule` is public (for `/schedule`; no sign-in). `GET /api/entities/PublishedSchedule` is also readable without auth.
 
 Uploaded PDFs are stored in the local `uploads/` directory and served back as static files.

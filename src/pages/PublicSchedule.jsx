@@ -3,12 +3,10 @@ import { base44 } from '@/api/base44Client';
 import { Loader2 } from 'lucide-react';
 
 export default function PublicSchedule() {
-  const { data: records = [], isLoading } = useQuery({
-    queryKey: ['published-schedule'],
-    queryFn: () => base44.entities.PublishedSchedule.list(),
+  const { data: latest, isLoading, isError } = useQuery({
+    queryKey: ['published-schedule-public'],
+    queryFn: () => base44.public.getPublishedSchedule(),
   });
-
-  const latest = records[0];
 
   if (isLoading) {
     return (
@@ -18,11 +16,13 @@ export default function PublicSchedule() {
     );
   }
 
-  if (!latest) {
+  if (isError || !latest) {
     return (
       <div className="min-h-screen flex items-center justify-center" dir="rtl">
         <div className="text-center">
-          <p className="text-xl font-semibold text-gray-600">טרם פורסם סידור עבודה</p>
+          <p className="text-xl font-semibold text-gray-600">
+            {isError ? 'לא ניתן לטעון את הסידור' : 'טרם פורסם סידור עבודה'}
+          </p>
           <p className="text-sm text-gray-400 mt-2">אנא נסה שנית מאוחר יותר</p>
         </div>
       </div>
