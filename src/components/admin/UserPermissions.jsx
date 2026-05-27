@@ -2,33 +2,19 @@ import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
-import { Shield, UserCheck, Loader2 } from 'lucide-react';
+import { Shield, UserCheck, Loader2, Trash2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
+import { useAuth } from '@/lib/AuthContext';
+import { isAdmin } from '@/lib/permissions';
 
-// Derive a simple "permission level" from user fields
 function getUserLevel(u) {
   if (u.role === 'admin') return 'admin';
   if (u.can_report_time) return 'reporter';
   return 'user';
 }
 
-// Map level → what to save
-function levelToFields(level) {
-  switch (level) {
-    case 'admin':    return { role: 'admin',  can_report_time: false, can_view_time_reports: false };
-    case 'reporter': return { role: 'user',   can_report_time: true,  can_view_time_reports: false };
-    default:         return { role: 'user',   can_report_time: false, can_view_time_reports: false };
-  }
-}
-
-const LEVELS = [
-  {
-    value: 'admin',
-    label: 'מנהל',
-    description: 'גישה מלאה לכל המערכת',
-    color: 'bg-purple-100 text-purple-700 border-purple-300',
-    activeColor: 'bg-purple-600 text-white border-purple-600',
-  },
+// Levels available to admin (cannot create another admin)
+const ADMIN_LEVELS = [
   {
     value: 'user',
     label: 'משתמש',
@@ -45,72 +31,152 @@ const LEVELS = [
   },
 ];
 
-export default function UserPermissions({ currentUser }) {
+// ─── Invite box (shared) ──────────────────────────────────────────────────────
+
+function InviteBox({ allowedLevel, label }) {
   const queryClient = useQueryClient();
-  const [inviteEmail, setInviteEmail] = useState('');
+  const [email, setEmail] = useState('');
+  const [fullName, setFullName] = useState('');
   const [inviting, setInviting] = useState(false);
+  const [result, setResult] = useState(null);
+  const [error, setError] = useState('');
+
+  const handleInvite = async () => {
+    if (!email.trim()) return;
+    setInviting(true);
+    setResult(null);
+    setError('');
+    try {
+      const res = await base44.auth.inviteUser(email.trim(), allowedLevel, fullName.trim());
+      setResult({ email: email.trim(), password: res.temporaryPassword });
+      setEmail('');
+      setFullName('');
+      queryClient.invalidateQueries({ queryKey: ['users-list'] });
+    } catch (err) {
+      setError(err?.message || 'שגיאה ביצירת המשתמש');
+    } finally {
+      setInviting(false);
+    }
+  };
+
+  return (
+    <div className="bg-card border border-border rounded-2xl p-5">
+      <h3 className="font-semibold mb-3 flex items-center gap-2">
+        <UserCheck size={16} className="text-primary" /> {label}
+      </h3>
+
+      {result ? (
+        <div className="p-3 bg-primary/10 rounded-lg text-sm border border-primary/20">
+          <p className="font-medium">משתמש נוצר בהצלחה</p>
+          <p className="text-muted-foreground mt-1" dir="ltr">{result.email}</p>
+          <p className="mt-2">
+            סיסמה זמנית:{' '}
+            <code className="bg-secondary px-2 py-0.5 rounded font-mono" dir="ltr">
+              {result.password}
+            </code>
+          </p>
+          <p className="text-xs text-muted-foreground mt-2">
+            העבר את הסיסמה למשתמש — לא תוצג שוב.
+          </p>
+          <Button className="mt-4" onClick={() => setResult(null)}>
+            הבנתי
+          </Button>
+        </div>
+      ) : (
+        <>
+          <div className="space-y-2">
+            <Input
+              placeholder="שם מלא (אופציונלי)"
+              value={fullName}
+              onChange={e => setFullName(e.target.value)}
+            />
+            <div className="flex gap-2">
+              <Input
+                placeholder="כתובת אימייל..."
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleInvite()}
+                className="flex-1"
+                dir="ltr"
+              />
+              <Button onClick={handleInvite} disabled={inviting || !email.trim()}>
+                {inviting ? <Loader2 size={15} className="animate-spin" /> : 'הוסף'}
+              </Button>
+            </div>
+          </div>
+
+          {error && (
+            <p className="mt-2 text-xs text-destructive bg-destructive/10 rounded-lg px-3 py-2">
+              {error}
+            </p>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+// ─── Admin view ───────────────────────────────────────────────────────────────
+
+function UserManager({ canManageUsers, inviteOptions }) {
+  const queryClient = useQueryClient();
   const [updating, setUpdating] = useState(null);
+  const [deleting, setDeleting] = useState(null);
 
   const { data: users = [], isLoading } = useQuery({
     queryKey: ['users-list'],
-    queryFn: () => base44.entities.User.list(),
+    queryFn: () => base44.auth.listUsers(),
+    enabled: canManageUsers,
   });
 
-  const isAdmin = currentUser?.role === 'admin';
+  const manageableUsers = users;
+
+  const levelButtons =
+    inviteOptions.includes('user')
+      ? ADMIN_LEVELS
+      : ADMIN_LEVELS.filter((l) => l.value === 'reporter');
 
   const handleSetLevel = async (user, level) => {
     setUpdating(user.id);
-    await base44.entities.User.update(user.id, levelToFields(level));
-    queryClient.invalidateQueries({ queryKey: ['users-list'] });
-    setUpdating(null);
+    try {
+      await base44.auth.updateUser(user.id, { level });
+      queryClient.invalidateQueries({ queryKey: ['users-list'] });
+    } finally {
+      setUpdating(null);
+    }
   };
 
-  const handleInvite = async () => {
-    if (!inviteEmail.trim()) return;
-    setInviting(true);
-    await base44.users.inviteUser(inviteEmail.trim(), 'user');
-    setInviteEmail('');
-    queryClient.invalidateQueries({ queryKey: ['users-list'] });
-    setInviting(false);
+  const handleDelete = async (user) => {
+    if (!window.confirm(`למחוק את המשתמש ${user.email}?`)) return;
+    setDeleting(user.id);
+    try {
+      await base44.auth.deleteUser(user.id);
+      queryClient.invalidateQueries({ queryKey: ['users-list'] });
+    } finally {
+      setDeleting(null);
+    }
   };
-
 
   return (
     <div className="space-y-5 max-w-3xl">
+      {inviteOptions.includes('user') && (
+        <InviteBox allowedLevel="user" label="הוספת משתמש רגיל" />
+      )}
+      {inviteOptions.includes('reporter') && (
+        <InviteBox allowedLevel="reporter" label="הוספת מדווח זמנים" />
+      )}
 
-      {/* Invite */}
-      <div className="bg-card border border-border rounded-2xl p-5">
-        <h3 className="font-semibold mb-3 flex items-center gap-2">
-          <UserCheck size={16} className="text-primary" /> הזמנת משתמש חדש
-        </h3>
-        <div className="flex gap-2">
-          <Input
-            placeholder="כתובת אימייל..."
-            value={inviteEmail}
-            onChange={e => setInviteEmail(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && handleInvite()}
-            className="flex-1"
-            dir="ltr"
-          />
-          <Button onClick={handleInvite} disabled={inviting || !inviteEmail.trim()}>
-            {inviting ? <Loader2 size={15} className="animate-spin" /> : 'הזמן'}
-          </Button>
-        </div>
-        <p className="text-xs text-muted-foreground mt-2">המשתמש יקבל אימייל הזמנה ויצטרך להירשם.</p>
-      </div>
-
-
-      {/* Users table */}
       <div className="bg-card border border-border rounded-2xl overflow-hidden">
         <div className="px-5 py-4 border-b border-border flex items-center gap-2">
           <Shield size={16} className="text-primary" />
           <h3 className="font-semibold">ניהול הרשאות משתמשים</h3>
-          <span className="text-xs text-muted-foreground bg-secondary px-2 py-0.5 rounded-full">{users.length} משתמשים</span>
+          <span className="text-xs text-muted-foreground bg-secondary px-2 py-0.5 rounded-full">
+            {manageableUsers.length} משתמשים
+          </span>
         </div>
 
-        {/* Legend */}
         <div className="px-5 py-3 bg-secondary/30 border-b border-border flex flex-wrap gap-4 text-xs text-muted-foreground">
-          {LEVELS.map(l => (
+          {levelButtons.map(l => (
             <span key={l.value} className="flex items-center gap-1.5">
               <span className={`inline-block w-2.5 h-2.5 rounded-full ${l.activeColor.split(' ')[0]}`} />
               <strong>{l.label}</strong> — {l.description}
@@ -122,49 +188,53 @@ export default function UserPermissions({ currentUser }) {
           <div className="p-8 text-center text-muted-foreground">
             <Loader2 size={20} className="animate-spin mx-auto" />
           </div>
+        ) : manageableUsers.length === 0 ? (
+          <div className="p-8 text-center text-muted-foreground text-sm">אין משתמשים לניהול</div>
         ) : (
           <div className="divide-y divide-border">
-            {users.map(u => {
-              const isSelf = u.id === currentUser?.id;
+            {manageableUsers.map(u => {
               const isUpdating = updating === u.id;
+              const isDeleting = deleting === u.id;
               const currentLevel = getUserLevel(u);
 
               return (
-                <div key={u.id} className={`flex items-center gap-4 px-5 py-4 flex-wrap transition-colors ${isSelf ? 'bg-primary/5' : 'hover:bg-secondary/10'}`}>
-                  {/* User info */}
+                <div key={u.id} className="flex items-center gap-4 px-5 py-4 flex-wrap hover:bg-secondary/10 transition-colors">
                   <div className="min-w-0 flex-1">
-                    <div className="font-medium flex items-center gap-2">
-                      {u.full_name || '—'}
-                      {isSelf && <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium">את/ה</span>}
-                    </div>
+                    <div className="font-medium">{u.full_name || '—'}</div>
                     <div className="text-xs text-muted-foreground mt-0.5" dir="ltr">{u.email}</div>
                   </div>
 
-                  {/* Level selector */}
-                  {isUpdating ? (
+                  {isUpdating || isDeleting ? (
                     <Loader2 size={16} className="animate-spin text-muted-foreground shrink-0" />
                   ) : (
-                    <div className="flex gap-1.5 flex-wrap">
-                      {LEVELS.map(level => {
-                        const isActive = currentLevel === level.value;
-                        const disabled = isSelf && level.value !== 'admin';
-                        return (
-                          <button
-                            key={level.value}
-                            disabled={disabled || isActive}
-                            onClick={() => handleSetLevel(u, level.value)}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all
-                              ${isActive
-                                ? level.activeColor + ' cursor-default'
-                                : level.color + ' hover:opacity-80 cursor-pointer'}
-                              ${disabled ? 'opacity-40 cursor-not-allowed' : ''}
-                            `}
-                            title={disabled ? 'לא ניתן לשנות את ההרשאה שלך' : level.description}
-                          >
-                            {level.label}
-                          </button>
-                        );
-                      })}
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <div className="flex gap-1.5">
+                        {levelButtons.map(level => {
+                          const isActive = currentLevel === level.value;
+                          return (
+                            <button
+                              key={level.value}
+                              disabled={isActive}
+                              onClick={() => handleSetLevel(u, level.value)}
+                              className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all
+                                ${isActive
+                                  ? level.activeColor + ' cursor-default'
+                                  : level.color + ' hover:opacity-80 cursor-pointer'}
+                              `}
+                              title={level.description}
+                            >
+                              {level.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <button
+                        onClick={() => handleDelete(u)}
+                        className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                        title="מחק משתמש"
+                      >
+                        <Trash2 size={14} />
+                      </button>
                     </div>
                   )}
                 </div>
@@ -174,5 +244,20 @@ export default function UserPermissions({ currentUser }) {
         )}
       </div>
     </div>
+  );
+}
+
+// ─── Main export ──────────────────────────────────────────────────────────────
+
+export default function UserPermissions() {
+  const { user } = useAuth();
+  const admin = isAdmin(user);
+  const canManageUsers = admin || user?.role === 'user';
+  const inviteOptions = admin ? ['user', 'reporter'] : ['reporter'];
+
+  if (!canManageUsers) return null;
+
+  return (
+    <UserManager canManageUsers={canManageUsers} inviteOptions={inviteOptions} />
   );
 }

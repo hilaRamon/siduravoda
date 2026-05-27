@@ -3,8 +3,34 @@
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL || "http://localhost:4000";
 
+const TOKEN_KEY = "auth_token";
+
+export function getAuthToken() {
+  return localStorage.getItem(TOKEN_KEY);
+}
+
+export function setAuthToken(token) {
+  if (token) {
+    localStorage.setItem(TOKEN_KEY, token);
+  } else {
+    localStorage.removeItem(TOKEN_KEY);
+  }
+}
+
 async function request(path, options = {}) {
-  const response = await fetch(`${API_BASE_URL}${path}`, options);
+  const headers = { ...(options.headers || {}) };
+  const token = getAuthToken();
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+  if (options.body && !(options.body instanceof FormData)) {
+    headers["Content-Type"] = headers["Content-Type"] || "application/json";
+  }
+
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    ...options,
+    headers,
+  });
 
   if (!response.ok) {
     let payload = null;
@@ -56,28 +82,24 @@ function createEntityClient(entityName) {
     filter(filter = {}, sort, limit = 1000) {
       return request(`/api/entities/${entityName}/filter`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ filter, sort, limit }),
       });
     },
     create(data) {
       return request(`/api/entities/${entityName}`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       });
     },
     bulkCreate(items) {
       return request(`/api/entities/${entityName}/bulk`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(items),
       });
     },
     update(id, data) {
       return request(`/api/entities/${entityName}/${id}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       });
     },
@@ -100,6 +122,11 @@ async function uploadFile({ file }) {
 }
 
 export const base44 = {
+  public: {
+    getPublishedSchedule() {
+      return request("/api/public/schedule");
+    },
+  },
   entities: {
     User: createEntityClient("User"),
     Student: createEntityClient("Student"),
@@ -112,6 +139,8 @@ export const base44 = {
     BackupSettings: createEntityClient("BackupSettings"),
     IncomingSMS: createEntityClient("IncomingSMS"),
     FarmerRequest: createEntityClient("FarmerRequest"),
+    TimeReport: createEntityClient("TimeReport"),
+    AppSettings: createEntityClient("AppSettings"),
   },
   integrations: {
     Core: {
@@ -119,10 +148,56 @@ export const base44 = {
     },
   },
   auth: {
+    async login(email, password) {
+      const result = await request("/api/auth/login", {
+        method: "POST",
+        body: JSON.stringify({ email, password }),
+      });
+      setAuthToken(result.token);
+      return result.user;
+    },
+    async logout() {
+      try {
+        await request("/api/auth/logout", { method: "POST" });
+      } finally {
+        setAuthToken(null);
+      }
+    },
     me() {
       return request("/api/auth/me");
     },
-    logout() {},
-    redirectToLogin() {},
+    listUsers() {
+      return request("/api/auth/users");
+    },
+    inviteUser(email, level = "user", fullName = "") {
+      return request("/api/auth/invite", {
+        method: "POST",
+        body: JSON.stringify({ email, level, full_name: fullName }),
+      });
+    },
+    updateUser(id, data) {
+      return request(`/api/auth/users/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      });
+    },
+    deleteUser(id) {
+      return request(`/api/auth/users/${id}`, { method: "DELETE" });
+    },
+    updateMe(data) {
+      return request("/api/auth/me", {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      });
+    },
+    changePassword(currentPassword, newPassword) {
+      return request("/api/auth/me/password", {
+        method: "PATCH",
+        body: JSON.stringify({
+          current_password: currentPassword,
+          new_password: newPassword,
+        }),
+      });
+    },
   },
 };

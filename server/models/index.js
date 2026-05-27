@@ -11,6 +11,7 @@ const baseSchemaOptions = {
     transform: (_doc, ret) => {
       ret.id = ret._id.toString();
       delete ret._id;
+      delete ret.password_hash;
       return ret;
     },
   },

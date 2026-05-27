@@ -1,8 +1,10 @@
 import { useState, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
+import { useAuth } from '@/lib/AuthContext';
+import { isAdmin } from '@/lib/permissions';
 import { Button } from '@/components/ui/button';
-import { CheckCircle2, XCircle, Clock, CalendarDays, Building2, User, ShieldOff } from 'lucide-react';
+import { CheckCircle2, XCircle, Clock, CalendarDays, Building2, User } from 'lucide-react';
 import { format } from 'date-fns';
 
 const STATUS_STYLES = {
@@ -84,15 +86,9 @@ export default function TimeReportsAdmin() {
   const [activeTab, setActiveTab] = useState('ממתין');
   const queryClient = useQueryClient();
 
-  const { data: currentUser, isLoading: loadingUser } = useQuery({
-    queryKey: ['current-user-tra'],
-    queryFn: async () => { try { return await base44.auth.me(); } catch { return null; } },
-  });
-
-  const isAdmin = currentUser?.role === 'admin';
-  const canView = isAdmin || !!currentUser?.can_view_time_reports;
-  // Read-only if not admin
-  const readOnly = !isAdmin;
+  const { user: currentUser, isLoadingAuth: loadingUser } = useAuth();
+  const userIsAdmin = isAdmin(currentUser);
+  const readOnly = !userIsAdmin;
 
   const { data: reports = [], isLoading } = useQuery({
     queryKey: ['time-reports', selectedDate],
@@ -217,15 +213,6 @@ export default function TimeReportsAdmin() {
     return (
       <div className="p-8 flex justify-center items-center">
         <div className="w-7 h-7 border-4 border-slate-200 border-t-primary rounded-full animate-spin" />
-      </div>
-    );
-  }
-
-  if (!canView) {
-    return (
-      <div className="p-8 flex flex-col items-center justify-center gap-4 text-center text-muted-foreground">
-        <ShieldOff size={48} className="opacity-30" />
-        <p className="font-medium">אין הרשאת גישה לעמוד זה.</p>
       </div>
     );
   }
