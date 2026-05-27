@@ -51,3 +51,33 @@ The Express server lives in `server/` and exposes:
 `GET /api/public/schedule` is public (for `/schedule`; no sign-in). `GET /api/entities/PublishedSchedule` is also readable without auth.
 
 Uploaded PDFs are stored in the local `uploads/` directory and served back as static files.
+
+## Render deployment
+
+This app is typically deployed as **two Render services**:
+
+| Service | URL | Type |
+|--------|-----|------|
+| Frontend | `siduravoda.onrender.com` | Static Site (`dist/`) |
+| API | `siduravoda-server.onrender.com` | Web Service (`npm start`) |
+
+**Frontend (static site)** — required settings:
+
+- Build command: `npm install && npm run build`
+- Publish directory: `dist`
+- Rewrite rule: `/*` → `/index.html` (SPA fallback for `/schedule`, `/time-reporting`, etc.)
+
+The rewrite is included via `public/_redirects` (copied into `dist/` on build) and `render.yaml`.
+
+**Frontend build env:**
+
+- `VITE_API_BASE_URL=https://siduravoda-server.onrender.com`
+
+**API (web service)** — required settings:
+
+- Build command: `npm install && npm run build`
+- Start command: `npm start`
+- `CLIENT_ORIGIN=https://siduravoda.onrender.com` (no trailing slash)
+- `MONGODB_URI`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`, etc.
+
+Admin Tools links use the **frontend** origin (`window.location.origin`), so SPA rewrites must be configured on the static site — not only on the API server.
