@@ -37,16 +37,11 @@ function toHebrewDate(dateStr) {
   } catch { return ''; }
 }
 
-// Workplaces to exclude from the PDF report
-const SKIP_WORKPLACE_NAMES = ['לא עובד', 'לימודים', 'לא יצא', 'תתת - לא עובד', 'קרוב', 'רחוק', 'אאא- לפני שיבוץ'];
-const shouldSkip = (name) => !name || !name.trim() || SKIP_WORKPLACE_NAMES.some(kw => name.trim() === kw);
-
 function buildReportGroups(assignments, logisticsMap, logisticsMapByName, studentsMap) {
-  // Only include assignments with a real workplace that's not in the skip list
+  // Include all assignments that have a workplace id and name
   const filtered = assignments.filter(a =>
     a.workplace_id &&
-    a.workplace_name &&
-    !shouldSkip(a.workplace_name)
+    a.workplace_name
   );
 
   // Deduplicate: keep one assignment per student (most recently updated)
