@@ -18,7 +18,7 @@ function toHebrewDate(dateStr) {
     const hebrewDigits = ['', 'א', 'ב', 'ג', 'ד', 'ה', 'ו', 'ז', 'ח', 'ט', 'י', 'י״א', 'י״ב', 'י״ג', 'י״ד', 'ט״ו', 'ט״ז', 'י״ז', 'י״ח', 'י״ט', 'כ', 'כ״א', 'כ״ב', 'כ״ג', 'כ״ד', 'כ״ה', 'כ״ו', 'כ״ז', 'כ״ח', 'כ״ט', 'ל'];
     const parts = formatted.split(' ');
     
-    if (parts.length >= 3 && !isNaN(parts[0])) {
+    if (parts.length >= 3 && !Number.isNaN(Number(parts[0]))) {
       const day = parseInt(parts[0]);
       const year = parseInt(parts[parts.length - 1]);
       const month = parts.slice(1, -1).join(' ');
@@ -37,16 +37,11 @@ function toHebrewDate(dateStr) {
   } catch { return ''; }
 }
 
-// Workplaces to exclude from the PDF report
-const SKIP_WORKPLACE_NAMES = ['לא עובד', 'לימודים', 'לא יצא', 'תתת - לא עובד', 'קרוב', 'רחוק', 'אאא- לפני שיבוץ'];
-const shouldSkip = (name) => !name || !name.trim() || SKIP_WORKPLACE_NAMES.some(kw => name.trim() === kw);
-
 function buildReportGroups(assignments, logisticsMap, logisticsMapByName, studentsMap) {
-  // Only include assignments with a real workplace that's not in the skip list
+  // Include all assignments that have a workplace id and name
   const filtered = assignments.filter(a =>
     a.workplace_id &&
-    a.workplace_name &&
-    !shouldSkip(a.workplace_name)
+    a.workplace_name
   );
 
   // Deduplicate: keep one assignment per student (most recently updated)
@@ -93,6 +88,7 @@ function buildReportGroups(assignments, logisticsMap, logisticsMapByName, studen
     });
 }
 
+/** @type {Record<string, import('react').CSSProperties>} */
 const S = {
   // The hidden container — A4 width at 96dpi ≈ 794px, we use 760px with padding
   wrap: {
@@ -110,12 +106,12 @@ const S = {
     paddingBottom: '5px',
     marginBottom: '8px',
   },
-  titleText: { fontSize: '14px', fontWeight: 'bold', color: '#1e3a8a', margin: 0 },
+  titleText: { fontSize: '18px', fontWeight: '800', color: '#1e3a8a', margin: 0 },
   subtitle: { fontSize: '9px', color: '#555', margin: '2px 0 0' },
   cols: { display: 'flex', gap: '6px', alignItems: 'flex-start' },
   col: { flex: 1, minWidth: 0 },
   group: { marginBottom: '12px', border: '1px solid #9ca3af', borderRadius: '3px', overflow: 'hidden', pageBreakInside: 'avoid' },
-  groupHeader: { background: '#1e3a8a', color: '#fff', padding: '4px 5px', fontWeight: 'bold', fontSize: '8px', pageBreakInside: 'avoid', display: 'flex', alignItems: 'center', minHeight: '16px' },
+  groupHeader: { background: '#1e3a8a', color: '#fff', padding: '5px 6px', fontWeight: '800', fontSize: '10px', pageBreakInside: 'avoid', display: 'flex', alignItems: 'center', minHeight: '20px' },
   logRow: {
     background: '#fef9c3',
     borderBottom: '1px solid #ca8a04',
@@ -136,7 +132,7 @@ const S = {
   tdEven: { border: '1px solid #e5e7eb', padding: '5px 4px', background: '#fff', fontSize: '8.5px', fontWeight: '500', color: '#1f2937', verticalAlign: 'middle', minHeight: '18px', display: 'table-cell' },
   tdOdd:  { border: '1px solid #e5e7eb', padding: '5px 4px', background: '#f9fafb', fontSize: '8.5px', fontWeight: '500', color: '#1f2937', verticalAlign: 'middle', minHeight: '18px', display: 'table-cell' },
   tdRole: { fontWeight: '700', color: '#1d4ed8' },
-  tfootTd: { border: '1px solid #d1d5db', padding: '5px 4px', fontSize: '7.5px', color: '#374151', background: '#f3f4f6', fontWeight: '600', minHeight: '18px', verticalAlign: 'middle', display: 'table-cell' },
+  tfootTd: { border: '1px solid #d1d5db', padding: '6px 5px', fontSize: '9px', color: '#1f2937', background: '#f3f4f6', fontWeight: '800', minHeight: '20px', verticalAlign: 'middle', display: 'table-cell' },
 };
 
 function WorkplaceCard({ group, studentsMap }) {
@@ -144,7 +140,7 @@ function WorkplaceCard({ group, studentsMap }) {
   const hasLog = group.vehicleName || group.exitTime || group.notes;
 
   return (
-    <div style={S.group}>
+    <div style={S.group} data-report-group="true">
       <div style={S.groupHeader}>{group.workplaceName}</div>
       {hasLog && (
         <div style={S.logRow}>
@@ -160,7 +156,7 @@ function WorkplaceCard({ group, studentsMap }) {
               <span style={S.logValRed}>⏰ {group.exitTime}</span>
             </span>
           )}
-          {group.notes && <span style={{ fontSize: '7px', color: '#78350f', verticalAlign: 'middle', lineHeight: '1.4' }}>📝 {group.notes}</span>}
+          {group.notes && <span style={{ fontSize: '8.5px', fontWeight: '700', color: '#78350f', verticalAlign: 'middle', lineHeight: '1.45' }}>📝 {group.notes}</span>}
         </div>
       )}
       <table style={S.table}>
@@ -216,6 +212,81 @@ function ReportContent({ forwardRef, reportGroups, gregDate, hebrewDate, student
   );
 }
 
+function buildAvoidBreakRanges(container, canvas) {
+  const containerRect = container.getBoundingClientRect();
+  const pxScale = containerRect.width > 0 ? canvas.width / containerRect.width : 1;
+  const MIN_BLOCK_START_PX = 52 * pxScale; // header + table head + at least one row
+  const groups = Array.from(container.querySelectorAll('[data-report-group="true"]'));
+
+  return groups
+    .map((el) => {
+      const r = el.getBoundingClientRect();
+      const top = Math.max(0, (r.top - containerRect.top) * pxScale);
+      return {
+        start: top,
+        end: top + MIN_BLOCK_START_PX,
+      };
+    })
+    .sort((a, b) => a.start - b.start);
+}
+
+function buildNoCutRowRanges(container, canvas) {
+  const containerRect = container.getBoundingClientRect();
+  const pxScale = containerRect.width > 0 ? canvas.width / containerRect.width : 1;
+  const rows = Array.from(container.querySelectorAll('[data-report-group="true"] tr'));
+
+  return rows
+    .map((row) => {
+      const r = row.getBoundingClientRect();
+      return {
+        start: Math.max(0, (r.top - containerRect.top) * pxScale),
+        end: Math.max(0, (r.bottom - containerRect.top) * pxScale),
+      };
+    })
+    .filter((r) => r.end > r.start)
+    .sort((a, b) => a.start - b.start);
+}
+
+function adjustPageBreak(targetEnd, srcY, pageHeightPx, avoidRanges, noCutRanges) {
+  const MIN_SLICE_RATIO = 0.55;
+  const minSlicePx = pageHeightPx * MIN_SLICE_RATIO;
+  const MAX_ITERATIONS = 8;
+
+  let adjustedEnd = targetEnd;
+  for (let i = 0; i < MAX_ITERATIONS; i += 1) {
+    // Highest priority: never split an existing table row/cell.
+    const rowBlocking = noCutRanges.find((r) => adjustedEnd > r.start && adjustedEnd < r.end);
+    if (rowBlocking) {
+      if (rowBlocking.start - srcY >= minSlicePx) {
+        adjustedEnd = rowBlocking.start;
+        continue;
+      }
+      if (rowBlocking.end - srcY <= pageHeightPx) {
+        adjustedEnd = rowBlocking.end;
+        continue;
+      }
+      break;
+    }
+
+    // Secondary rule: don't start a new page with only a table title/header tail.
+    const blocking = avoidRanges.find((r) => adjustedEnd > r.start && adjustedEnd < r.end);
+    if (!blocking) {
+      return adjustedEnd;
+    }
+    if (blocking.start - srcY >= minSlicePx) {
+      adjustedEnd = blocking.start;
+      continue;
+    }
+    if (blocking.end - srcY <= pageHeightPx) {
+      adjustedEnd = blocking.end;
+      continue;
+    }
+    break;
+  }
+
+  return adjustedEnd;
+}
+
 async function generatePDFBlob(container) {
   container.style.display = 'block';
   container.style.position = 'fixed';
@@ -225,6 +296,8 @@ async function generatePDFBlob(container) {
 
   const SCALE = 3; // high-res for crisp text
   const canvas = await html2canvas(container, { scale: SCALE, useCORS: true, backgroundColor: '#ffffff' });
+  const avoidRanges = buildAvoidBreakRanges(container, canvas);
+  const noCutRanges = buildNoCutRowRanges(container, canvas);
 
   container.style.display = 'none';
 
@@ -243,7 +316,15 @@ async function generatePDFBlob(container) {
   let firstPage = true;
 
   while (srcY < canvas.height) {
-    const sliceH = Math.min(pageHeightPx, canvas.height - srcY);
+    let targetEnd = Math.min(srcY + pageHeightPx, canvas.height);
+    if (targetEnd < canvas.height) {
+      targetEnd = adjustPageBreak(targetEnd, srcY, pageHeightPx, avoidRanges, noCutRanges);
+      if (targetEnd <= srcY) {
+        targetEnd = Math.min(srcY + pageHeightPx, canvas.height);
+      }
+    }
+
+    const sliceH = targetEnd - srcY;
     const slice = document.createElement('canvas');
     slice.width = canvas.width;
     slice.height = sliceH;
@@ -252,7 +333,7 @@ async function generatePDFBlob(container) {
     if (!firstPage) pdf.addPage();
     pdf.addImage(slice.toDataURL('image/jpeg', 0.92), 'JPEG', margin, margin, contentW, sliceH * mmPerPx);
     firstPage = false;
-    srcY += sliceH;
+    srcY = targetEnd;
   }
 
   return pdf.output('blob');
