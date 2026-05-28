@@ -145,7 +145,7 @@ function WorkplaceCard({ group, studentsMap }) {
   const hasLog = group.vehicleName || group.exitTime || group.notes;
 
   return (
-    <div style={S.group}>
+    <div style={S.group} data-report-group="true">
       <div style={S.groupHeader}>{group.workplaceName}</div>
       {hasLog && (
         <div style={S.logRow}>
@@ -217,6 +217,81 @@ function ReportContent({ forwardRef, reportGroups, gregDate, hebrewDate, student
   );
 }
 
+function buildAvoidBreakRanges(container, canvas) {
+  const containerRect = container.getBoundingClientRect();
+  const pxScale = containerRect.width > 0 ? canvas.width / containerRect.width : 1;
+  const MIN_BLOCK_START_PX = 52 * pxScale; // header + table head + at least one row
+  const groups = Array.from(container.querySelectorAll('[data-report-group="true"]'));
+
+  return groups
+    .map((el) => {
+      const r = el.getBoundingClientRect();
+      const top = Math.max(0, (r.top - containerRect.top) * pxScale);
+      return {
+        start: top,
+        end: top + MIN_BLOCK_START_PX,
+      };
+    })
+    .sort((a, b) => a.start - b.start);
+}
+
+function buildNoCutRowRanges(container, canvas) {
+  const containerRect = container.getBoundingClientRect();
+  const pxScale = containerRect.width > 0 ? canvas.width / containerRect.width : 1;
+  const rows = Array.from(container.querySelectorAll('[data-report-group="true"] tr'));
+
+  return rows
+    .map((row) => {
+      const r = row.getBoundingClientRect();
+      return {
+        start: Math.max(0, (r.top - containerRect.top) * pxScale),
+        end: Math.max(0, (r.bottom - containerRect.top) * pxScale),
+      };
+    })
+    .filter((r) => r.end > r.start)
+    .sort((a, b) => a.start - b.start);
+}
+
+function adjustPageBreak(targetEnd, srcY, pageHeightPx, avoidRanges, noCutRanges) {
+  const MIN_SLICE_RATIO = 0.55;
+  const minSlicePx = pageHeightPx * MIN_SLICE_RATIO;
+  const MAX_ITERATIONS = 8;
+
+  let adjustedEnd = targetEnd;
+  for (let i = 0; i < MAX_ITERATIONS; i += 1) {
+    // Highest priority: never split an existing table row/cell.
+    const rowBlocking = noCutRanges.find((r) => adjustedEnd > r.start && adjustedEnd < r.end);
+    if (rowBlocking) {
+      if (rowBlocking.start - srcY >= minSlicePx) {
+        adjustedEnd = rowBlocking.start;
+        continue;
+      }
+      if (rowBlocking.end - srcY <= pageHeightPx) {
+        adjustedEnd = rowBlocking.end;
+        continue;
+      }
+      break;
+    }
+
+    // Secondary rule: don't start a new page with only a table title/header tail.
+    const blocking = avoidRanges.find((r) => adjustedEnd > r.start && adjustedEnd < r.end);
+    if (!blocking) {
+      return adjustedEnd;
+    }
+    if (blocking.start - srcY >= minSlicePx) {
+      adjustedEnd = blocking.start;
+      continue;
+    }
+    if (blocking.end - srcY <= pageHeightPx) {
+      adjustedEnd = blocking.end;
+      continue;
+    }
+    break;
+  }
+
+  return adjustedEnd;
+}
+
 async function generatePDFBlob(container) {
   container.style.display = 'block';
   container.style.position = 'fixed';
@@ -226,6 +301,8 @@ async function generatePDFBlob(container) {
 
   const SCALE = 3; // high-res for crisp text
   const canvas = await html2canvas(container, { scale: SCALE, useCORS: true, backgroundColor: '#ffffff' });
+  const avoidRanges = buildAvoidBreakRanges(container, canvas);
+  const noCutRanges = buildNoCutRowRanges(container, canvas);
 
   container.style.display = 'none';
 
@@ -244,7 +321,15 @@ async function generatePDFBlob(container) {
   let firstPage = true;
 
   while (srcY < canvas.height) {
-    const sliceH = Math.min(pageHeightPx, canvas.height - srcY);
+    let targetEnd = Math.min(srcY + pageHeightPx, canvas.height);
+    if (targetEnd < canvas.height) {
+      targetEnd = adjustPageBreak(targetEnd, srcY, pageHeightPx, avoidRanges, noCutRanges);
+      if (targetEnd <= srcY) {
+        targetEnd = Math.min(srcY + pageHeightPx, canvas.height);
+      }
+    }
+
+    const sliceH = targetEnd - srcY;
     const slice = document.createElement('canvas');
     slice.width = canvas.width;
     slice.height = sliceH;
@@ -253,7 +338,7 @@ async function generatePDFBlob(container) {
     if (!firstPage) pdf.addPage();
     pdf.addImage(slice.toDataURL('image/jpeg', 0.92), 'JPEG', margin, margin, contentW, sliceH * mmPerPx);
     firstPage = false;
-    srcY += sliceH;
+    srcY = targetEnd;
   }
 
   return pdf.output('blob');
