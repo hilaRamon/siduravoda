@@ -15,6 +15,7 @@ import { ensureAdminUser } from "./lib/bootstrap.js";
 dotenv.config();
 
 const app = express();
+app.set("trust proxy", true);
 const port = Number.parseInt(process.env.PORT || "4000", 10);
 const mongoUri = process.env.MONGODB_URI;
 const clientOrigin = process.env.CLIENT_ORIGIN || "http://localhost:5173";
