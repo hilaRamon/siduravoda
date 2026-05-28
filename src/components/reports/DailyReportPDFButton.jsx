@@ -18,7 +18,7 @@ function toHebrewDate(dateStr) {
     const hebrewDigits = ['', 'א', 'ב', 'ג', 'ד', 'ה', 'ו', 'ז', 'ח', 'ט', 'י', 'י״א', 'י״ב', 'י״ג', 'י״ד', 'ט״ו', 'ט״ז', 'י״ז', 'י״ח', 'י״ט', 'כ', 'כ״א', 'כ״ב', 'כ״ג', 'כ״ד', 'כ״ה', 'כ״ו', 'כ״ז', 'כ״ח', 'כ״ט', 'ל'];
     const parts = formatted.split(' ');
     
-    if (parts.length >= 3 && !isNaN(parts[0])) {
+    if (parts.length >= 3 && !Number.isNaN(Number(parts[0]))) {
       const day = parseInt(parts[0]);
       const year = parseInt(parts[parts.length - 1]);
       const month = parts.slice(1, -1).join(' ');
@@ -93,6 +93,7 @@ function buildReportGroups(assignments, logisticsMap, logisticsMapByName, studen
     });
 }
 
+/** @type {Record<string, import('react').CSSProperties>} */
 const S = {
   // The hidden container — A4 width at 96dpi ≈ 794px, we use 760px with padding
   wrap: {
@@ -110,12 +111,12 @@ const S = {
     paddingBottom: '5px',
     marginBottom: '8px',
   },
-  titleText: { fontSize: '14px', fontWeight: 'bold', color: '#1e3a8a', margin: 0 },
+  titleText: { fontSize: '18px', fontWeight: '800', color: '#1e3a8a', margin: 0 },
   subtitle: { fontSize: '9px', color: '#555', margin: '2px 0 0' },
   cols: { display: 'flex', gap: '6px', alignItems: 'flex-start' },
   col: { flex: 1, minWidth: 0 },
   group: { marginBottom: '12px', border: '1px solid #9ca3af', borderRadius: '3px', overflow: 'hidden', pageBreakInside: 'avoid' },
-  groupHeader: { background: '#1e3a8a', color: '#fff', padding: '4px 5px', fontWeight: 'bold', fontSize: '8px', pageBreakInside: 'avoid', display: 'flex', alignItems: 'center', minHeight: '16px' },
+  groupHeader: { background: '#1e3a8a', color: '#fff', padding: '5px 6px', fontWeight: '800', fontSize: '10px', pageBreakInside: 'avoid', display: 'flex', alignItems: 'center', minHeight: '20px' },
   logRow: {
     background: '#fef9c3',
     borderBottom: '1px solid #ca8a04',
@@ -136,7 +137,7 @@ const S = {
   tdEven: { border: '1px solid #e5e7eb', padding: '5px 4px', background: '#fff', fontSize: '8.5px', fontWeight: '500', color: '#1f2937', verticalAlign: 'middle', minHeight: '18px', display: 'table-cell' },
   tdOdd:  { border: '1px solid #e5e7eb', padding: '5px 4px', background: '#f9fafb', fontSize: '8.5px', fontWeight: '500', color: '#1f2937', verticalAlign: 'middle', minHeight: '18px', display: 'table-cell' },
   tdRole: { fontWeight: '700', color: '#1d4ed8' },
-  tfootTd: { border: '1px solid #d1d5db', padding: '5px 4px', fontSize: '7.5px', color: '#374151', background: '#f3f4f6', fontWeight: '600', minHeight: '18px', verticalAlign: 'middle', display: 'table-cell' },
+  tfootTd: { border: '1px solid #d1d5db', padding: '6px 5px', fontSize: '9px', color: '#1f2937', background: '#f3f4f6', fontWeight: '800', minHeight: '20px', verticalAlign: 'middle', display: 'table-cell' },
 };
 
 function WorkplaceCard({ group, studentsMap }) {
@@ -160,7 +161,7 @@ function WorkplaceCard({ group, studentsMap }) {
               <span style={S.logValRed}>⏰ {group.exitTime}</span>
             </span>
           )}
-          {group.notes && <span style={{ fontSize: '7px', color: '#78350f', verticalAlign: 'middle', lineHeight: '1.4' }}>📝 {group.notes}</span>}
+          {group.notes && <span style={{ fontSize: '8.5px', fontWeight: '700', color: '#78350f', verticalAlign: 'middle', lineHeight: '1.45' }}>📝 {group.notes}</span>}
         </div>
       )}
       <table style={S.table}>
