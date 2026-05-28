@@ -26,7 +26,9 @@ router.post('/core/upload-file', upload.single('file'), async (req, res) => {
     return res.status(400).json({ message: 'Missing file upload' });
   }
 
-  const baseUrl = (process.env.PUBLIC_API_URL || `${req.protocol}://${req.get('host')}`).replace(/\/$/, '');
+  const forwardedProto = (req.get('x-forwarded-proto') || '').split(',')[0].trim();
+  const protocol = forwardedProto || req.protocol;
+  const baseUrl = (process.env.PUBLIC_API_URL || `${protocol}://${req.get('host')}`).replace(/\/$/, '');
   return res.status(201).json({
     file_url: `${baseUrl}/uploads/${req.file.filename}`,
     original_name: req.file.originalname,
