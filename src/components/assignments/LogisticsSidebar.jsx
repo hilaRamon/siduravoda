@@ -167,7 +167,7 @@ export default function LogisticsSidebar({ date, assignments }) {
     if (existing) {
       await base44.entities.WorkplaceLogistics.update(existing.id, data);
     } else {
-      await base44.entities.WorkplaceLogistics.create({ date, workplace_id: workplaceId, workplace_name: workplaceName, ...data });
+      await base44.entities.WorkplaceLogistics.create({ date, workplace_id: workplaceId, workplace_name: workplaceName, exit_time: '06:35', ...data });
     }
     queryClient.invalidateQueries({ queryKey: ['workplace-logistics', date] });
   };
