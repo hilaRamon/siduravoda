@@ -121,6 +121,36 @@ async function uploadFile({ file }) {
   });
 }
 
+async function htmlToPdf({ html }) {
+  const headers = { "Content-Type": "application/json" };
+  const token = getAuthToken();
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+
+  const response = await fetch(`${API_BASE_URL}/api/integrations/core/html-to-pdf`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ html }),
+  });
+
+  if (!response.ok) {
+    let message = `Request failed: ${response.status}`;
+    try {
+      const payload = await response.json();
+      message = payload?.message || message;
+    } catch {
+      // response had no JSON body
+    }
+    /** @type {ApiError} */
+    const error = new Error(message);
+    error.status = response.status;
+    throw error;
+  }
+
+  return response.blob();
+}
+
 export const base44 = {
   public: {
     getPublishedSchedule() {
@@ -145,6 +175,7 @@ export const base44 = {
   integrations: {
     Core: {
       UploadFile: uploadFile,
+      HtmlToPdf: htmlToPdf,
     },
   },
   auth: {

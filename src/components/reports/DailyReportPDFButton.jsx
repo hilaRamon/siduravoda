@@ -7,7 +7,7 @@ import {
   ReportContent,
   buildLookupMaps,
   buildReportGroups,
-  generatePDFBlob,
+  htmlToPdfBlob,
   toGregDate,
   toHebrewDate,
 } from "@/components/reports/dailyReportPdf";
@@ -44,7 +44,7 @@ export default function DailyReportPDFButton({ date, assignments }) {
 
   const handleExport = async () => {
     setExporting(true);
-    const blob = await generatePDFBlob(hiddenRef.current);
+    const blob = await htmlToPdfBlob(hiddenRef.current);
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -57,7 +57,7 @@ export default function DailyReportPDFButton({ date, assignments }) {
   const handlePublish = async () => {
     setPublishing(true);
     setPublishedOk(false);
-    const blob = await generatePDFBlob(hiddenRef.current);
+    const blob = await htmlToPdfBlob(hiddenRef.current);
     const file = new File([blob], `schedule_${date}.pdf`, {
       type: "application/pdf",
     });

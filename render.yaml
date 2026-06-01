@@ -9,6 +9,10 @@ services:
     runtime: static
     buildCommand: npm install && npm run build
     staticPublishPath: ./dist
+    envVars:
+      # Frontend build does not need Chromium; skip the heavy download.
+      - key: PUPPETEER_SKIP_DOWNLOAD
+        value: "true"
     routes:
       - type: rewrite
         source: /*
@@ -26,3 +30,7 @@ services:
         value: https://siduravoda.onrender.com
       - key: VITE_API_BASE_URL
         value: https://siduravoda-server.onrender.com
+      # Download Chromium during build into the project dir so puppeteer can
+      # find it at runtime (build and runtime share /opt/render/project/src).
+      - key: PUPPETEER_CACHE_DIR
+        value: /opt/render/project/src/.cache/puppeteer

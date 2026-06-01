@@ -1,5 +1,4 @@
-import jsPDF from "jspdf";
-import html2canvas from "html2canvas";
+import { base44 } from "@/api/base44Client";
 
 export function toHebrewDate(dateStr) {
   try {
@@ -192,93 +191,141 @@ const S = {
     margin: 0,
   },
   subtitle: { fontSize: "9px", color: "#555", margin: "2px 0 0" },
-  cols: { display: "flex", gap: "6px", alignItems: "flex-start" },
-  col: { flex: 1, minWidth: 0 },
+  cols: { columnCount: 2, columnGap: "6px" },
   group: {
     marginBottom: "12px",
     border: "1px solid #9ca3af",
     borderRadius: "3px",
     overflow: "hidden",
     pageBreakInside: "avoid",
+    breakInside: "avoid",
   },
   groupHeader: {
     background: "#1e3a8a",
     color: "#fff",
-    padding: "5px 6px",
+    padding: "3px 6px",
     fontWeight: "800",
     fontSize: "10px",
     pageBreakInside: "avoid",
     display: "flex",
     alignItems: "center",
-    minHeight: "20px",
+    minHeight: "16px",
   },
   logRow: {
     background: "#fef9c3",
     borderBottom: "1px solid #ca8a04",
-    padding: "4px 5px",
+    padding: "2px 5px",
     display: "flex",
     gap: "8px",
     alignItems: "center",
     fontSize: "8.5px",
     flexWrap: "wrap",
-    minHeight: "20px",
-    lineHeight: "1.4",
+    minHeight: "14px",
+    lineHeight: "1.3",
   },
   logLabel: { color: "#78716c", fontSize: "7.5px", verticalAlign: "middle" },
   logVal: { fontWeight: "bold", color: "#1e3a8a", verticalAlign: "middle" },
   logValRed: { fontWeight: "bold", color: "#b91c1c", verticalAlign: "middle" },
   table: {
     width: "100%",
-    fontSize: "8.5px",
+    fontSize: "8px",
     borderCollapse: "collapse",
-    minHeight: "30px",
     pageBreakInside: "avoid",
   },
   th: {
     background: "#dbeafe",
     border: "1px solid #d1d5db",
-    padding: "2.5px 4px",
+    padding: "1.5px 4px",
     textAlign: "right",
-    fontSize: "7.5px",
+    fontSize: "7px",
     fontWeight: "bold",
     color: "#1e3a8a",
     verticalAlign: "middle",
   },
   tdEven: {
     border: "1px solid #e5e7eb",
-    padding: "5px 4px",
+    padding: "1.5px 4px",
     background: "#fff",
-    fontSize: "8.5px",
+    fontSize: "8px",
     fontWeight: "500",
     color: "#1f2937",
     verticalAlign: "middle",
     display: "table-cell",
-    lineHeight: "0.8",
+    lineHeight: "1",
   },
   tdOdd: {
     border: "1px solid #e5e7eb",
-    padding: "5px 4px",
+    padding: "1.5px 4px",
     background: "#f9fafb",
-    fontSize: "8.5px",
+    fontSize: "8px",
     fontWeight: "500",
     color: "#1f2937",
     verticalAlign: "middle",
     display: "table-cell",
-    lineHeight: "0.8",
+    lineHeight: "1",
   },
   tdRole: { fontWeight: "700", color: "#1d4ed8" },
   tfootTd: {
     border: "1px solid #d1d5db",
-    padding: "6px 5px",
-    fontSize: "9px",
+    padding: "3px 5px",
+    fontSize: "8px",
     color: "#1f2937",
     background: "#f3f4f6",
     fontWeight: "800",
     verticalAlign: "middle",
     display: "table-cell",
-    lineHeight: "0.8",
+    lineHeight: "1",
   },
 };
+
+// Inline SVG icons (currentColor) so they render reliably in the PDF without
+// needing an emoji font embedded in headless Chrome.
+/** @type {import('react').SVGProps<SVGSVGElement>} */
+const iconBase = {
+  width: 11,
+  height: 11,
+  viewBox: "0 0 24 24",
+  fill: "none",
+  stroke: "currentColor",
+  strokeWidth: 2.2,
+  strokeLinecap: "round",
+  strokeLinejoin: "round",
+};
+const iconStyle = {
+  display: "inline-block",
+  verticalAlign: "middle",
+  marginLeft: "2px",
+};
+
+function VehicleIcon() {
+  return (
+    <svg {...iconBase} style={iconStyle}>
+      <path d="M8 6v6M15 6v6M2 12h19.6M18 18h3l.8-3a4 4 0 0 0-.2-2.4l-1.4-4.6A2 2 0 0 0 18.3 6H4a2 2 0 0 0-2 2v10h3" />
+      <circle cx="7" cy="18" r="2" />
+      <circle cx="16" cy="18" r="2" />
+    </svg>
+  );
+}
+
+function ClockIcon() {
+  return (
+    <svg {...iconBase} style={iconStyle}>
+      <circle cx="12" cy="12" r="9" />
+      <polyline points="12 7 12 12 16 14" />
+    </svg>
+  );
+}
+
+function NoteIcon() {
+  return (
+    <svg {...iconBase} style={iconStyle}>
+      <path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" />
+      <polyline points="14 3 14 9 20 9" />
+      <line x1="9" y1="13" x2="15" y2="13" />
+      <line x1="9" y1="17" x2="15" y2="17" />
+    </svg>
+  );
+}
 
 function WorkplaceCard({ group, studentsMap }) {
   const roleMap = { נהג: "נהג", "ראש צוות": "ראש צוות", 'אחראי פק"ל': 'פק"ל' };
@@ -292,13 +339,17 @@ function WorkplaceCard({ group, studentsMap }) {
           {group.vehicleName && (
             <span>
               <span style={S.logLabel}>רכב: </span>
-              <span style={S.logVal}>🚐 {group.vehicleName}</span>
+              <span style={S.logVal}>
+                <VehicleIcon /> {group.vehicleName}
+              </span>
             </span>
           )}
           {group.exitTime && (
             <span>
               <span style={S.logLabel}>יציאה: </span>
-              <span style={S.logValRed}>⏰ {group.exitTime}</span>
+              <span style={S.logValRed}>
+                <ClockIcon /> {group.exitTime}
+              </span>
             </span>
           )}
           {group.notes && (
@@ -311,7 +362,7 @@ function WorkplaceCard({ group, studentsMap }) {
                 lineHeight: "1.45",
               }}
             >
-              📝 {group.notes}
+              <NoteIcon /> {group.notes}
             </span>
           )}
         </div>
@@ -367,9 +418,6 @@ export function ReportContent({
   studentsMap,
   preview = false,
 }) {
-  const leftCol = reportGroups.filter((_, i) => i % 2 === 0);
-  const rightCol = reportGroups.filter((_, i) => i % 2 === 1);
-
   const wrapStyle = preview
     ? { ...S.wrap, display: "block", width: "100%", margin: "0 auto" }
     : S.wrap;
@@ -383,197 +431,37 @@ export function ReportContent({
         </p>
       </div>
       <div style={S.cols}>
-        <div style={S.col}>
-          {leftCol.map((g) => (
-            <WorkplaceCard
-              key={g.workplaceName}
-              group={g}
-              studentsMap={studentsMap}
-            />
-          ))}
-        </div>
-        <div style={S.col}>
-          {rightCol.map((g) => (
-            <WorkplaceCard
-              key={g.workplaceName}
-              group={g}
-              studentsMap={studentsMap}
-            />
-          ))}
-        </div>
+        {reportGroups.map((g) => (
+          <WorkplaceCard
+            key={g.workplaceName}
+            group={g}
+            studentsMap={studentsMap}
+          />
+        ))}
       </div>
     </div>
   );
 }
 
-function buildAvoidBreakRanges(container, canvas) {
-  const containerRect = container.getBoundingClientRect();
-  const pxScale =
-    containerRect.width > 0 ? canvas.width / containerRect.width : 1;
-  const MIN_BLOCK_START_PX = 52 * pxScale; // header + table head + at least one row
-  const groups = Array.from(
-    container.querySelectorAll('[data-report-group="true"]'),
-  );
+/**
+ * Serialize a rendered ReportContent container and ask the server (Puppeteer)
+ * to turn it into a real, vector A4 PDF. Returns a PDF Blob.
+ */
+export async function htmlToPdfBlob(container) {
+  // Clone so we can force the hidden wrapper to be visible/full-width in the
+  // serialized markup without touching the on-page node.
+  const clone = container.cloneNode(true);
+  clone.style.display = "block";
+  clone.style.position = "static";
+  clone.style.top = "auto";
+  clone.style.left = "auto";
+  // A4 (210mm) minus the 8mm server print margins leaves ~733px of printable
+  // width at 96dpi; keep the layout narrower so nothing is clipped (RTL clips
+  // on the left).
+  clone.style.width = "720px";
+  clone.style.maxWidth = "720px";
+  clone.style.margin = "0 auto";
 
-  return groups
-    .map((el) => {
-      const r = el.getBoundingClientRect();
-      const top = Math.max(0, (r.top - containerRect.top) * pxScale);
-      return {
-        start: top,
-        end: top + MIN_BLOCK_START_PX,
-      };
-    })
-    .sort((a, b) => a.start - b.start);
-}
-
-function buildNoCutRowRanges(container, canvas) {
-  const containerRect = container.getBoundingClientRect();
-  const pxScale =
-    containerRect.width > 0 ? canvas.width / containerRect.width : 1;
-  const rows = Array.from(
-    container.querySelectorAll('[data-report-group="true"] tr'),
-  );
-
-  return rows
-    .map((row) => {
-      const r = row.getBoundingClientRect();
-      return {
-        start: Math.max(0, (r.top - containerRect.top) * pxScale),
-        end: Math.max(0, (r.bottom - containerRect.top) * pxScale),
-      };
-    })
-    .filter((r) => r.end > r.start)
-    .sort((a, b) => a.start - b.start);
-}
-
-function adjustPageBreak(
-  targetEnd,
-  srcY,
-  pageHeightPx,
-  avoidRanges,
-  noCutRanges,
-) {
-  const MIN_SLICE_RATIO = 0.55;
-  const minSlicePx = pageHeightPx * MIN_SLICE_RATIO;
-  const MAX_ITERATIONS = 8;
-
-  let adjustedEnd = targetEnd;
-  for (let i = 0; i < MAX_ITERATIONS; i += 1) {
-    // Highest priority: never split an existing table row/cell.
-    const rowBlocking = noCutRanges.find(
-      (r) => adjustedEnd > r.start && adjustedEnd < r.end,
-    );
-    if (rowBlocking) {
-      if (rowBlocking.start - srcY >= minSlicePx) {
-        adjustedEnd = rowBlocking.start;
-        continue;
-      }
-      if (rowBlocking.end - srcY <= pageHeightPx) {
-        adjustedEnd = rowBlocking.end;
-        continue;
-      }
-      break;
-    }
-
-    // Secondary rule: don't start a new page with only a table title/header tail.
-    const blocking = avoidRanges.find(
-      (r) => adjustedEnd > r.start && adjustedEnd < r.end,
-    );
-    if (!blocking) {
-      return adjustedEnd;
-    }
-    if (blocking.start - srcY >= minSlicePx) {
-      adjustedEnd = blocking.start;
-      continue;
-    }
-    if (blocking.end - srcY <= pageHeightPx) {
-      adjustedEnd = blocking.end;
-      continue;
-    }
-    break;
-  }
-
-  return adjustedEnd;
-}
-
-export async function generatePDFBlob(container) {
-  container.style.display = "block";
-  container.style.position = "fixed";
-  container.style.top = "-9999px";
-  container.style.left = "0";
-  await new Promise((r) => setTimeout(r, 200));
-
-  const SCALE = 3; // high-res for crisp text
-  const canvas = await html2canvas(container, {
-    scale: SCALE,
-    useCORS: true,
-    backgroundColor: "#ffffff",
-  });
-  const avoidRanges = buildAvoidBreakRanges(container, canvas);
-  const noCutRanges = buildNoCutRowRanges(container, canvas);
-
-  container.style.display = "none";
-
-  const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-  const pageW = pdf.internal.pageSize.getWidth(); // 210
-  const pageH = pdf.internal.pageSize.getHeight(); // 297
-  const margin = 8;
-  const contentW = pageW - margin * 2;
-  const contentH = pageH - margin * 2;
-
-  // How many canvas pixels fit in one PDF page (height)
-  const mmPerPx = contentW / canvas.width;
-  const pageHeightPx = contentH / mmPerPx;
-
-  let srcY = 0;
-  let firstPage = true;
-
-  while (srcY < canvas.height) {
-    let targetEnd = Math.min(srcY + pageHeightPx, canvas.height);
-    if (targetEnd < canvas.height) {
-      targetEnd = adjustPageBreak(
-        targetEnd,
-        srcY,
-        pageHeightPx,
-        avoidRanges,
-        noCutRanges,
-      );
-      if (targetEnd <= srcY) {
-        targetEnd = Math.min(srcY + pageHeightPx, canvas.height);
-      }
-    }
-
-    const sliceH = targetEnd - srcY;
-    const slice = document.createElement("canvas");
-    slice.width = canvas.width;
-    slice.height = sliceH;
-    slice
-      .getContext("2d")
-      .drawImage(
-        canvas,
-        0,
-        srcY,
-        canvas.width,
-        sliceH,
-        0,
-        0,
-        canvas.width,
-        sliceH,
-      );
-
-    if (!firstPage) pdf.addPage();
-    pdf.addImage(
-      slice.toDataURL("image/jpeg", 0.92),
-      "JPEG",
-      margin,
-      margin,
-      contentW,
-      sliceH * mmPerPx,
-    );
-    firstPage = false;
-    srcY = targetEnd;
-  }
-
-  return pdf.output("blob");
+  const html = clone.outerHTML;
+  return base44.integrations.Core.HtmlToPdf({ html });
 }

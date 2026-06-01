@@ -8,7 +8,7 @@ import {
   ReportContent,
   buildLookupMaps,
   buildReportGroups,
-  generatePDFBlob,
+  htmlToPdfBlob,
   toGregDate,
   toHebrewDate,
 } from "@/components/reports/dailyReportPdf";
@@ -54,7 +54,7 @@ export default function DailyAssignmentReport() {
 
   const handleExportPDF = async () => {
     setExporting(true);
-    const blob = await generatePDFBlob(hiddenRef.current);
+    const blob = await htmlToPdfBlob(hiddenRef.current);
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
