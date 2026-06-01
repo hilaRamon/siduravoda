@@ -8,6 +8,7 @@ import path from "node:path";
 import { entityNames } from "./config/entities.js";
 import entitiesRouter from "./routes/entities.js";
 import uploadsRouter from "./routes/uploads.js";
+import reportsRouter from "./routes/reports.js";
 import authRouter from "./routes/auth.js";
 import publicRouter from "./routes/public.js";
 import { ensureAdminUser } from "./lib/bootstrap.js";
@@ -42,6 +43,7 @@ app.use("/api/auth", authRouter);
 app.use("/api/public", publicRouter);
 app.use("/api/entities", entitiesRouter);
 app.use("/api/integrations", uploadsRouter);
+app.use("/api/integrations", reportsRouter);
 
 const distDir = path.resolve(process.cwd(), "dist");
 const hasFrontendBuild = fs.existsSync(path.join(distDir, "index.html"));
