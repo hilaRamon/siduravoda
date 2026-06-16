@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { BarChart2, Users } from 'lucide-react';
+import { BarChart2, Users, FileSpreadsheet } from 'lucide-react';
 import PeriodicWorkReport from '@/components/reports/PeriodicWorkReport';
 import PeriodWorkReport from '@/components/reports/PeriodWorkReport';
 import StudentWorkReport from '@/components/reports/StudentWorkReport';
+import ArzenuReport from '@/components/reports/ArzenuReport';
 
 export default function Reports() {
   const [activeTab, setActiveTab] = useState('periodic');
@@ -11,6 +12,7 @@ export default function Reports() {
     { key: 'periodic', label: 'דוח עבודה חודשי', icon: BarChart2 },
     { key: 'period', label: 'דוח עבודה לתקופה', icon: BarChart2 },
     { key: 'student', label: 'דוח עבודת תלמיד', icon: Users },
+    { key: 'arzenu', label: 'דוח לארצנו', icon: FileSpreadsheet },
   ];
 
   return (
@@ -38,6 +40,7 @@ export default function Reports() {
       {activeTab === 'periodic' && <PeriodicWorkReport />}
       {activeTab === 'period' && <PeriodWorkReport />}
       {activeTab === 'student' && <StudentWorkReport />}
+      {activeTab === 'arzenu' && <ArzenuReport />}
     </div>
   );
 }
