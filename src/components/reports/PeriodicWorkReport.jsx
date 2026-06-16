@@ -1,31 +1,60 @@
-import { useState, useMemo, useRef } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { base44 } from '@/api/base44Client';
-import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Checkbox } from '@/components/ui/checkbox';
-import { ChevronsUpDown, Download, Loader2, FileSpreadsheet, X } from 'lucide-react';
-import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
-import * as XLSX from 'xlsx';
+import { useState, useMemo, useRef } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { base44 } from "@/api/base44Client";
+import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  ChevronsUpDown,
+  Download,
+  Loader2,
+  FileSpreadsheet,
+  X,
+} from "lucide-react";
+import jsPDF from "jspdf";
+import html2canvas from "html2canvas";
+import * as XLSX from "xlsx";
 
 const MONTHS = [
-  { value: '01', label: 'ינואר' }, { value: '02', label: 'פברואר' },
-  { value: '03', label: 'מרץ' }, { value: '04', label: 'אפריל' },
-  { value: '05', label: 'מאי' }, { value: '06', label: 'יוני' },
-  { value: '07', label: 'יולי' }, { value: '08', label: 'אוגוסט' },
-  { value: '09', label: 'ספטמבר' }, { value: '10', label: 'אוקטובר' },
-  { value: '11', label: 'נובמבר' }, { value: '12', label: 'דצמבר' },
+  { value: "01", label: "ינואר" },
+  { value: "02", label: "פברואר" },
+  { value: "03", label: "מרץ" },
+  { value: "04", label: "אפריל" },
+  { value: "05", label: "מאי" },
+  { value: "06", label: "יוני" },
+  { value: "07", label: "יולי" },
+  { value: "08", label: "אוגוסט" },
+  { value: "09", label: "ספטמבר" },
+  { value: "10", label: "אוקטובר" },
+  { value: "11", label: "נובמבר" },
+  { value: "12", label: "דצמבר" },
 ];
 
-const YEARS = ['2026', '2025'];
-const SKIP_WORKPLACES = ['לא עובד', 'לימודים'];
+const YEARS = ["2026", "2025"];
+const SKIP_WORKPLACES = ["לא עובד", "לימודים"];
 
 export default function PeriodicWorkReport() {
-  const [month, setMonth] = useState('04');
-  const [year, setYear] = useState('2026');
+  const [month, setMonth] = useState("04");
+  const [year, setYear] = useState("2026");
   const [exporting, setExporting] = useState(false);
   const [exportingXlsx, setExportingXlsx] = useState(false);
   const [selectedFarms, setSelectedFarms] = useState([]); // multi-select
@@ -33,93 +62,111 @@ export default function PeriodicWorkReport() {
   const reportRef = useRef(null);
 
   const { data: workplaces = [] } = useQuery({
-    queryKey: ['workplaces'],
+    queryKey: ["workplaces"],
     queryFn: () => base44.entities.Workplace.list(),
   });
 
   // Unique farm names for filter
   const farmNames = useMemo(() => {
-    const names = new Set(workplaces.map(w => w.farm_name).filter(Boolean));
-    return [...names].sort((a, b) => a.localeCompare(b, 'he'));
+    const names = new Set(workplaces.map((w) => w.farm_name).filter(Boolean));
+    return [...names].sort((a, b) => a.localeCompare(b, "he"));
   }, [workplaces]);
 
   const { data: allAssignments = [], isLoading } = useQuery({
-    queryKey: ['assignments-all'],
+    queryKey: ["assignments-all"],
     queryFn: () => base44.entities.Assignment.list(),
   });
 
   const workplaceFarmMap = useMemo(() => {
     const map = {};
-    workplaces.forEach(w => { map[w.id] = w.farm_name || ''; });
+    workplaces.forEach((w) => {
+      map[w.id] = w.farm_name || "";
+    });
     return map;
   }, [workplaces]);
 
   const toggleFarm = (farm) => {
-    setSelectedFarms(prev =>
-      prev.includes(farm) ? prev.filter(f => f !== farm) : [...prev, farm]
+    setSelectedFarms((prev) =>
+      prev.includes(farm) ? prev.filter((f) => f !== farm) : [...prev, farm],
     );
   };
 
   const reportByFarm = useMemo(() => {
     const prefix = `${year}-${month}`;
-    const filtered = allAssignments.filter(a =>
-      a.date?.startsWith(prefix) && !SKIP_WORKPLACES.includes(a.workplace_name)
+    const filtered = allAssignments.filter(
+      (a) =>
+        a.date?.startsWith(prefix) &&
+        !SKIP_WORKPLACES.includes(a.workplace_name),
     );
 
     const grouped = {};
-    filtered.forEach(a => {
-      const farmName = workplaceFarmMap[a.workplace_id] || '';
+    filtered.forEach((a) => {
+      const farmName = workplaceFarmMap[a.workplace_id] || "";
       const key = `${a.date}__${a.workplace_id}`;
-      if (!grouped[key]) grouped[key] = {
-        date: a.date,
-        workplaceName: a.workplace_name,
-        farmName,
-        rate: a.rate || 0,
-        students: [],
-      };
+      if (!grouped[key])
+        grouped[key] = {
+          date: a.date,
+          workplaceName: a.workplace_name,
+          farmName,
+          rate: a.rate || 0,
+          students: [],
+        };
       grouped[key].students.push(a);
     });
 
     const byFarm = {};
-    Object.values(grouped).forEach(g => {
+    Object.values(grouped).forEach((g) => {
       const totalHours = g.students.reduce((s, a) => s + (a.hours || 0), 0);
+      const totalBonus = g.students.reduce((s, a) => s + (a.bonus || 0), 0);
       const avgHours = g.students.length ? totalHours / g.students.length : 0;
       const rate = g.rate || 0;
       const row = {
         date: g.date,
         workplaceName: g.workplaceName,
         rate,
+        bonus: Math.round(totalBonus * 100) / 100,
         studentCount: g.students.length,
-        totalHours: Math.round(totalHours * 10) / 10,
-        avgHours: Math.round(avgHours * 10) / 10,
-        totalPrice: Math.round(totalHours * rate),
+        totalHours: Math.round(totalHours * 100) / 100,
+        avgHours: Math.round(avgHours * 100) / 100,
+        totalPrice: Math.round((totalHours * rate + totalBonus) * 100) / 100,
       };
       const fn = g.farmName || g.workplaceName;
       if (!byFarm[fn]) byFarm[fn] = [];
       byFarm[fn].push(row);
     });
 
-    Object.values(byFarm).forEach(rows => rows.sort((a, b) => {
-      const wpCmp = (a.workplaceName || '').localeCompare(b.workplaceName || '', 'he');
-      if (wpCmp !== 0) return wpCmp;
-      return a.date.localeCompare(b.date);
-    }));
+    Object.values(byFarm).forEach((rows) =>
+      rows.sort((a, b) => {
+        const wpCmp = (a.workplaceName || "").localeCompare(
+          b.workplaceName || "",
+          "he",
+        );
+        if (wpCmp !== 0) return wpCmp;
+        return a.date.localeCompare(b.date);
+      }),
+    );
 
     return Object.entries(byFarm)
-      .filter(([farm]) => selectedFarms.length === 0 || selectedFarms.includes(farm))
-      .sort(([a], [b]) => a.localeCompare(b, 'he'));
+      .filter(
+        ([farm]) => selectedFarms.length === 0 || selectedFarms.includes(farm),
+      )
+      .sort(([a], [b]) => a.localeCompare(b, "he"));
   }, [month, year, allAssignments, workplaceFarmMap, selectedFarms]);
 
   const formatDate = (d) => {
-    const [y, m, day] = d.split('-');
+    const [y, m, day] = d.split("-");
     return `${day}/${m}/${y}`;
   };
 
   const handleExportPDF = async () => {
     setExporting(true);
-    await new Promise(r => setTimeout(r, 100));
+    await new Promise((r) => setTimeout(r, 100));
     const el = reportRef.current;
-    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    const pdf = new jsPDF({
+      orientation: "portrait",
+      unit: "mm",
+      format: "a4",
+    });
     const pageW = pdf.internal.pageSize.getWidth();
     const pageH = pdf.internal.pageSize.getHeight();
     const margin = 10;
@@ -129,18 +176,41 @@ export default function PeriodicWorkReport() {
     const sections = Array.from(el.children);
     let firstPage = true;
     for (const section of sections) {
-      const canvas = await html2canvas(section, { scale: 1.5, useCORS: true, backgroundColor: '#ffffff' });
+      const canvas = await html2canvas(section, {
+        scale: 1.5,
+        useCORS: true,
+        backgroundColor: "#ffffff",
+      });
       const pxPerMM = canvas.width / printW;
       const pageHeightPx = maxImgH * pxPerMM;
       let srcY = 0;
       while (srcY < canvas.height) {
         const sliceH = Math.min(pageHeightPx, canvas.height - srcY);
-        const slice = document.createElement('canvas');
+        const slice = document.createElement("canvas");
         slice.width = canvas.width;
         slice.height = sliceH;
-        slice.getContext('2d').drawImage(canvas, 0, srcY, canvas.width, sliceH, 0, 0, canvas.width, sliceH);
+        slice
+          .getContext("2d")
+          .drawImage(
+            canvas,
+            0,
+            srcY,
+            canvas.width,
+            sliceH,
+            0,
+            0,
+            canvas.width,
+            sliceH,
+          );
         if (!firstPage) pdf.addPage();
-        pdf.addImage(slice.toDataURL('image/jpeg', 0.88), 'JPEG', margin, margin, printW, sliceH / pxPerMM);
+        pdf.addImage(
+          slice.toDataURL("image/jpeg", 0.88),
+          "JPEG",
+          margin,
+          margin,
+          printW,
+          sliceH / pxPerMM,
+        );
         srcY += sliceH;
         firstPage = false;
       }
@@ -153,64 +223,119 @@ export default function PeriodicWorkReport() {
     setExportingXlsx(true);
     const rows = [];
     reportByFarm.forEach(([farm, farmRows]) => {
-      const grandTotalHours = Math.round(farmRows.reduce((s, r) => s + r.totalHours, 0) * 10) / 10;
-      const grandTotalPrice = farmRows.reduce((s, r) => s + r.totalPrice, 0);
-      farmRows.forEach(r => rows.push({
-        'משק': farm, 'תאריך': formatDate(r.date), 'מקום עבודה': r.workplaceName,
-        'תעריף': r.rate, 'כמות תלמידים': r.studentCount,
-        'סך שעות': r.totalHours, 'ממוצע שעות': r.avgHours, 'מחיר': r.totalPrice,
-      }));
-      rows.push({ 'משק': '', 'תאריך': '', 'מקום עבודה': 'סה"כ', 'תעריף': '', 'כמות תלמידים': '', 'סך שעות': grandTotalHours, 'ממוצע שעות': '', 'מחיר': grandTotalPrice });
+      const grandTotalHours =
+        Math.round(farmRows.reduce((s, r) => s + r.totalHours, 0) * 100) / 100;
+      const grandTotalBonus =
+        Math.round(farmRows.reduce((s, r) => s + r.bonus, 0) * 100) / 100;
+      const grandTotalPrice =
+        Math.round(farmRows.reduce((s, r) => s + r.totalPrice, 0) * 100) / 100;
+      farmRows.forEach((r) =>
+        rows.push({
+          משק: farm,
+          תאריך: formatDate(r.date),
+          "מקום עבודה": r.workplaceName,
+          תעריף: r.rate,
+          "תשלום נוסף": r.bonus,
+          "כמות תלמידים": r.studentCount,
+          "סך שעות": r.totalHours,
+          "ממוצע שעות": r.avgHours,
+          מחיר: r.totalPrice,
+        }),
+      );
+      rows.push({
+        משק: "",
+        תאריך: "",
+        "מקום עבודה": 'סה"כ',
+        תעריף: "",
+        "תשלום נוסף": grandTotalBonus,
+        "כמות תלמידים": "",
+        "סך שעות": grandTotalHours,
+        "ממוצע שעות": "",
+        מחיר: grandTotalPrice,
+      });
       rows.push({});
     });
     const ws = XLSX.utils.json_to_sheet(rows);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'דוח חודשי');
+    XLSX.utils.book_append_sheet(wb, ws, "דוח חודשי");
     XLSX.writeFile(wb, `דוח_עבודה_חודשי_${month}_${year}.xlsx`);
     setExportingXlsx(false);
   };
 
-  const monthLabel = MONTHS.find(m => m.value === month)?.label || '';
+  const monthLabel = MONTHS.find((m) => m.value === month)?.label || "";
   const hasData = reportByFarm.length > 0;
-  const farmLabel = selectedFarms.length === 0
-    ? 'כל המשקים'
-    : selectedFarms.length === 1
-      ? selectedFarms[0]
-      : `${selectedFarms.length} משקים נבחרו`;
+  const farmLabel =
+    selectedFarms.length === 0
+      ? "כל המשקים"
+      : selectedFarms.length === 1
+        ? selectedFarms[0]
+        : `${selectedFarms.length} משקים נבחרו`;
 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap gap-3 items-end">
         <div>
-          <label className="text-xs text-muted-foreground block mb-1">חודש</label>
+          <label className="text-xs text-muted-foreground block mb-1">
+            חודש
+          </label>
           <Select value={month} onValueChange={setMonth}>
-            <SelectTrigger className="w-32 h-9 text-sm"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="w-32 h-9 text-sm">
+              <SelectValue />
+            </SelectTrigger>
             <SelectContent>
-              {MONTHS.map(m => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}
+              {MONTHS.map((m) => (
+                <SelectItem key={m.value} value={m.value}>
+                  {m.label}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
         <div>
-          <label className="text-xs text-muted-foreground block mb-1">שנה</label>
+          <label className="text-xs text-muted-foreground block mb-1">
+            שנה
+          </label>
           <Select value={year} onValueChange={setYear}>
-            <SelectTrigger className="w-24 h-9 text-sm"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="w-24 h-9 text-sm">
+              <SelectValue />
+            </SelectTrigger>
             <SelectContent>
-              {YEARS.map(y => <SelectItem key={y} value={y}>{y}</SelectItem>)}
+              {YEARS.map((y) => (
+                <SelectItem key={y} value={y}>
+                  {y}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
         <div>
-          <label className="text-xs text-muted-foreground block mb-1">משק (ניתן לבחור מרובים)</label>
+          <label className="text-xs text-muted-foreground block mb-1">
+            משק (ניתן לבחור מרובים)
+          </label>
           <Popover open={farmOpen} onOpenChange={setFarmOpen}>
             <PopoverTrigger asChild>
               <button className="h-9 w-56 border border-border rounded-md px-3 text-sm flex items-center justify-between bg-card hover:bg-secondary/40 transition-colors">
-                <span className={selectedFarms.length === 0 ? 'text-muted-foreground truncate' : 'truncate'}>{farmLabel}</span>
-                <ChevronsUpDown size={14} className="opacity-50 shrink-0 mr-1" />
+                <span
+                  className={
+                    selectedFarms.length === 0
+                      ? "text-muted-foreground truncate"
+                      : "truncate"
+                  }
+                >
+                  {farmLabel}
+                </span>
+                <ChevronsUpDown
+                  size={14}
+                  className="opacity-50 shrink-0 mr-1"
+                />
               </button>
             </PopoverTrigger>
             <PopoverContent className="w-64 p-0" align="start" dir="rtl">
               <Command>
-                <CommandInput placeholder="חיפוש משק..." className="h-8 text-xs" />
+                <CommandInput
+                  placeholder="חיפוש משק..."
+                  className="h-8 text-xs"
+                />
                 <CommandList>
                   <CommandEmpty>לא נמצא</CommandEmpty>
                   <CommandGroup>
@@ -219,17 +344,23 @@ export default function PeriodicWorkReport() {
                       onSelect={() => setSelectedFarms([])}
                       className="text-xs text-muted-foreground flex items-center gap-2"
                     >
-                      <Checkbox checked={selectedFarms.length === 0} className="shrink-0" />
+                      <Checkbox
+                        checked={selectedFarms.length === 0}
+                        className="shrink-0"
+                      />
                       כל המשקים
                     </CommandItem>
-                    {farmNames.map(f => (
+                    {farmNames.map((f) => (
                       <CommandItem
                         key={f}
                         value={f}
                         onSelect={() => toggleFarm(f)}
                         className="text-xs flex items-center gap-2"
                       >
-                        <Checkbox checked={selectedFarms.includes(f)} className="shrink-0" />
+                        <Checkbox
+                          checked={selectedFarms.includes(f)}
+                          className="shrink-0"
+                        />
                         {f}
                       </CommandItem>
                     ))}
@@ -240,24 +371,51 @@ export default function PeriodicWorkReport() {
           </Popover>
           {selectedFarms.length > 0 && (
             <div className="flex flex-wrap gap-1 mt-1">
-              {selectedFarms.map(f => (
-                <span key={f} className="flex items-center gap-1 bg-primary/10 text-primary text-xs px-2 py-0.5 rounded-full">
+              {selectedFarms.map((f) => (
+                <span
+                  key={f}
+                  className="flex items-center gap-1 bg-primary/10 text-primary text-xs px-2 py-0.5 rounded-full"
+                >
                   {f}
-                  <button onClick={() => toggleFarm(f)} className="hover:text-destructive"><X size={10} /></button>
+                  <button
+                    onClick={() => toggleFarm(f)}
+                    className="hover:text-destructive"
+                  >
+                    <X size={10} />
+                  </button>
                 </span>
               ))}
-              <button onClick={() => setSelectedFarms([])} className="text-xs text-muted-foreground underline px-1">נקה</button>
+              <button
+                onClick={() => setSelectedFarms([])}
+                className="text-xs text-muted-foreground underline px-1"
+              >
+                נקה
+              </button>
             </div>
           )}
         </div>
         {hasData && (
           <>
             <Button onClick={handleExportPDF} disabled={exporting} size="sm">
-              {exporting ? <Loader2 size={14} className="animate-spin ml-1" /> : <Download size={14} className="ml-1" />}
+              {exporting ? (
+                <Loader2 size={14} className="animate-spin ml-1" />
+              ) : (
+                <Download size={14} className="ml-1" />
+              )}
               הורד PDF
             </Button>
-            <Button onClick={handleExportXLSX} disabled={exportingXlsx} size="sm" style={{ backgroundColor: '#166534', color: 'white' }} className="hover:opacity-90">
-              {exportingXlsx ? <Loader2 size={14} className="animate-spin ml-1" /> : <FileSpreadsheet size={14} className="ml-1" />}
+            <Button
+              onClick={handleExportXLSX}
+              disabled={exportingXlsx}
+              size="sm"
+              style={{ backgroundColor: "#166534", color: "white" }}
+              className="hover:opacity-90"
+            >
+              {exportingXlsx ? (
+                <Loader2 size={14} className="animate-spin ml-1" />
+              ) : (
+                <FileSpreadsheet size={14} className="ml-1" />
+              )}
               הורד Excel
             </Button>
           </>
@@ -267,47 +425,107 @@ export default function PeriodicWorkReport() {
       {isLoading && <p className="text-sm text-muted-foreground">טוען...</p>}
 
       {!isLoading && (
-        <div ref={reportRef} className="bg-white p-4 rounded-xl border border-border space-y-6" dir="rtl">
+        <div
+          ref={reportRef}
+          className="bg-white p-4 rounded-xl border border-border space-y-6"
+          dir="rtl"
+        >
           {!hasData ? (
-            <p className="text-sm text-muted-foreground py-4 text-center">אין נתונים לתקופה זו</p>
+            <p className="text-sm text-muted-foreground py-4 text-center">
+              אין נתונים לתקופה זו
+            </p>
           ) : (
             reportByFarm.map(([farm, rows]) => {
-              const grandTotalHours = Math.round(rows.reduce((s, r) => s + r.totalHours, 0) * 10) / 10;
-              const grandTotalPrice = rows.reduce((s, r) => s + r.totalPrice, 0);
+              const grandTotalHours =
+                Math.round(rows.reduce((s, r) => s + r.totalHours, 0) * 100) /
+                100;
+              const grandTotalBonus =
+                Math.round(rows.reduce((s, r) => s + r.bonus, 0) * 100) / 100;
+              const grandTotalPrice =
+                Math.round(rows.reduce((s, r) => s + r.totalPrice, 0) * 100) /
+                100;
               return (
                 <div key={farm}>
                   <div className="mb-2">
                     <p className="text-sm font-bold">לכבוד: {farm}</p>
-                    <p className="text-xs text-gray-500">דוח עבודה תקופתי — {monthLabel} {year}</p>
+                    <p className="text-xs text-gray-500">
+                      דוח עבודה תקופתי — {monthLabel} {year}
+                    </p>
                   </div>
                   <table className="w-full text-xs border-collapse">
                     <thead>
                       <tr className="bg-gray-100">
-                        {['תאריך','שם מקום עבודה','תעריף','תשלום נוסף','כמות תלמידים','סך שעות','ממוצע שעות','מחיר'].map(h => (
-                          <th key={h} className="border border-gray-300 px-2 py-1.5 text-right font-semibold">{h}</th>
+                        {[
+                          "תאריך",
+                          "שם מקום עבודה",
+                          "תעריף",
+                          "תשלום נוסף",
+                          "כמות תלמידים",
+                          "סך שעות",
+                          "ממוצע שעות",
+                          "מחיר",
+                        ].map((h) => (
+                          <th
+                            key={h}
+                            className="border border-gray-300 px-2 py-1.5 text-right font-semibold"
+                          >
+                            {h}
+                          </th>
                         ))}
                       </tr>
                     </thead>
                     <tbody>
                       {rows.map((r, i) => (
-                        <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                          <td className="border border-gray-300 px-2 py-1.5">{formatDate(r.date)}</td>
-                          <td className="border border-gray-300 px-2 py-1.5">{r.workplaceName}</td>
-                          <td className="border border-gray-300 px-2 py-1.5 text-center">{r.rate}</td>
-                          <td className="border border-gray-300 px-2 py-1.5 text-center">0</td>
-                          <td className="border border-gray-300 px-2 py-1.5 text-center">{r.studentCount}</td>
-                          <td className="border border-gray-300 px-2 py-1.5 text-center">{r.totalHours}</td>
-                          <td className="border border-gray-300 px-2 py-1.5 text-center">{r.avgHours}</td>
-                          <td className="border border-gray-300 px-2 py-1.5 text-center">{r.totalPrice} ₪</td>
+                        <tr
+                          key={i}
+                          className={i % 2 === 0 ? "bg-white" : "bg-gray-50"}
+                        >
+                          <td className="border border-gray-300 px-2 py-1.5">
+                            {formatDate(r.date)}
+                          </td>
+                          <td className="border border-gray-300 px-2 py-1.5">
+                            {r.workplaceName}
+                          </td>
+                          <td className="border border-gray-300 px-2 py-1.5 text-center">
+                            {r.rate}
+                          </td>
+                          <td className="border border-gray-300 px-2 py-1.5 text-center">
+                            {r.bonus}
+                          </td>
+                          <td className="border border-gray-300 px-2 py-1.5 text-center">
+                            {r.studentCount}
+                          </td>
+                          <td className="border border-gray-300 px-2 py-1.5 text-center">
+                            {r.totalHours}
+                          </td>
+                          <td className="border border-gray-300 px-2 py-1.5 text-center">
+                            {r.avgHours}
+                          </td>
+                          <td className="border border-gray-300 px-2 py-1.5 text-center">
+                            {r.totalPrice} ₪
+                          </td>
                         </tr>
                       ))}
                     </tbody>
                     <tfoot>
                       <tr className="bg-gray-200 font-bold">
-                        <td colSpan={5} className="border border-gray-300 px-2 py-1.5 text-right">סה"כ</td>
-                        <td className="border border-gray-300 px-2 py-1.5 text-center">{grandTotalHours}</td>
+                        <td
+                          colSpan={3}
+                          className="border border-gray-300 px-2 py-1.5 text-right"
+                        >
+                          סה"כ
+                        </td>
+                        <td className="border border-gray-300 px-2 py-1.5 text-center">
+                          {grandTotalBonus}
+                        </td>
                         <td className="border border-gray-300 px-2 py-1.5"></td>
-                        <td className="border border-gray-300 px-2 py-1.5 text-center">{grandTotalPrice} ₪</td>
+                        <td className="border border-gray-300 px-2 py-1.5 text-center">
+                          {grandTotalHours}
+                        </td>
+                        <td className="border border-gray-300 px-2 py-1.5"></td>
+                        <td className="border border-gray-300 px-2 py-1.5 text-center">
+                          {grandTotalPrice} ₪
+                        </td>
                       </tr>
                     </tfoot>
                   </table>
