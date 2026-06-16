@@ -63,16 +63,18 @@ export default function PeriodWorkReport() {
     const byWorkplace = {};
     Object.values(grouped).forEach(g => {
       const totalHours = g.students.reduce((s, a) => s + (a.hours || 0), 0);
+      const totalBonus = g.students.reduce((s, a) => s + (a.bonus || 0), 0);
       const avgHours = g.students.length ? totalHours / g.students.length : 0;
       const rate = g.rate || 0;
       const row = {
         date: g.date,
         workplaceName: g.workplaceName,
         rate,
+        bonus: Math.round(totalBonus * 100) / 100,
         studentCount: g.students.length,
-        totalHours: Math.round(totalHours * 10) / 10,
-        avgHours: Math.round(avgHours * 10) / 10,
-        totalPrice: Math.round(totalHours * rate),
+        totalHours: Math.round(totalHours * 100) / 100,
+        avgHours: Math.round(avgHours * 100) / 100,
+        totalPrice: Math.round((totalHours * rate + totalBonus) * 100) / 100,
       };
       if (!byWorkplace[g.workplaceName]) byWorkplace[g.workplaceName] = [];
       byWorkplace[g.workplaceName].push(row);
@@ -123,18 +125,20 @@ export default function PeriodWorkReport() {
     setExportingXlsx(true);
     const rows = [];
     reportByWorkplace.forEach(([wp, wpRows]) => {
-      const grandTotalHours = Math.round(wpRows.reduce((s, r) => s + r.totalHours, 0) * 10) / 10;
-      const grandTotalPrice = wpRows.reduce((s, r) => s + r.totalPrice, 0);
+      const grandTotalHours = Math.round(wpRows.reduce((s, r) => s + r.totalHours, 0) * 100) / 100;
+      const grandTotalBonus = Math.round(wpRows.reduce((s, r) => s + r.bonus, 0) * 100) / 100;
+      const grandTotalPrice = Math.round(wpRows.reduce((s, r) => s + r.totalPrice, 0) * 100) / 100;
       wpRows.forEach(r => rows.push({
         'מקום עבודה': wp,
         'תאריך': formatDate(r.date),
         'תעריף': r.rate,
+        'תשלום נוסף': r.bonus,
         'כמות תלמידים': r.studentCount,
         'סך שעות': r.totalHours,
         'ממוצע שעות': r.avgHours,
         'מחיר': r.totalPrice,
       }));
-      rows.push({ 'מקום עבודה': '', 'תאריך': 'סה"כ', 'תעריף': '', 'כמות תלמידים': '', 'סך שעות': grandTotalHours, 'ממוצע שעות': '', 'מחיר': grandTotalPrice });
+      rows.push({ 'מקום עבודה': '', 'תאריך': 'סה"כ', 'תעריף': '', 'תשלום נוסף': grandTotalBonus, 'כמות תלמידים': '', 'סך שעות': grandTotalHours, 'ממוצע שעות': '', 'מחיר': grandTotalPrice });
       rows.push({});
     });
     const ws = XLSX.utils.json_to_sheet(rows);
@@ -227,8 +231,9 @@ export default function PeriodWorkReport() {
             <p className="text-sm text-muted-foreground py-4 text-center">אין נתונים לתקופה זו</p>
           ) : (
             reportByWorkplace.map(([wp, rows]) => {
-              const grandTotalHours = Math.round(rows.reduce((s, r) => s + r.totalHours, 0) * 10) / 10;
-              const grandTotalPrice = rows.reduce((s, r) => s + r.totalPrice, 0);
+              const grandTotalHours = Math.round(rows.reduce((s, r) => s + r.totalHours, 0) * 100) / 100;
+              const grandTotalBonus = Math.round(rows.reduce((s, r) => s + r.bonus, 0) * 100) / 100;
+              const grandTotalPrice = Math.round(rows.reduce((s, r) => s + r.totalPrice, 0) * 100) / 100;
               return (
                 <div key={wp}>
                   <div className="mb-2">
@@ -238,7 +243,7 @@ export default function PeriodWorkReport() {
                   <table className="w-full text-xs border-collapse">
                     <thead>
                       <tr className="bg-gray-100">
-                        {['תאריך','תעריף','כמות תלמידים','סך שעות','ממוצע שעות','מחיר'].map(h => (
+                        {['תאריך','תעריף','תשלום נוסף','כמות תלמידים','סך שעות','ממוצע שעות','מחיר'].map(h => (
                           <th key={h} className="border border-gray-300 px-2 py-1.5 text-right font-semibold">{h}</th>
                         ))}
                       </tr>
@@ -248,6 +253,7 @@ export default function PeriodWorkReport() {
                         <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                           <td className="border border-gray-300 px-2 py-1.5">{formatDate(r.date)}</td>
                           <td className="border border-gray-300 px-2 py-1.5 text-center">{r.rate}</td>
+                          <td className="border border-gray-300 px-2 py-1.5 text-center">{r.bonus}</td>
                           <td className="border border-gray-300 px-2 py-1.5 text-center">{r.studentCount}</td>
                           <td className="border border-gray-300 px-2 py-1.5 text-center">{r.totalHours}</td>
                           <td className="border border-gray-300 px-2 py-1.5 text-center">{r.avgHours}</td>
@@ -257,7 +263,9 @@ export default function PeriodWorkReport() {
                     </tbody>
                     <tfoot>
                       <tr className="bg-gray-200 font-bold">
-                        <td colSpan={3} className="border border-gray-300 px-2 py-1.5 text-right">סה"כ</td>
+                        <td colSpan={2} className="border border-gray-300 px-2 py-1.5 text-right">סה"כ</td>
+                        <td className="border border-gray-300 px-2 py-1.5 text-center">{grandTotalBonus}</td>
+                        <td className="border border-gray-300 px-2 py-1.5"></td>
                         <td className="border border-gray-300 px-2 py-1.5 text-center">{grandTotalHours}</td>
                         <td className="border border-gray-300 px-2 py-1.5"></td>
                         <td className="border border-gray-300 px-2 py-1.5 text-center">{grandTotalPrice} ₪</td>
