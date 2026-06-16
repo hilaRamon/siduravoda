@@ -2,8 +2,8 @@ import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
-import { Loader2, FileSpreadsheet, FlaskConical } from 'lucide-react';
-import { format, subMonths, startOfMonth, endOfMonth, eachDayOfInterval, getDay } from 'date-fns';
+import { Loader2, FileSpreadsheet } from 'lucide-react';
+import { format, subMonths, startOfMonth, endOfMonth } from 'date-fns';
 import * as XLSX from 'xlsx';
 
 const SKIP_WORKPLACES = ['לא עובד', 'לימודים'];
@@ -17,60 +17,16 @@ function previousMonthRange() {
   };
 }
 
-const MOCK_NAMES = [
-  'אבי כהן', 'דניאל לוי', 'יוסף מזרחי', 'נועה פרידמן', 'איתי ברק',
-  'תמר שלום', 'משה אזולאי', 'רוני גולן', 'שירה כץ', 'עומר דהן',
-  'ליאור בן דוד', 'מיכל אברהם', 'גיל נחמיאס', 'הדר רוזן', 'אורי שגב',
-];
-const MOCK_WORKPLACES = ['מטעי הדרים', 'חממות הבשור', 'אריזת תבלינים', 'רפת ההר', 'כרם הזיתים'];
-
-// Builds a deterministic-looking, in-memory set of assignments spanning the
-// selected range. Nothing here is persisted — it only feeds the preview/export.
-function buildMockAssignments(startDate, endDate) {
-  if (!startDate || !endDate || startDate > endDate) return [];
-  const days = eachDayOfInterval({
-    start: new Date(startDate + 'T12:00:00'),
-    end: new Date(endDate + 'T12:00:00'),
-  });
-  const rows = [];
-  days.forEach((day, di) => {
-    const dow = getDay(day); // 6 = Saturday (no work)
-    if (dow === 6) return;
-    const date = format(day, 'yyyy-MM-dd');
-    const count = 6 + (di % 5); // 6..10 people per day
-    for (let i = 0; i < count; i++) {
-      const nameIdx = (di * 3 + i) % MOCK_NAMES.length;
-      const wpIdx = (di + i) % MOCK_WORKPLACES.length;
-      rows.push({
-        date,
-        student_id: `mock-${nameIdx}`,
-        student_name: MOCK_NAMES[nameIdx],
-        workplace_name: MOCK_WORKPLACES[wpIdx],
-      });
-    }
-  });
-  return rows;
-}
-
 export default function ArzenuReport() {
   const defaults = useMemo(previousMonthRange, []);
   const [startDate, setStartDate] = useState(defaults.start);
   const [endDate, setEndDate] = useState(defaults.end);
   const [exporting, setExporting] = useState(false);
-  const [useMock, setUseMock] = useState(false);
 
-  const { data: realAssignments = [], isLoading } = useQuery({
+  const { data: allAssignments = [], isLoading } = useQuery({
     queryKey: ['assignments-all'],
     queryFn: () => base44.entities.Assignment.list(),
-    enabled: !useMock,
   });
-
-  const mockAssignments = useMemo(
-    () => (useMock ? buildMockAssignments(startDate, endDate) : []),
-    [useMock, startDate, endDate],
-  );
-
-  const allAssignments = useMock ? mockAssignments : realAssignments;
 
   const { data: students = [] } = useQuery({
     queryKey: ['students'],
@@ -137,7 +93,6 @@ export default function ArzenuReport() {
 
   const hasData = rows.length > 0;
   const canSearch = startDate && endDate;
-  const loading = useMock ? false : isLoading;
 
   return (
     <div className="space-y-4">
@@ -160,14 +115,6 @@ export default function ArzenuReport() {
             className="border border-border rounded-lg px-3 py-2 text-sm bg-card focus:outline-none focus:ring-2 focus:ring-primary/30 h-9"
           />
         </div>
-        <Button
-          onClick={() => setUseMock((v) => !v)}
-          size="sm"
-          variant={useMock ? 'default' : 'outline'}
-        >
-          <FlaskConical size={14} className="ml-1" />
-          {useMock ? 'נתוני דמו פעילים' : 'הצג נתוני דמו'}
-        </Button>
         {hasData && (
           <Button
             onClick={handleExportXLSX}
@@ -186,18 +133,12 @@ export default function ArzenuReport() {
         )}
       </div>
 
-      {useMock && (
-        <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-          מצב תצוגה: מוצגים נתוני דמו בלבד (לא נשמרים במסד הנתונים)
-        </p>
-      )}
-
       {!canSearch && (
         <p className="text-sm text-muted-foreground">בחר תאריך התחלה וסוף להצגת הדוח</p>
       )}
-      {loading && <p className="text-sm text-muted-foreground">טוען...</p>}
+      {isLoading && <p className="text-sm text-muted-foreground">טוען...</p>}
 
-      {canSearch && !loading && (
+      {canSearch && !isLoading && (
         <div className="bg-white p-4 rounded-xl border border-border" dir="rtl">
           {!hasData ? (
             <p className="text-sm text-muted-foreground py-4 text-center">אין נתונים לתקופה זו</p>
