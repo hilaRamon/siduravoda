@@ -204,6 +204,11 @@ export const base44 = {
         })}`,
       );
     },
+    arzenu({ startDate, endDate }) {
+      return request(
+        `/api/reports/arzenu${buildQuery({ startDate, endDate })}`,
+      );
+    },
   },
   auth: {
     async login(email, password) {

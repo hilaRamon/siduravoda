@@ -12,4 +12,9 @@ export const reportKeys = {
     "student-work",
     { startDate, endDate, students },
   ],
+  arzenu: ({ startDate, endDate }) => [
+    ...reportKeys.all,
+    "arzenu",
+    { startDate, endDate },
+  ],
 };

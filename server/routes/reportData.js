@@ -1,6 +1,7 @@
 import express from "express";
 import { canViewTimeReports } from "../config/permissions.js";
 import { attachUser, requireAuth } from "../middleware/auth.js";
+import { getArzenuReport } from "../services/arzenuReportService.js";
 import { getWorkByWorkplaceReport } from "../services/workByWorkplaceReportService.js";
 import { getStudentWorkReport } from "../services/studentWorkReportService.js";
 
@@ -87,6 +88,32 @@ router.get("/student-work", requireReportAccess, async (req, res, next) => {
       students: parseListParam(req.query.students),
     });
 
+    return res.json(result);
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.get("/arzenu", requireReportAccess, async (req, res, next) => {
+  try {
+    const { startDate, endDate } = req.query;
+    if (!startDate || !endDate) {
+      return res
+        .status(400)
+        .json({ message: "startDate and endDate are required" });
+    }
+    if (!DATE_RE.test(startDate) || !DATE_RE.test(endDate)) {
+      return res
+        .status(400)
+        .json({ message: "Dates must be YYYY-MM-DD format" });
+    }
+    if (startDate > endDate) {
+      return res
+        .status(400)
+        .json({ message: "startDate must be before or equal to endDate" });
+    }
+
+    const result = await getArzenuReport({ startDate, endDate });
     return res.json(result);
   } catch (error) {
     return next(error);
