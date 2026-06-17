@@ -1,6 +1,4 @@
-import { useState, useMemo, useRef } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { base44 } from "@/api/base44Client";
+import { useMemo, useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -33,6 +31,9 @@ import {
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 import * as XLSX from "xlsx";
+import { format, subMonths } from "date-fns";
+import { useWorkByWorkplaceReport } from "@/queries/reports/useWorkByWorkplaceReport";
+import { useWorkplaces } from "@/queries/reports/useWorkplaces";
 
 const MONTHS = [
   { value: "01", label: "ינואר" },
@@ -50,108 +51,52 @@ const MONTHS = [
 ];
 
 const YEARS = ["2026", "2025"];
-const SKIP_WORKPLACES = ["לא עובד", "לימודים"];
+
+function previousMonthDefaults() {
+  const prev = subMonths(new Date(), 1);
+  return {
+    month: format(prev, "MM"),
+    year: format(prev, "yyyy"),
+  };
+}
+
+function monthDateRange(year, month) {
+  const startDate = `${year}-${month}-01`;
+  const lastDay = new Date(Number(year), Number(month), 0).getDate();
+  const endDate = `${year}-${month}-${String(lastDay).padStart(2, "0")}`;
+  return { startDate, endDate };
+}
 
 export default function PeriodicWorkReport() {
-  const [month, setMonth] = useState("04");
-  const [year, setYear] = useState("2026");
+  const [month, setMonth] = useState(() => previousMonthDefaults().month);
+  const [year, setYear] = useState(() => previousMonthDefaults().year);
   const [exporting, setExporting] = useState(false);
   const [exportingXlsx, setExportingXlsx] = useState(false);
   const [selectedFarms, setSelectedFarms] = useState([]); // multi-select
   const [farmOpen, setFarmOpen] = useState(false);
   const reportRef = useRef(null);
 
-  const { data: workplaces = [] } = useQuery({
-    queryKey: ["workplaces"],
-    queryFn: () => base44.entities.Workplace.list(),
+  const { startDate, endDate } = useMemo(
+    () => monthDateRange(year, month),
+    [year, month],
+  );
+
+  const { farmNames } = useWorkplaces(); // unique farm names for filter
+
+  const { data, isLoading } = useWorkByWorkplaceReport({
+    startDate,
+    endDate,
+    farms: selectedFarms.length > 0 ? selectedFarms : undefined,
+    groupBy: "farm",
   });
 
-  // Unique farm names for filter
-  const farmNames = useMemo(() => {
-    const names = new Set(workplaces.map((w) => w.farm_name).filter(Boolean));
-    return [...names].sort((a, b) => a.localeCompare(b, "he"));
-  }, [workplaces]);
-
-  const { data: allAssignments = [], isLoading } = useQuery({
-    queryKey: ["assignments-all"],
-    queryFn: () => base44.entities.Assignment.list(),
-  });
-
-  const workplaceFarmMap = useMemo(() => {
-    const map = {};
-    workplaces.forEach((w) => {
-      map[w.id] = w.farm_name || "";
-    });
-    return map;
-  }, [workplaces]);
+  const groups = data?.groups ?? [];
 
   const toggleFarm = (farm) => {
     setSelectedFarms((prev) =>
       prev.includes(farm) ? prev.filter((f) => f !== farm) : [...prev, farm],
     );
   };
-
-  const reportByFarm = useMemo(() => {
-    const prefix = `${year}-${month}`;
-    const filtered = allAssignments.filter(
-      (a) =>
-        a.date?.startsWith(prefix) &&
-        !SKIP_WORKPLACES.includes(a.workplace_name),
-    );
-
-    const grouped = {};
-    filtered.forEach((a) => {
-      const farmName = workplaceFarmMap[a.workplace_id] || "";
-      const key = `${a.date}__${a.workplace_id}`;
-      if (!grouped[key])
-        grouped[key] = {
-          date: a.date,
-          workplaceName: a.workplace_name,
-          farmName,
-          rate: a.rate || 0,
-          students: [],
-        };
-      grouped[key].students.push(a);
-    });
-
-    const byFarm = {};
-    Object.values(grouped).forEach((g) => {
-      const totalHours = g.students.reduce((s, a) => s + (a.hours || 0), 0);
-      const totalBonus = g.students.reduce((s, a) => s + (a.bonus || 0), 0);
-      const avgHours = g.students.length ? totalHours / g.students.length : 0;
-      const rate = g.rate || 0;
-      const row = {
-        date: g.date,
-        workplaceName: g.workplaceName,
-        rate,
-        bonus: Math.round(totalBonus * 100) / 100,
-        studentCount: g.students.length,
-        totalHours: Math.round(totalHours * 100) / 100,
-        avgHours: Math.round(avgHours * 100) / 100,
-        totalPrice: Math.round((totalHours * rate + totalBonus) * 100) / 100,
-      };
-      const fn = g.farmName || g.workplaceName;
-      if (!byFarm[fn]) byFarm[fn] = [];
-      byFarm[fn].push(row);
-    });
-
-    Object.values(byFarm).forEach((rows) =>
-      rows.sort((a, b) => {
-        const wpCmp = (a.workplaceName || "").localeCompare(
-          b.workplaceName || "",
-          "he",
-        );
-        if (wpCmp !== 0) return wpCmp;
-        return a.date.localeCompare(b.date);
-      }),
-    );
-
-    return Object.entries(byFarm)
-      .filter(
-        ([farm]) => selectedFarms.length === 0 || selectedFarms.includes(farm),
-      )
-      .sort(([a], [b]) => a.localeCompare(b, "he"));
-  }, [month, year, allAssignments, workplaceFarmMap, selectedFarms]);
 
   const formatDate = (d) => {
     const [y, m, day] = d.split("-");
@@ -222,13 +167,9 @@ export default function PeriodicWorkReport() {
   const handleExportXLSX = () => {
     setExportingXlsx(true);
     const rows = [];
-    reportByFarm.forEach(([farm, farmRows]) => {
-      const grandTotalHours =
-        Math.round(farmRows.reduce((s, r) => s + r.totalHours, 0) * 100) / 100;
-      const grandTotalBonus =
-        Math.round(farmRows.reduce((s, r) => s + r.bonus, 0) * 100) / 100;
-      const grandTotalPrice =
-        Math.round(farmRows.reduce((s, r) => s + r.totalPrice, 0) * 100) / 100;
+    groups.forEach((group) => {
+      const farm = group.farmName;
+      const farmRows = group.rows;
       farmRows.forEach((r) =>
         rows.push({
           משק: farm,
@@ -247,11 +188,11 @@ export default function PeriodicWorkReport() {
         תאריך: "",
         "מקום עבודה": 'סה"כ',
         תעריף: "",
-        "תשלום נוסף": grandTotalBonus,
+        "תשלום נוסף": group.totals.bonus,
         "כמות תלמידים": "",
-        "סך שעות": grandTotalHours,
+        "סך שעות": group.totals.totalHours,
         "ממוצע שעות": "",
-        מחיר: grandTotalPrice,
+        מחיר: group.totals.totalPrice,
       });
       rows.push({});
     });
@@ -263,7 +204,7 @@ export default function PeriodicWorkReport() {
   };
 
   const monthLabel = MONTHS.find((m) => m.value === month)?.label || "";
-  const hasData = reportByFarm.length > 0;
+  const hasData = groups.length > 0;
   const farmLabel =
     selectedFarms.length === 0
       ? "כל המשקים"
@@ -435,15 +376,9 @@ export default function PeriodicWorkReport() {
               אין נתונים לתקופה זו
             </p>
           ) : (
-            reportByFarm.map(([farm, rows]) => {
-              const grandTotalHours =
-                Math.round(rows.reduce((s, r) => s + r.totalHours, 0) * 100) /
-                100;
-              const grandTotalBonus =
-                Math.round(rows.reduce((s, r) => s + r.bonus, 0) * 100) / 100;
-              const grandTotalPrice =
-                Math.round(rows.reduce((s, r) => s + r.totalPrice, 0) * 100) /
-                100;
+            groups.map((group) => {
+              const farm = group.farmName;
+              const rows = group.rows;
               return (
                 <div key={farm}>
                   <div className="mb-2">
@@ -516,15 +451,15 @@ export default function PeriodicWorkReport() {
                           סה"כ
                         </td>
                         <td className="border border-gray-300 px-2 py-1.5 text-center">
-                          {grandTotalBonus}
+                          {group.totals.bonus}
                         </td>
                         <td className="border border-gray-300 px-2 py-1.5"></td>
                         <td className="border border-gray-300 px-2 py-1.5 text-center">
-                          {grandTotalHours}
+                          {group.totals.totalHours}
                         </td>
                         <td className="border border-gray-300 px-2 py-1.5"></td>
                         <td className="border border-gray-300 px-2 py-1.5 text-center">
-                          {grandTotalPrice} ₪
+                          {group.totals.totalPrice} ₪
                         </td>
                       </tr>
                     </tfoot>

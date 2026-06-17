@@ -1,6 +1,4 @@
-import { useState, useMemo, useRef } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { base44 } from '@/api/base44Client';
+import { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Download, Loader2, FileSpreadsheet, ChevronsUpDown, X } from 'lucide-react';
@@ -9,8 +7,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import * as XLSX from 'xlsx';
-
-const SKIP_WORKPLACES = ['לא עובד', 'לימודים'];
+import { useWorkByWorkplaceReport } from '@/queries/reports/useWorkByWorkplaceReport';
 
 export default function PeriodWorkReport() {
   const [startDate, setStartDate] = useState('');
@@ -21,72 +18,14 @@ export default function PeriodWorkReport() {
   const [exportingXlsx, setExportingXlsx] = useState(false);
   const reportRef = useRef(null);
 
-  const { data: allAssignments = [], isLoading } = useQuery({
-    queryKey: ['assignments-all'],
-    queryFn: () => base44.entities.Assignment.list(),
+  const { data, isLoading } = useWorkByWorkplaceReport({
+    startDate,
+    endDate,
+    workplaces: selectedWorkplaces.length > 0 ? selectedWorkplaces : undefined,
   });
 
-  const { data: settingsList = [] } = useQuery({
-    queryKey: ['app-settings'],
-    queryFn: () => base44.entities.AppSettings.list(),
-  });
-  const defaultRate = settingsList[0]?.default_rate ?? 40;
-
-  // Unique workplace names from assignments in range (or all if no range yet)
-  const workplaceNames = useMemo(() => {
-    const names = new Set(
-      allAssignments
-        .filter(a => !SKIP_WORKPLACES.includes(a.workplace_name) && a.workplace_name)
-        .map(a => a.workplace_name)
-    );
-    return [...names].sort((a, b) => a.localeCompare(b, 'he'));
-  }, [allAssignments]);
-
-  // Group by workplace, then by date within each workplace
-  const reportByWorkplace = useMemo(() => {
-    if (!startDate || !endDate) return [];
-
-    const filtered = allAssignments.filter(a =>
-      a.date >= startDate && a.date <= endDate &&
-      !SKIP_WORKPLACES.includes(a.workplace_name)
-    );
-
-    // Group by date+workplace
-    const grouped = {};
-    filtered.forEach(a => {
-      const key = `${a.workplace_name}__${a.date}`;
-      if (!grouped[key]) grouped[key] = { date: a.date, workplaceName: a.workplace_name, rate: a.rate || defaultRate, students: [] };
-      grouped[key].students.push(a);
-    });
-
-    // Aggregate rows per workplace
-    const byWorkplace = {};
-    Object.values(grouped).forEach(g => {
-      const totalHours = g.students.reduce((s, a) => s + (a.hours || 0), 0);
-      const totalBonus = g.students.reduce((s, a) => s + (a.bonus || 0), 0);
-      const avgHours = g.students.length ? totalHours / g.students.length : 0;
-      const rate = g.rate || 0;
-      const row = {
-        date: g.date,
-        workplaceName: g.workplaceName,
-        rate,
-        bonus: Math.round(totalBonus * 100) / 100,
-        studentCount: g.students.length,
-        totalHours: Math.round(totalHours * 100) / 100,
-        avgHours: Math.round(avgHours * 100) / 100,
-        totalPrice: Math.round((totalHours * rate + totalBonus) * 100) / 100,
-      };
-      if (!byWorkplace[g.workplaceName]) byWorkplace[g.workplaceName] = [];
-      byWorkplace[g.workplaceName].push(row);
-    });
-
-    // Sort rows within each workplace by date
-    Object.values(byWorkplace).forEach(rows => rows.sort((a, b) => a.date.localeCompare(b.date)));
-
-    return Object.entries(byWorkplace)
-      .filter(([wp]) => selectedWorkplaces.length === 0 || selectedWorkplaces.includes(wp))
-      .sort(([a], [b]) => a.localeCompare(b, 'he'));
-  }, [startDate, endDate, allAssignments, selectedWorkplaces, defaultRate]);
+  const groups = data?.groups ?? [];
+  const workplaceOptions = data?.workplaceOptions ?? []; // workplaces in range (from report API)
 
   const formatDate = (d) => { const [y, m, day] = d.split('-'); return `${day}/${m}/${y}`; };
 
@@ -124,11 +63,9 @@ export default function PeriodWorkReport() {
   const handleExportXLSX = () => {
     setExportingXlsx(true);
     const rows = [];
-    reportByWorkplace.forEach(([wp, wpRows]) => {
-      const grandTotalHours = Math.round(wpRows.reduce((s, r) => s + r.totalHours, 0) * 100) / 100;
-      const grandTotalBonus = Math.round(wpRows.reduce((s, r) => s + r.bonus, 0) * 100) / 100;
-      const grandTotalPrice = Math.round(wpRows.reduce((s, r) => s + r.totalPrice, 0) * 100) / 100;
-      wpRows.forEach(r => rows.push({
+    groups.forEach((group) => {
+      const wp = group.workplaceName;
+      group.rows.forEach((r) => rows.push({
         'מקום עבודה': wp,
         'תאריך': formatDate(r.date),
         'תעריף': r.rate,
@@ -138,7 +75,16 @@ export default function PeriodWorkReport() {
         'ממוצע שעות': r.avgHours,
         'מחיר': r.totalPrice,
       }));
-      rows.push({ 'מקום עבודה': '', 'תאריך': 'סה"כ', 'תעריף': '', 'תשלום נוסף': grandTotalBonus, 'כמות תלמידים': '', 'סך שעות': grandTotalHours, 'ממוצע שעות': '', 'מחיר': grandTotalPrice });
+      rows.push({
+        'מקום עבודה': '',
+        'תאריך': 'סה"כ',
+        'תעריף': '',
+        'תשלום נוסף': group.totals.bonus,
+        'כמות תלמידים': '',
+        'סך שעות': group.totals.totalHours,
+        'ממוצע שעות': '',
+        'מחיר': group.totals.totalPrice,
+      });
       rows.push({});
     });
     const ws = XLSX.utils.json_to_sheet(rows);
@@ -148,7 +94,7 @@ export default function PeriodWorkReport() {
     setExportingXlsx(false);
   };
 
-  const hasData = reportByWorkplace.length > 0;
+  const hasData = groups.length > 0;
   const canSearch = startDate && endDate;
 
   return (
@@ -185,7 +131,7 @@ export default function PeriodWorkReport() {
                       <Checkbox checked={selectedWorkplaces.length === 0} className="shrink-0" />
                       כל מקומות העבודה
                     </CommandItem>
-                    {workplaceNames.map(w => (
+                    {workplaceOptions.map(w => (
                       <CommandItem key={w} value={w} onSelect={() => setSelectedWorkplaces(prev => prev.includes(w) ? prev.filter(x => x !== w) : [...prev, w])} className="text-xs flex items-center gap-2">
                         <Checkbox checked={selectedWorkplaces.includes(w)} className="shrink-0" />
                         {w}
@@ -230,10 +176,9 @@ export default function PeriodWorkReport() {
           {!hasData ? (
             <p className="text-sm text-muted-foreground py-4 text-center">אין נתונים לתקופה זו</p>
           ) : (
-            reportByWorkplace.map(([wp, rows]) => {
-              const grandTotalHours = Math.round(rows.reduce((s, r) => s + r.totalHours, 0) * 100) / 100;
-              const grandTotalBonus = Math.round(rows.reduce((s, r) => s + r.bonus, 0) * 100) / 100;
-              const grandTotalPrice = Math.round(rows.reduce((s, r) => s + r.totalPrice, 0) * 100) / 100;
+            groups.map((group) => {
+              const wp = group.workplaceName;
+              const rows = group.rows;
               return (
                 <div key={wp}>
                   <div className="mb-2">
@@ -243,7 +188,7 @@ export default function PeriodWorkReport() {
                   <table className="w-full text-xs border-collapse">
                     <thead>
                       <tr className="bg-gray-100">
-                        {['תאריך','תעריף','תשלום נוסף','כמות תלמידים','סך שעות','ממוצע שעות','מחיר'].map(h => (
+                        {['תאריך', 'תעריף', 'תשלום נוסף', 'כמות תלמידים', 'סך שעות', 'ממוצע שעות', 'מחיר'].map(h => (
                           <th key={h} className="border border-gray-300 px-2 py-1.5 text-right font-semibold">{h}</th>
                         ))}
                       </tr>
@@ -264,11 +209,11 @@ export default function PeriodWorkReport() {
                     <tfoot>
                       <tr className="bg-gray-200 font-bold">
                         <td colSpan={2} className="border border-gray-300 px-2 py-1.5 text-right">סה"כ</td>
-                        <td className="border border-gray-300 px-2 py-1.5 text-center">{grandTotalBonus}</td>
+                        <td className="border border-gray-300 px-2 py-1.5 text-center">{group.totals.bonus}</td>
                         <td className="border border-gray-300 px-2 py-1.5"></td>
-                        <td className="border border-gray-300 px-2 py-1.5 text-center">{grandTotalHours}</td>
+                        <td className="border border-gray-300 px-2 py-1.5 text-center">{group.totals.totalHours}</td>
                         <td className="border border-gray-300 px-2 py-1.5"></td>
-                        <td className="border border-gray-300 px-2 py-1.5 text-center">{grandTotalPrice} ₪</td>
+                        <td className="border border-gray-300 px-2 py-1.5 text-center">{group.totals.totalPrice} ₪</td>
                       </tr>
                     </tfoot>
                   </table>

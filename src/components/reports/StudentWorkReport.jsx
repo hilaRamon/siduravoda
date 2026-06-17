@@ -1,13 +1,11 @@
 import { useState, useMemo, useRef } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { X, Download, Loader2 } from 'lucide-react';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
-
-const SKIP_WORKPLACES = ['לא עובד', 'לימודים'];
+import { useStudentWorkReport } from '@/queries/reports/useStudentWorkReport';
+import { useStudents } from '@/queries/reports/useStudents';
 
 export default function StudentWorkReport() {
   const today = new Date().toISOString().slice(0, 10);
@@ -20,42 +18,24 @@ export default function StudentWorkReport() {
   const [exporting, setExporting] = useState(false);
   const reportRef = useRef(null);
 
-  const { data: allAssignments = [], isLoading } = useQuery({
-    queryKey: ['assignments-all'],
-    queryFn: () => base44.entities.Assignment.list(),
+  const { students, cohorts, studentOptions, studentNameById } = useStudents(); // from Student entity — cohort filter and search
+
+  const { data, isLoading } = useStudentWorkReport({
+    startDate: fromDate,
+    endDate: toDate,
+    students: selectedStudents.length > 0 ? selectedStudents : undefined,
   });
+  // Report API deduplicates by (student_id, date) — a student can only work one day per date
 
-  const { data: students = [] } = useQuery({
-    queryKey: ['students'],
-    queryFn: () => base44.entities.Student.list(),
-  });
-
-  const cohorts = useMemo(() => {
-    const s = new Set(students.map(s => s.cohort).filter(Boolean));
-    return [...s].sort();
-  }, [students]);
-
-  // Unique students from assignments
-  const allStudents = useMemo(() => {
-    const map = {};
-    allAssignments.forEach(a => {
-      if (a.student_id && a.student_name) map[a.student_id] = a.student_name;
-    });
-    return Object.entries(map)
-      .map(([id, name]) => ({ id, name }))
-      .sort((a, b) => a.name.localeCompare(b.name, 'he'));
-  }, [allAssignments]);
-
-  const studentNameById = Object.fromEntries(allStudents.map(s => [s.id, s.name]));
+  const reportData = data?.students ?? [];
 
   // When cohort selected, auto-fill selectedStudents with that cohort's students
   const handleCohortChange = (cohort) => {
     setSelectedCohort(cohort);
     if (cohort && cohort !== 'all') {
       const cohortStudentIds = students
-        .filter(s => s.cohort === cohort)
-        .map(s => s.id)
-        .filter(id => allStudents.some(a => a.id === id));
+        .filter((s) => s.cohort === cohort)
+        .map((s) => s.id);
       setSelectedStudents(cohortStudentIds);
     } else {
       setSelectedStudents([]);
@@ -64,60 +44,25 @@ export default function StudentWorkReport() {
 
   const filteredSuggestions = useMemo(() => {
     if (!searchInput.trim()) return [];
-    return allStudents.filter(
-      s => s.name.includes(searchInput) && !selectedStudents.includes(s.id)
+    return studentOptions.filter(
+      (s) => s.name.includes(searchInput) && !selectedStudents.includes(s.id),
     ).slice(0, 8);
-  }, [searchInput, allStudents, selectedStudents]);
+  }, [searchInput, studentOptions, selectedStudents]);
 
   const addStudent = (id) => {
-    setSelectedStudents(prev => [...prev, id]);
+    setSelectedStudents((prev) => [...prev, id]);
     setSearchInput('');
     setSelectedCohort('');
   };
 
   const removeStudent = (id) => {
-    setSelectedStudents(prev => prev.filter(s => s !== id));
+    setSelectedStudents((prev) => prev.filter((s) => s !== id));
     setSelectedCohort('');
   };
 
-  const reportData = useMemo(() => {
-    // Deduplicate by (student_id, date) — a student can only work one day per date
-    const seen = new Set();
-    const deduped = allAssignments.filter(a => {
-      const key = `${a.student_id}__${a.date}`;
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
-
-    const filtered = deduped.filter(a =>
-      !SKIP_WORKPLACES.includes(a.workplace_name) &&
-      a.date >= fromDate &&
-      a.date <= toDate &&
-      (selectedStudents.length === 0 || selectedStudents.includes(a.student_id))
-    );
-
-    const byStudent = {};
-    filtered.forEach(a => {
-      if (!byStudent[a.student_id]) {
-        byStudent[a.student_id] = { name: a.student_name, workplaces: {} };
-      }
-      const wp = a.workplace_name || '';
-      byStudent[a.student_id].workplaces[wp] = (byStudent[a.student_id].workplaces[wp] || 0) + 1;
-    });
-
-    return Object.values(byStudent)
-      .sort((a, b) => (a.name || '').localeCompare(b.name || '', 'he'))
-      .map(s => ({
-        name: s.name,
-        workplaces: Object.entries(s.workplaces).sort(([a], [b]) => a.localeCompare(b, 'he')),
-        totalDays: Object.values(s.workplaces).reduce((sum, d) => sum + d, 0),
-      }));
-  }, [allAssignments, fromDate, toDate, selectedStudents]);
-
   const handleExportPDF = async () => {
     setExporting(true);
-    await new Promise(r => setTimeout(r, 100));
+    await new Promise((r) => setTimeout(r, 100));
 
     const el = reportRef.current;
     const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
@@ -170,7 +115,7 @@ export default function StudentWorkReport() {
           <input
             type="date"
             value={fromDate}
-            onChange={e => setFromDate(e.target.value)}
+            onChange={(e) => setFromDate(e.target.value)}
             className="border border-border rounded-lg px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
           />
         </div>
@@ -179,7 +124,7 @@ export default function StudentWorkReport() {
           <input
             type="date"
             value={toDate}
-            onChange={e => setToDate(e.target.value)}
+            onChange={(e) => setToDate(e.target.value)}
             className="border border-border rounded-lg px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
           />
         </div>
@@ -193,7 +138,9 @@ export default function StudentWorkReport() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">כל המחזורים</SelectItem>
-              {cohorts.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+              {cohorts.map((c) => (
+                <SelectItem key={c} value={c}>{c}</SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
@@ -205,13 +152,13 @@ export default function StudentWorkReport() {
             <input
               type="text"
               value={searchInput}
-              onChange={e => setSearchInput(e.target.value)}
+              onChange={(e) => setSearchInput(e.target.value)}
               placeholder="חיפוש תלמיד..."
               className="w-full border border-border rounded-lg px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
             />
             {filteredSuggestions.length > 0 && (
               <div className="absolute z-20 top-full mt-1 w-full bg-card border border-border rounded-lg shadow-lg overflow-hidden">
-                {filteredSuggestions.map(s => (
+                {filteredSuggestions.map((s) => (
                   <button
                     key={s.id}
                     onClick={() => addStudent(s.id)}
@@ -225,7 +172,7 @@ export default function StudentWorkReport() {
           </div>
           {selectedStudents.length > 0 && (
             <div className="flex flex-wrap gap-1 mt-2">
-              {selectedStudents.map(id => (
+              {selectedStudents.map((id) => (
                 <span key={id} className="flex items-center gap-1 bg-primary/10 text-primary text-xs px-2 py-1 rounded-full">
                   {studentNameById[id] || id}
                   <button onClick={() => removeStudent(id)} className="hover:text-destructive">
@@ -233,7 +180,10 @@ export default function StudentWorkReport() {
                   </button>
                 </span>
               ))}
-              <button onClick={() => { setSelectedStudents([]); setSelectedCohort(''); }} className="text-xs text-muted-foreground underline px-1">
+              <button
+                onClick={() => { setSelectedStudents([]); setSelectedCohort(''); }}
+                className="text-xs text-muted-foreground underline px-1"
+              >
                 נקה הכל
               </button>
             </div>
@@ -273,18 +223,18 @@ export default function StudentWorkReport() {
             </thead>
             <tbody>
               {reportData.map((student, si) =>
-                student.workplaces.map(([wpName, days], wi) => (
+                student.workplaces.map((wp, wi) => (
                   <tr key={`${si}-${wi}`} className={si % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                     <td className="border border-gray-300 px-3 py-2 font-medium">
                       {wi === 0 ? student.name : ''}
                     </td>
-                    <td className="border border-gray-300 px-3 py-2">{wpName}</td>
-                    <td className="border border-gray-300 px-3 py-2 text-center">{days}</td>
+                    <td className="border border-gray-300 px-3 py-2">{wp.workplaceName}</td>
+                    <td className="border border-gray-300 px-3 py-2 text-center">{wp.days}</td>
                     <td className="border border-gray-300 px-3 py-2 text-center font-bold">
                       {wi === 0 ? student.totalDays : ''}
                     </td>
                   </tr>
-                ))
+                )),
               )}
             </tbody>
           </table>
