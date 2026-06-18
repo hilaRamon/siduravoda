@@ -151,6 +151,11 @@ async function htmlToPdf({ html }) {
   return response.blob();
 }
 
+function joinList(values) {
+  if (!values?.length) return undefined;
+  return values.join(",");
+}
+
 export const base44 = {
   public: {
     getPublishedSchedule() {
@@ -176,6 +181,33 @@ export const base44 = {
     Core: {
       UploadFile: uploadFile,
       HtmlToPdf: htmlToPdf,
+    },
+  },
+  reports: {
+    workByWorkplace({ startDate, endDate, workplaces, farms, groupBy }) {
+      return request(
+        `/api/reports/work-by-workplace${buildQuery({
+          startDate,
+          endDate,
+          workplaces: joinList(workplaces),
+          farms: joinList(farms),
+          groupBy,
+        })}`,
+      );
+    },
+    studentWork({ startDate, endDate, students }) {
+      return request(
+        `/api/reports/student-work${buildQuery({
+          startDate,
+          endDate,
+          students: joinList(students),
+        })}`,
+      );
+    },
+    arzenu({ startDate, endDate }) {
+      return request(
+        `/api/reports/arzenu${buildQuery({ startDate, endDate })}`,
+      );
     },
   },
   auth: {

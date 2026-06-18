@@ -1,12 +1,9 @@
 import { useState, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import { Loader2, FileSpreadsheet } from 'lucide-react';
 import { format, subMonths, startOfMonth, endOfMonth } from 'date-fns';
 import * as XLSX from 'xlsx';
-
-const SKIP_WORKPLACES = ['לא עובד', 'לימודים'];
+import { useArzenuReport } from '@/queries/reports/useArzenuReport';
 
 // Default range = the full previous calendar month relative to today.
 function previousMonthRange() {
@@ -23,45 +20,8 @@ export default function ArzenuReport() {
   const [endDate, setEndDate] = useState(defaults.end);
   const [exporting, setExporting] = useState(false);
 
-  const { data: allAssignments = [], isLoading } = useQuery({
-    queryKey: ['assignments-all'],
-    queryFn: () => base44.entities.Assignment.list(),
-  });
-
-  const { data: students = [] } = useQuery({
-    queryKey: ['students'],
-    queryFn: () => base44.entities.Student.list('-created_date'),
-  });
-
-  const studentNameById = useMemo(
-    () => Object.fromEntries(students.map((s) => [s.id, s.name])),
-    [students],
-  );
-
-  // One row per assignment (per person, per day) within the selected range,
-  // strictly sorted chronologically (oldest -> newest).
-  const rows = useMemo(() => {
-    if (!startDate || !endDate) return [];
-    return allAssignments
-      .filter(
-        (a) =>
-          a.date &&
-          a.date >= startDate &&
-          a.date <= endDate &&
-          a.workplace_name &&
-          !SKIP_WORKPLACES.includes(a.workplace_name),
-      )
-      .map((a) => ({
-        date: a.date,
-        name: studentNameById[a.student_id] || a.student_name || '',
-        workplace: a.workplace_name,
-      }))
-      .sort((a, b) => {
-        const byDate = a.date.localeCompare(b.date);
-        if (byDate !== 0) return byDate;
-        return a.name.localeCompare(b.name, 'he');
-      });
-  }, [allAssignments, studentNameById, startDate, endDate]);
+  const { data, isLoading } = useArzenuReport({ startDate, endDate });
+  const rows = data?.rows ?? [];
 
   const formatDate = (d) => {
     const [y, m, day] = d.split('-');
@@ -71,12 +31,12 @@ export default function ArzenuReport() {
   const handleExportXLSX = () => {
     setExporting(true);
     try {
-      const data = rows.map((r) => ({
+      const sheetData = rows.map((r) => ({
         'תאריך': formatDate(r.date),
         'שם': r.name,
         'מקום עבודה': r.workplace,
       }));
-      const ws = XLSX.utils.json_to_sheet(data, {
+      const ws = XLSX.utils.json_to_sheet(sheetData, {
         header: ['תאריך', 'שם', 'מקום עבודה'],
       });
       ws['!cols'] = [{ wch: 14 }, { wch: 28 }, { wch: 28 }];
