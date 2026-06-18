@@ -1,6 +1,5 @@
 import { getModel } from "../models/index.js";
-import { SKIP_WORKPLACES } from "../lib/reportConstants.js";
-// import { SKIP_FARMS } from "../lib/reportConstants.js";
+import { SKIP_FARMS, SKIP_WORKPLACES } from "../lib/reportConstants.js";
 
 async function getWorkplaceMaps() {
   const Workplace = getModel("Workplace");
@@ -13,8 +12,7 @@ async function getWorkplaceMaps() {
     const name = workplace.name || "";
     const farmName = workplace.farm_name || "";
     byId[id] = { name, farmName };
-    if (SKIP_WORKPLACES.includes(name)) {
-      // || SKIP_FARMS.includes(farmName)
+    if (SKIP_WORKPLACES.includes(name) || SKIP_FARMS.includes(farmName)) {
       skipIds.push(id);
     }
   }
@@ -43,8 +41,10 @@ function resolveWorkplaceName(workplaceId, assignmentName, byId) {
 function shouldSkipAssignment(workplaceId, workplaceName, byId) {
   const info = byId[workplaceId];
   if (info) {
-    return SKIP_WORKPLACES.includes(info.name);
-    // || SKIP_FARMS.includes(info.farmName)
+    return (
+      SKIP_WORKPLACES.includes(info.name) ||
+      SKIP_FARMS.includes(info.farmName)
+    );
   }
   return SKIP_WORKPLACES.includes(workplaceName);
 }
