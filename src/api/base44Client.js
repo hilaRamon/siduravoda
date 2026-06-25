@@ -263,4 +263,15 @@ export const base44 = {
       });
     },
   },
+  admin: {
+    runBackup() {
+      return request("/api/admin/backup/run", { method: "POST" });
+    },
+    sendBackupVerification(emails) {
+      return request("/api/admin/backup/verify", {
+        method: "POST",
+        body: JSON.stringify({ emails }),
+      });
+    },
+  },
 };
