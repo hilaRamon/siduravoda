@@ -21,7 +21,7 @@ services:
   - type: web
     name: siduravoda-server
     runtime: node
-    buildCommand: npm install && npm run build
+    buildCommand: npm install && npm run install-chrome && npm run build
     startCommand: npm start
     envVars:
       - key: NODE_ENV

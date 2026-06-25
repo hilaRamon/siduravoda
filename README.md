@@ -106,8 +106,9 @@ The rewrite is included via `public/_redirects` (copied into `dist/` on build) a
 
 **API (web service)** — required settings:
 
-- Build command: `npm install && npm run build`
+- Build command: `npm install && npm run install-chrome && npm run build`
 - Start command: `npm start`
+- `PUPPETEER_CACHE_DIR=/opt/render/project/src/.cache/puppeteer` (so Chromium downloaded at build is found at runtime; see `render.yaml`)
 - `CLIENT_ORIGIN=https://siduravoda.onrender.com` (no trailing slash)
 - `MONGODB_URI`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`, etc.
 
