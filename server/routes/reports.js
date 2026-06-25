@@ -22,6 +22,8 @@ const SUBSET_RANGES = {
 };
 const WEIGHTS = [400, 500, 700, 800];
 
+const LAUNCH_ARGS = ["--no-sandbox", "--disable-setuid-sandbox"];
+
 /** Build @font-face declarations once, embedding the bundled woff2 as data URIs. */
 function buildFontFaceCss() {
   const faces = [];
@@ -42,20 +44,15 @@ function buildFontFaceCss() {
 
 const FONT_FACE_CSS = buildFontFaceCss();
 
-let browserPromise = null;
-function getBrowser() {
-  if (!browserPromise) {
-    browserPromise = puppeteer
-      .launch({
-        headless: true,
-        args: ["--no-sandbox", "--disable-setuid-sandbox"],
-      })
-      .catch((error) => {
-        browserPromise = null;
-        throw error;
-      });
-  }
-  return browserPromise;
+function isBrowserClosedError(error) {
+  const message = error?.message || "";
+  return (
+    message.includes("Connection closed") ||
+    message.includes("Target closed") ||
+    message.includes("Protocol error") ||
+    error?.name === "ConnectionClosedError" ||
+    error?.name === "TargetCloseError"
+  );
 }
 
 function buildDocument(bodyHtml) {
@@ -70,15 +67,14 @@ function buildDocument(bodyHtml) {
   );
 }
 
-router.post("/core/html-to-pdf", async (req, res, next) => {
-  const { html } = req.body || {};
-  if (!html || typeof html !== "string") {
-    return res.status(400).json({ message: "Missing html" });
-  }
-
+async function renderPdf(html) {
+  let browser;
   let page;
   try {
-    const browser = await getBrowser();
+    browser = await puppeteer.launch({
+      headless: true,
+      args: LAUNCH_ARGS,
+    });
     page = await browser.newPage();
 
     // Sandbox the page: only allow inline/data resources, block any outbound network.
@@ -91,22 +87,51 @@ router.post("/core/html-to-pdf", async (req, res, next) => {
       return request.abort();
     });
 
-    await page.setContent(buildDocument(html), { waitUntil: "networkidle0" });
-    const pdf = await page.pdf({
+    await page.setContent(buildDocument(html), { waitUntil: "load", timeout: 30_000 });
+    return await page.pdf({
       format: "a4",
       printBackground: true,
       margin: { top: "8mm", bottom: "8mm", left: "8mm", right: "8mm" },
     });
-
-    res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Length", pdf.length);
-    return res.send(Buffer.from(pdf));
-  } catch (error) {
-    return next(error);
   } finally {
     if (page) {
       await page.close().catch(() => {});
     }
+    if (browser) {
+      await browser.close().catch(() => {});
+    }
+  }
+}
+
+async function renderPdfWithRetry(html, attempts = 2) {
+  let lastError;
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    try {
+      return await renderPdf(html);
+    } catch (error) {
+      lastError = error;
+      if (!isBrowserClosedError(error) || attempt === attempts - 1) {
+        throw error;
+      }
+    }
+  }
+  throw lastError;
+}
+
+router.post("/core/html-to-pdf", async (req, res, next) => {
+  const { html } = req.body || {};
+  if (!html || typeof html !== "string") {
+    return res.status(400).json({ message: "Missing html" });
+  }
+
+  try {
+    const pdf = await renderPdfWithRetry(html);
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Length", pdf.length);
+    return res.send(Buffer.from(pdf));
+  } catch (error) {
+    console.error("html-to-pdf failed:", error);
+    return next(error);
   }
 });
 

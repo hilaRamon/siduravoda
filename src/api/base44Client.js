@@ -159,7 +159,7 @@ function joinList(values) {
 export const base44 = {
   public: {
     getPublishedSchedule() {
-      return request("/api/public/schedule");
+      return request("/api/public/schedule", { cache: "no-store" });
     },
   },
   entities: {

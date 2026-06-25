@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import { Download, Loader2, Share2 } from "lucide-react";
@@ -17,6 +17,7 @@ export default function DailyReportPDFButton({ date, assignments }) {
   const [publishing, setPublishing] = useState(false);
   const [publishedOk, setPublishedOk] = useState(false);
   const hiddenRef = useRef(null);
+  const queryClient = useQueryClient();
 
   const { data: logisticsList = [] } = useQuery({
     queryKey: ["workplace-logistics", date],
@@ -57,18 +58,25 @@ export default function DailyReportPDFButton({ date, assignments }) {
   const handlePublish = async () => {
     setPublishing(true);
     setPublishedOk(false);
-    const blob = await htmlToPdfBlob(hiddenRef.current);
-    const file = new File([blob], `schedule_${date}.pdf`, {
-      type: "application/pdf",
-    });
-    const { file_url } = await base44.integrations.Core.UploadFile({ file });
-    const existing = await base44.entities.PublishedSchedule.list();
-    await Promise.all(
-      existing.map((r) => base44.entities.PublishedSchedule.delete(r.id)),
-    );
-    await base44.entities.PublishedSchedule.create({ date, file_url });
-    setPublishedOk(true);
-    setPublishing(false);
+    try {
+      const blob = await htmlToPdfBlob(hiddenRef.current);
+      const file = new File([blob], `schedule_${date}.pdf`, {
+        type: "application/pdf",
+      });
+      const { file_url } = await base44.integrations.Core.UploadFile({ file });
+      const existing = await base44.entities.PublishedSchedule.list();
+      await Promise.all(
+        existing.map((r) => base44.entities.PublishedSchedule.delete(r.id)),
+      );
+      await base44.entities.PublishedSchedule.create({ date, file_url });
+      queryClient.invalidateQueries({ queryKey: ["published-schedule"] });
+      const channel = new BroadcastChannel("published-schedule");
+      channel.postMessage({ type: "published" });
+      channel.close();
+      setPublishedOk(true);
+    } finally {
+      setPublishing(false);
+    }
   };
 
   return (

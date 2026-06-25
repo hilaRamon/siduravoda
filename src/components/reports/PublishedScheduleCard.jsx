@@ -8,7 +8,6 @@ export default function PublishedScheduleCard() {
   const { data: records = [] } = useQuery({
     queryKey: ['published-schedule'],
     queryFn: () => base44.entities.PublishedSchedule.list(),
-    refetchInterval: 10000,
   });
 
   const latest = records[0];
