@@ -1,13 +1,30 @@
-import { useQuery } from '@tanstack/react-query';
+import { useEffect } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { resolveUploadUrl } from '@/lib/uploads';
 import { Loader2 } from 'lucide-react';
 
+const SCHEDULE_CHANNEL = 'published-schedule';
+const REFETCH_MS = 30_000;
+
 export default function PublicSchedule() {
+  const queryClient = useQueryClient();
+
   const { data: latest, isLoading, isError } = useQuery({
     queryKey: ['published-schedule-public'],
     queryFn: () => base44.public.getPublishedSchedule(),
+    refetchInterval: REFETCH_MS,
+    refetchIntervalInBackground: true,
+    refetchOnWindowFocus: true,
   });
+
+  useEffect(() => {
+    const channel = new BroadcastChannel(SCHEDULE_CHANNEL);
+    channel.onmessage = () => {
+      queryClient.invalidateQueries({ queryKey: ['published-schedule-public'] });
+    };
+    return () => channel.close();
+  }, [queryClient]);
 
   if (isLoading) {
     return (
@@ -18,6 +35,9 @@ export default function PublicSchedule() {
   }
 
   const fileUrl = resolveUploadUrl(latest?.file_url);
+  const pdfSrc = fileUrl
+    ? `${fileUrl}${fileUrl.includes('?') ? '&' : '?'}v=${encodeURIComponent(latest.updated_date || latest.id)}`
+    : fileUrl;
 
   if (isError || !latest) {
     return (
@@ -40,7 +60,7 @@ export default function PublicSchedule() {
           <p className="text-sm text-gray-500">תאריך: {latest.date}</p>
         </div>
         <a
-          href={fileUrl}
+          href={pdfSrc}
           download
           className="bg-primary text-white text-sm px-4 py-2 rounded-lg hover:opacity-90 transition-opacity"
         >
@@ -49,7 +69,8 @@ export default function PublicSchedule() {
       </div>
       <div className="flex-1">
         <iframe
-          src={fileUrl}
+          key={latest.id ?? pdfSrc}
+          src={pdfSrc}
           className="w-full h-full min-h-screen border-0"
           title="סידור עבודה"
         />

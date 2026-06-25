@@ -10,6 +10,7 @@ router.get("/schedule", async (req, res, next) => {
     const Model = getModel("PublishedSchedule");
     const sort = buildSort("-date");
     const doc = await Model.findOne().sort(sort).exec();
+    res.set("Cache-Control", "no-store");
     res.json(doc ? doc.toJSON() : null);
   } catch (error) {
     next(error);

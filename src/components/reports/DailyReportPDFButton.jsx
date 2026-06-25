@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import { Download, Loader2, Share2 } from "lucide-react";
@@ -12,11 +12,15 @@ import {
   toHebrewDate,
 } from "@/components/reports/dailyReportPdf";
 
+const PUBLISH_TOAST_MS = 5000;
+
 export default function DailyReportPDFButton({ date, assignments }) {
   const [exporting, setExporting] = useState(false);
   const [publishing, setPublishing] = useState(false);
-  const [publishedOk, setPublishedOk] = useState(false);
+  const [showPublishToast, setShowPublishToast] = useState(false);
   const hiddenRef = useRef(null);
+  const toastTimerRef = useRef(null);
+  const queryClient = useQueryClient();
 
   const { data: logisticsList = [] } = useQuery({
     queryKey: ["workplace-logistics", date],
@@ -27,6 +31,15 @@ export default function DailyReportPDFButton({ date, assignments }) {
     queryKey: ["students"],
     queryFn: () => base44.entities.Student.list("-created_date"),
   });
+
+  const { data: published = [] } = useQuery({
+    queryKey: ["published-schedule"],
+    queryFn: () => base44.entities.PublishedSchedule.list(),
+  });
+
+  const isLiveForThisDate = published[0]?.date === date;
+  const showToast = showPublishToast;
+  const showStatus = !showToast && isLiveForThisDate;
 
   const { logisticsMap, logisticsMapByName, studentsMap } = buildLookupMaps(
     logisticsList,
@@ -56,19 +69,31 @@ export default function DailyReportPDFButton({ date, assignments }) {
 
   const handlePublish = async () => {
     setPublishing(true);
-    setPublishedOk(false);
-    const blob = await htmlToPdfBlob(hiddenRef.current);
-    const file = new File([blob], `schedule_${date}.pdf`, {
-      type: "application/pdf",
-    });
-    const { file_url } = await base44.integrations.Core.UploadFile({ file });
-    const existing = await base44.entities.PublishedSchedule.list();
-    await Promise.all(
-      existing.map((r) => base44.entities.PublishedSchedule.delete(r.id)),
-    );
-    await base44.entities.PublishedSchedule.create({ date, file_url });
-    setPublishedOk(true);
-    setPublishing(false);
+    setShowPublishToast(false);
+    clearTimeout(toastTimerRef.current);
+    try {
+      const blob = await htmlToPdfBlob(hiddenRef.current);
+      const file = new File([blob], `schedule_${date}.pdf`, {
+        type: "application/pdf",
+      });
+      const { file_url } = await base44.integrations.Core.UploadFile({ file });
+      const existing = await base44.entities.PublishedSchedule.list();
+      await Promise.all(
+        existing.map((r) => base44.entities.PublishedSchedule.delete(r.id)),
+      );
+      await base44.entities.PublishedSchedule.create({ date, file_url });
+      queryClient.invalidateQueries({ queryKey: ["published-schedule"] });
+      const channel = new BroadcastChannel("published-schedule");
+      channel.postMessage({ type: "published" });
+      channel.close();
+      setShowPublishToast(true);
+      toastTimerRef.current = setTimeout(
+        () => setShowPublishToast(false),
+        PUBLISH_TOAST_MS,
+      );
+    } finally {
+      setPublishing(false);
+    }
   };
 
   return (
@@ -100,10 +125,17 @@ export default function DailyReportPDFButton({ date, assignments }) {
             {publishing ? "מפרסם..." : "פרסום סידור"}
           </Button>
         </div>
-        {publishedOk && (
+        {showToast && (
           <div className="flex items-center gap-2 bg-green-50 border border-green-200 rounded-lg px-3 py-2 text-xs">
             <span className="text-green-700 font-medium">
               ✓ הסידור פורסם בהצלחה!
+            </span>
+          </div>
+        )}
+        {showStatus && (
+          <div className="flex items-center gap-2 bg-green-50 border border-green-200 rounded-lg px-3 py-2 text-xs">
+            <span className="text-green-700 font-medium">
+              הסידור של תאריך זה מפורסם לציבור
             </span>
           </div>
         )}
