@@ -12,11 +12,14 @@ import {
   toHebrewDate,
 } from "@/components/reports/dailyReportPdf";
 
+const PUBLISH_TOAST_MS = 5000;
+
 export default function DailyReportPDFButton({ date, assignments }) {
   const [exporting, setExporting] = useState(false);
   const [publishing, setPublishing] = useState(false);
-  const [publishedOk, setPublishedOk] = useState(false);
+  const [showPublishToast, setShowPublishToast] = useState(false);
   const hiddenRef = useRef(null);
+  const toastTimerRef = useRef(null);
   const queryClient = useQueryClient();
 
   const { data: logisticsList = [] } = useQuery({
@@ -28,6 +31,15 @@ export default function DailyReportPDFButton({ date, assignments }) {
     queryKey: ["students"],
     queryFn: () => base44.entities.Student.list("-created_date"),
   });
+
+  const { data: published = [] } = useQuery({
+    queryKey: ["published-schedule"],
+    queryFn: () => base44.entities.PublishedSchedule.list(),
+  });
+
+  const isLiveForThisDate = published[0]?.date === date;
+  const showToast = showPublishToast;
+  const showStatus = !showToast && isLiveForThisDate;
 
   const { logisticsMap, logisticsMapByName, studentsMap } = buildLookupMaps(
     logisticsList,
@@ -57,7 +69,8 @@ export default function DailyReportPDFButton({ date, assignments }) {
 
   const handlePublish = async () => {
     setPublishing(true);
-    setPublishedOk(false);
+    setShowPublishToast(false);
+    clearTimeout(toastTimerRef.current);
     try {
       const blob = await htmlToPdfBlob(hiddenRef.current);
       const file = new File([blob], `schedule_${date}.pdf`, {
@@ -73,7 +86,11 @@ export default function DailyReportPDFButton({ date, assignments }) {
       const channel = new BroadcastChannel("published-schedule");
       channel.postMessage({ type: "published" });
       channel.close();
-      setPublishedOk(true);
+      setShowPublishToast(true);
+      toastTimerRef.current = setTimeout(
+        () => setShowPublishToast(false),
+        PUBLISH_TOAST_MS,
+      );
     } finally {
       setPublishing(false);
     }
@@ -108,10 +125,17 @@ export default function DailyReportPDFButton({ date, assignments }) {
             {publishing ? "מפרסם..." : "פרסום סידור"}
           </Button>
         </div>
-        {publishedOk && (
+        {showToast && (
           <div className="flex items-center gap-2 bg-green-50 border border-green-200 rounded-lg px-3 py-2 text-xs">
             <span className="text-green-700 font-medium">
               ✓ הסידור פורסם בהצלחה!
+            </span>
+          </div>
+        )}
+        {showStatus && (
+          <div className="flex items-center gap-2 bg-green-50 border border-green-200 rounded-lg px-3 py-2 text-xs">
+            <span className="text-green-700 font-medium">
+              הסידור של תאריך זה מפורסם לציבור
             </span>
           </div>
         )}

@@ -809,7 +809,7 @@ export default function Assignments() {
             </p>
           </div>
           <div className="flex gap-2 flex-wrap">
-            <DailyReportPDFButton date={date} assignments={assignments} />
+            <DailyReportPDFButton key={date} date={date} assignments={assignments} />
             <Button
               variant="outline"
               onClick={() => {
