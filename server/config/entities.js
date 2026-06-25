@@ -106,6 +106,8 @@ export const entityDefinitions = {
     required: [],
     schema: {
       emails: [{ type: String }],
+      last_backup_at: { type: Date },
+      last_backup_filename: { type: String },
     },
   },
   IncomingSMS: {

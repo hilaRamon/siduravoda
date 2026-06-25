@@ -52,6 +52,37 @@ The Express server lives in `server/` and exposes:
 
 Uploaded PDFs are stored in the local `uploads/` directory and served back as static files.
 
+## Weekly automatic backup
+
+The server can generate a full data backup (students, workplaces, vehicles, assignments) as a ZIP of Excel files and email it to addresses configured in Admin Tools → גיבוי.
+
+**Schedule (production):** A Render Cron Job calls `POST /api/admin/backup/run` every Sunday at 7:00 UTC (~9:00 Israel winter time). See `render.yaml`.
+
+**Manual trigger (local or admin UI):**
+
+```bash
+curl -X POST -H "Authorization: Bearer $BACKUP_CRON_SECRET" http://localhost:4000/api/admin/backup/run
+```
+
+Admins can also use **שלח גיבוי עכשיו** in Backup Email Settings.
+
+When a **new email address** is saved, the server sends the latest stored backup to that address only (verification).
+
+**Required env vars:**
+
+```
+SMTP_HOST=smtp.example.com
+SMTP_PORT=587
+SMTP_USER=...
+SMTP_PASS=...
+MAIL_FROM=גיבוי רגבים <backup@example.com>
+BACKUP_CRON_SECRET=long-random-secret
+```
+
+Set `BACKUP_CRON_SECRET` on both the API web service and the Render cron job.
+
+Backups are stored under `uploads/backups/`.
+
 ## Render deployment
 
 This app is typically deployed as **two Render services**:

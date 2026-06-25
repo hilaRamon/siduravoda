@@ -12,6 +12,7 @@ import reportsRouter from "./routes/reports.js";
 import reportDataRouter from "./routes/reportData.js";
 import authRouter from "./routes/auth.js";
 import publicRouter from "./routes/public.js";
+import backupRouter from "./routes/backup.js";
 import { ensureAdminUser } from "./lib/bootstrap.js";
 
 dotenv.config();
@@ -46,6 +47,7 @@ app.use("/api/entities", entitiesRouter);
 app.use("/api/reports", reportDataRouter);
 app.use("/api/integrations", uploadsRouter);
 app.use("/api/integrations", reportsRouter);
+app.use("/api/admin/backup", backupRouter);
 
 const distDir = path.resolve(process.cwd(), "dist");
 const hasFrontendBuild = fs.existsSync(path.join(distDir, "index.html"));

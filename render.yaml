@@ -34,3 +34,16 @@ services:
       # find it at runtime (build and runtime share /opt/render/project/src).
       - key: PUPPETEER_CACHE_DIR
         value: /opt/render/project/src/.cache/puppeteer
+
+  - type: cron
+    name: siduravoda-weekly-backup
+    runtime: node
+    schedule: "0 7 * * 0"
+    buildCommand: "true"
+    startCommand: >
+      curl -fsS -X POST
+      -H "Authorization: Bearer $BACKUP_CRON_SECRET"
+      https://siduravoda-server.onrender.com/api/admin/backup/run
+    envVars:
+      - key: BACKUP_CRON_SECRET
+        sync: false

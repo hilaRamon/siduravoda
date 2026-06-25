@@ -203,7 +203,7 @@ export default function BackupExport() {
           </div>
           <div>
             <h3 className="font-semibold text-base">הורדת גיבוי נתונים</h3>
-            <p className="text-sm text-muted-foreground">קובץ Excel נפרד לכל ישות</p>
+            <p className="text-sm text-muted-foreground">גיבוי יומי מלא — כל הנתונים, כולל כל השיבוצים</p>
           </div>
         </div>
         <Button size="sm" onClick={handleDownloadAll} disabled={zipping} className="shrink-0">
