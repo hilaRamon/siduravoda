@@ -31,11 +31,8 @@ function formatHebrewDate(dateStr) {
   });
 }
 
-function formatWeekRangeLabel(weekRange) {
-  if (!weekRange) return "";
-  const { startStr, endStr } = weekRange;
-  if (startStr === endStr) return formatHebrewDate(endStr);
-  return `${formatHebrewDate(startStr)} – ${formatHebrewDate(endStr)}`;
+function formatExportDateLabel(exportDateStr) {
+  return formatHebrewDate(exportDateStr);
 }
 
 async function sendBackupEmail({ to, subject, body, zipBuffer, zipFilename }) {
@@ -56,12 +53,12 @@ async function sendBackupEmail({ to, subject, body, zipBuffer, zipFilename }) {
   });
 }
 
-export async function sendWeeklyBackupToRecipients({ recipients, weekRange, zipBuffer, zipFilename }) {
-  const label = formatWeekRangeLabel(weekRange);
+export async function sendWeeklyBackupToRecipients({ recipients, exportDateStr, zipBuffer, zipFilename }) {
+  const label = formatExportDateLabel(exportDateStr);
   const subject = `גיבוי שבועי — ${label}`;
   const body =
-    `שלום,\n\nמצורף גיבוי שבועי לתקופה ${weekRange.startStr} עד ${weekRange.endStr}.\n\n` +
-    `• שיבוצים — קובץ Excel נפרד לכל יום בשבוע\n` +
+    `שלום,\n\nמצורף גיבוי שבועי מתאריך ${exportDateStr}.\n\n` +
+    `• שיבוצים — קובץ Excel אחד עם כל השיבוצים במערכת (ממוין לפי תאריך)\n` +
     `• תלמידים, מקומות עבודה ורכבים — מצב עדכני\n\n` +
     `נשלח אוטומטית מהמערכת — רגבים.`;
 
@@ -79,12 +76,12 @@ export async function sendWeeklyBackupToRecipients({ recipients, weekRange, zipB
   return results;
 }
 
-export async function sendVerificationToRecipients({ recipients, weekRange, zipBuffer, zipFilename }) {
-  const label = formatWeekRangeLabel(weekRange);
+export async function sendVerificationToRecipients({ recipients, exportDateStr, zipBuffer, zipFilename }) {
+  const label = formatExportDateLabel(exportDateStr);
   const subject = `אימות כתובת גיבוי — ${label}`;
   const body =
     `שלום,\n\nנוספת כתובת זו לרשימת הגיבוי השבועי.\n\n` +
-    `מצורף גיבוי השבוע האחרון (${weekRange.startStr} עד ${weekRange.endStr}) לאימות שהכתובת פעילה.\n\n` +
+    `מצורף גיבוי עדכני (${exportDateStr}) לאימות שהכתובת פעילה.\n\n` +
     `מעתה תקבלו גיבוי אוטומטי בכל יום ראשון בשעה 9:00.\n\n` +
     `נשלח מהמערכת — רגבים.`;
 

@@ -128,7 +128,7 @@ export default function BackupEmailSettings() {
           </div>
           <div>
             <h3 className="font-semibold text-base">גיבוי שבועי אוטומטי</h3>
-            <p className="text-sm text-muted-foreground">נשלח בכל יום ראשון בשעה 9:00 — קובץ שיבוצים לכל יום בשבוע + מצב עדכני של ישויות</p>
+            <p className="text-sm text-muted-foreground">נשלח בכל יום ראשון בשעה 9:00 — קובץ שיבוצים אחד עם כל השיבוצים במערכת + מצב עדכני של ישויות</p>
           </div>
         </div>
         <Button size="sm" variant="outline" onClick={handleRunBackup} disabled={runningBackup || saving} className="shrink-0">
@@ -137,7 +137,7 @@ export default function BackupEmailSettings() {
         </Button>
       </div>
 
-      <p className="text-xs text-muted-foreground">כתובת חדשה תקבל את גיבוי השבוע האחרון לאימות</p>
+      <p className="text-xs text-muted-foreground">כתובת חדשה תקבל את הגיבוי העדכני לאימות</p>
 
       <div className="space-y-2">
         {emails.map(email => (
