@@ -150,14 +150,18 @@ export function buildReportGroups(
 }
 
 /** Build the logistics + students lookup maps used by buildReportGroups. */
+/** @returns {{ logisticsMap: Record<string, unknown>, logisticsMapByName: Record<string, unknown>, studentsMap: Record<string, unknown> }} */
 export function buildLookupMaps(logisticsList, students) {
+  /** @type {Record<string, unknown>} */
   const logisticsMap = {};
+  /** @type {Record<string, unknown>} */
   const logisticsMapByName = {};
   logisticsList.forEach((l) => {
     if (l.workplace_id) logisticsMap[l.workplace_id] = l;
     if (l.workplace_name) logisticsMapByName[l.workplace_name] = l;
   });
 
+  /** @type {Record<string, unknown>} */
   const studentsMap = {};
   students.forEach((s) => {
     studentsMap[s.id] = s;
@@ -228,7 +232,7 @@ const S = {
   logValRed: { fontWeight: "bold", color: "#b91c1c", verticalAlign: "middle" },
   table: {
     width: "100%",
-    fontSize: "8px",
+    fontSize: "8.5px",
     borderCollapse: "collapse",
     pageBreakInside: "avoid",
   },
@@ -407,16 +411,29 @@ function WorkplaceCard({ group, studentsMap }) {
 }
 
 /**
+ * @typedef {object} ReportContentProps
+ * @property {import('react').Ref<HTMLDivElement> | null} [forwardRef]
+ * @property {ReturnType<typeof buildReportGroups>} reportGroups
+ * @property {string} gregDate
+ * @property {string} hebrewDate
+ * @property {Record<string, unknown>} [studentsMap]
+ * @property {boolean} [preview]
+ * @property {number} [columnCount]
+ */
+
+/**
  * Hidden (or preview) A4 layout that html2canvas captures into a PDF.
  * Pass `preview` to render it visibly in normal flow instead of hidden.
+ * @param {ReportContentProps} props
  */
 export function ReportContent({
-  forwardRef,
+  forwardRef = null,
   reportGroups,
   gregDate,
   hebrewDate,
-  studentsMap,
+  studentsMap = {},
   preview = false,
+  columnCount = 2,
 }) {
   const wrapStyle = preview
     ? { ...S.wrap, display: "block", width: "100%", margin: "0 auto" }
@@ -430,7 +447,7 @@ export function ReportContent({
           {gregDate} — {hebrewDate}
         </p>
       </div>
-      <div style={S.cols}>
+      <div style={{ ...S.cols, columnCount }}>
         {reportGroups.map((g) => (
           <WorkplaceCard
             key={g.workplaceName}
