@@ -1,7 +1,7 @@
 import * as React from "react";
 
 /** Minimum viewport width for the TV fit-to-screen schedule layout */
-export const TV_SCHEDULE_MIN_WIDTH = 1020;
+export const TV_SCHEDULE_MIN_WIDTH = 1920;
 
 export function useIsTvSchedule() {
   const [isTv, setIsTv] = React.useState(
