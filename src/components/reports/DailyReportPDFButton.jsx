@@ -81,7 +81,11 @@ export default function DailyReportPDFButton({ date, assignments }) {
       await Promise.all(
         existing.map((r) => base44.entities.PublishedSchedule.delete(r.id)),
       );
-      await base44.entities.PublishedSchedule.create({ date, file_url });
+      await base44.entities.PublishedSchedule.create({
+        date,
+        file_url,
+        snapshot: { reportGroups, gregDate, hebrewDate },
+      });
       queryClient.invalidateQueries({ queryKey: ["published-schedule"] });
       const channel = new BroadcastChannel("published-schedule");
       channel.postMessage({ type: "published" });

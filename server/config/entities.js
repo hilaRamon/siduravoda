@@ -100,6 +100,7 @@ export const entityDefinitions = {
     schema: {
       date: { type: String, required: true },
       file_url: { type: String, required: true },
+      snapshot: { type: Object },
     },
   },
   BackupSettings: {
