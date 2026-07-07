@@ -1,6 +1,5 @@
 import fs from "node:fs";
 import path from "node:path";
-import { format, subDays, eachDayOfInterval, parseISO } from "date-fns";
 import * as XLSX from "xlsx";
 import JSZip from "jszip";
 import { getModel } from "../models/index.js";
@@ -13,38 +12,15 @@ function todayInIsrael() {
   return new Date().toLocaleDateString("en-CA", { timeZone: ISRAEL_TZ });
 }
 
-/** Sunday–Saturday week in Israel. On Sunday, use the week that ended yesterday. */
-export function getWeeklyAssignmentRange(referenceDateStr = todayInIsrael()) {
-  const today = new Date(`${referenceDateStr}T12:00:00`);
-  const dayOfWeek = today.getDay();
-
-  let endDate;
-  let startDate;
-
-  if (dayOfWeek === 0) {
-    endDate = subDays(today, 1);
-    startDate = subDays(endDate, 6);
-  } else {
-    endDate = today;
-    startDate = subDays(today, dayOfWeek);
-  }
-
-  return {
-    startStr: format(startDate, "yyyy-MM-dd"),
-    endStr: format(endDate, "yyyy-MM-dd"),
-  };
-}
-
-function zipFilenameForWeek(startStr, endStr) {
-  if (startStr === endStr) return `גיבוי_מלא_${endStr}.zip`;
-  return `גיבוי_מלא_${startStr}_${endStr}.zip`;
+function zipFilenameForDate(exportDateStr) {
+  return `גיבוי_מלא_${exportDateStr}.zip`;
 }
 
 function workbookToBuffer(wb) {
   return XLSX.write(wb, { bookType: "xlsx", type: "buffer" });
 }
 
-async function loadBackupData(weekRange) {
+async function loadBackupData() {
   const Student = getModel("Student");
   const Workplace = getModel("Workplace");
   const Vehicle = getModel("Vehicle");
@@ -54,22 +30,10 @@ async function loadBackupData(weekRange) {
     Student.find().sort({ full_name: 1 }).limit(1000).lean(),
     Workplace.find().sort({ name: 1 }).limit(1000).lean(),
     Vehicle.find().sort({ name: 1 }).limit(1000).lean(),
-    Assignment.find({
-      date: { $gte: weekRange.startStr, $lte: weekRange.endStr },
-    })
-      .sort({ date: 1 })
-      .limit(10000)
-      .lean(),
+    Assignment.find().sort({ date: 1 }).lean(),
   ]);
 
-  return { students, workplaces, vehicles, assignments, weekRange };
-}
-
-function enumerateDaysInRange(weekRange) {
-  return eachDayOfInterval({
-    start: parseISO(weekRange.startStr),
-    end: parseISO(weekRange.endStr),
-  }).map((d) => format(d, "yyyy-MM-dd"));
+  return { students, workplaces, vehicles, assignments };
 }
 
 function mapAssignmentRows(assignments) {
@@ -86,7 +50,7 @@ function mapAssignmentRows(assignments) {
 }
 
 function buildWorkbookFiles(data, exportDateStr) {
-  const { students, workplaces, vehicles, assignments, weekRange } = data;
+  const { students, workplaces, vehicles, assignments } = data;
 
   const wsStudents = XLSX.utils.json_to_sheet(
     students.map((s) => ({
@@ -125,33 +89,20 @@ function buildWorkbookFiles(data, exportDateStr) {
   const wbVehicles = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wbVehicles, wsVehicles, "רכבים");
 
-  const byDate = new Map();
-  for (const a of assignments) {
-    const key = a.date || "";
-    if (!byDate.has(key)) byDate.set(key, []);
-    byDate.get(key).push(a);
-  }
+  const sorted = [...assignments].sort((a, b) => {
+    if (a.date !== b.date) return a.date.localeCompare(b.date);
+    return (a.student_name || "").localeCompare(b.student_name || "", "he");
+  });
+  const wsAssignments = XLSX.utils.json_to_sheet(mapAssignmentRows(sorted));
+  const wbAssignments = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wbAssignments, wsAssignments, "שיבוצים");
 
-  const files = [
+  return [
     { name: `גיבוי_תלמידים_${exportDateStr}.xlsx`, buffer: workbookToBuffer(wbStudents) },
     { name: `גיבוי_מקומות_עבודה_${exportDateStr}.xlsx`, buffer: workbookToBuffer(wbWorkplaces) },
     { name: `גיבוי_רכבים_${exportDateStr}.xlsx`, buffer: workbookToBuffer(wbVehicles) },
+    { name: `גיבוי_שיבוצים_${exportDateStr}.xlsx`, buffer: workbookToBuffer(wbAssignments) },
   ];
-
-  for (const dayStr of enumerateDaysInRange(weekRange)) {
-    const dayAssignments = (byDate.get(dayStr) || []).sort((a, b) =>
-      (a.student_name || "").localeCompare(b.student_name || "", "he"),
-    );
-    const ws = XLSX.utils.json_to_sheet(mapAssignmentRows(dayAssignments));
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "שיבוצים");
-    files.push({
-      name: `גיבוי_שיבוצים_${dayStr}.xlsx`,
-      buffer: workbookToBuffer(wb),
-    });
-  }
-
-  return files;
 }
 
 async function buildZipBuffer(files) {
@@ -208,14 +159,14 @@ export async function getBackupRecipients() {
   return doc.emails || [];
 }
 
-function extractWeekFromFilename(filename) {
+function extractDateFromFilename(filename) {
   const rangeMatch = filename.match(/גיבוי_מלא_(\d{4}-\d{2}-\d{2})_(\d{4}-\d{2}-\d{2})\.zip$/);
   if (rangeMatch) {
-    return { startStr: rangeMatch[1], endStr: rangeMatch[2] };
+    return rangeMatch[2];
   }
   const singleMatch = filename.match(/גיבוי_מלא_(\d{4}-\d{2}-\d{2})\.zip$/);
   if (singleMatch) {
-    return { startStr: singleMatch[1], endStr: singleMatch[1] };
+    return singleMatch[1];
   }
   return null;
 }
@@ -230,7 +181,7 @@ export async function getLatestBackup() {
       candidates.push({
         zipPath,
         filename: doc.last_backup_filename,
-        weekRange: extractWeekFromFilename(doc.last_backup_filename),
+        exportDateStr: extractDateFromFilename(doc.last_backup_filename),
         mtime: fs.statSync(zipPath).mtimeMs,
       });
     }
@@ -245,7 +196,7 @@ export async function getLatestBackup() {
       candidates.push({
         zipPath,
         filename: entry,
-        weekRange: extractWeekFromFilename(entry),
+        exportDateStr: extractDateFromFilename(entry),
         mtime,
       });
     }
@@ -261,19 +212,18 @@ export async function getLatestBackup() {
     zipPath: latest.zipPath,
     zipBuffer,
     filename: latest.filename,
-    weekRange: latest.weekRange || getWeeklyAssignmentRange(),
+    exportDateStr: latest.exportDateStr || todayInIsrael(),
   };
 }
 
 export async function generateAndPersistBackup() {
   fs.mkdirSync(BACKUP_DIR, { recursive: true });
 
-  const weekRange = getWeeklyAssignmentRange();
   const exportDateStr = todayInIsrael();
-  const data = await loadBackupData(weekRange);
+  const data = await loadBackupData();
   const files = buildWorkbookFiles(data, exportDateStr);
   const zipBuffer = await buildZipBuffer(files);
-  const filename = zipFilenameForWeek(weekRange.startStr, weekRange.endStr);
+  const filename = zipFilenameForDate(exportDateStr);
   const zipPath = path.join(BACKUP_DIR, filename);
 
   fs.writeFileSync(zipPath, zipBuffer);
@@ -281,7 +231,6 @@ export async function generateAndPersistBackup() {
 
   return {
     exportDateStr,
-    weekRange,
     zipPath,
     zipBuffer,
     filename,
@@ -297,7 +246,7 @@ export async function runWeeklyBackup() {
     return {
       ok: false,
       message: "לא הוגדרו כתובות מייל לגיבוי",
-      weekRange: archive.weekRange,
+      exportDateStr: archive.exportDateStr,
       filename: archive.filename,
       results: {},
     };
@@ -305,14 +254,14 @@ export async function runWeeklyBackup() {
 
   const results = await sendWeeklyBackupToRecipients({
     recipients,
-    weekRange: archive.weekRange,
+    exportDateStr: archive.exportDateStr,
     zipBuffer: archive.zipBuffer,
     zipFilename: archive.filename,
   });
 
   return {
     ok: true,
-    weekRange: archive.weekRange,
+    exportDateStr: archive.exportDateStr,
     filename: archive.filename,
     fileNames: archive.fileNames,
     results,
@@ -333,14 +282,14 @@ export async function sendVerificationBackup(newEmails) {
     latest = {
       zipBuffer: archive.zipBuffer,
       filename: archive.filename,
-      weekRange: archive.weekRange,
+      exportDateStr: archive.exportDateStr,
     };
     generatedFresh = true;
   }
 
   const results = await sendVerificationToRecipients({
     recipients: trimmed,
-    weekRange: latest.weekRange,
+    exportDateStr: latest.exportDateStr,
     zipBuffer: latest.zipBuffer,
     zipFilename: latest.filename,
   });
@@ -348,7 +297,7 @@ export async function sendVerificationBackup(newEmails) {
   return {
     ok: Object.values(results).every((r) => r.success),
     sentTo: trimmed,
-    weekRange: latest.weekRange,
+    exportDateStr: latest.exportDateStr,
     generatedFresh,
     results,
   };
