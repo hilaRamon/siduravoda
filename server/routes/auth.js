@@ -264,6 +264,34 @@ router.delete("/users/:id", requireAuth, async (req, res, next) => {
   }
 });
 
+// ─── Set password for a managed user ──────────────────────────────────────────
+
+router.patch("/users/:id/password", requireAuth, async (req, res, next) => {
+  try {
+    const User = getModel("User");
+    const target = await User.findById(req.params.id).select("+password_hash");
+    if (!target) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    if (!canManageTargetUser(req, target)) {
+      return res.status(403).json({ message: "You cannot set this user's password" });
+    }
+
+    const password = String(req.body.password || "");
+    if (!password || password.length < 4) {
+      return res.status(400).json({ message: "Password must be at least 4 characters" });
+    }
+
+    target.password_hash = await hashPassword(password);
+    await target.save();
+
+    return res.json({ ok: true });
+  } catch (error) {
+    return next(error);
+  }
+});
+
 // ─── Update own profile ───────────────────────────────────────────────────────
 
 router.patch("/me", requireAuth, async (req, res, next) => {

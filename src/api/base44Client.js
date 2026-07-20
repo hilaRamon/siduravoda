@@ -247,6 +247,12 @@ export const base44 = {
     deleteUser(id) {
       return request(`/api/auth/users/${id}`, { method: "DELETE" });
     },
+    setUserPassword(userId, password) {
+      return request(`/api/auth/users/${userId}/password`, {
+        method: "PATCH",
+        body: JSON.stringify({ password }),
+      });
+    },
     updateMe(data) {
       return request("/api/auth/me", {
         method: "PATCH",
