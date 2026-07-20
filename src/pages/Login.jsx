@@ -5,7 +5,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Loader2, LogIn } from 'lucide-react';
 import { PasswordField } from '@/components/ui/password-field';
-import { canReportTime } from '@/lib/permissions';
+import { canReportTime, isWorkplaceManagerOnly } from '@/lib/permissions';
+
+function getPostLoginTarget(user, from) {
+  if (isWorkplaceManagerOnly(user)) return '/workplaces';
+  if (canReportTime(user) && user.role !== 'admin') return '/time-reporting';
+  return from;
+}
 
 export default function Login() {
   const { login, isAuthenticated, user, isLoadingAuth } = useAuth();
@@ -23,9 +29,7 @@ export default function Login() {
 
   useEffect(() => {
     if (!isLoadingAuth && isAuthenticated && user) {
-      const target =
-        canReportTime(user) && user.role !== 'admin' ? '/time-reporting' : from;
-      navigate(target, { replace: true });
+      navigate(getPostLoginTarget(user, from), { replace: true });
     }
   }, [isLoadingAuth, isAuthenticated, user, from, navigate]);
 
@@ -38,9 +42,7 @@ export default function Login() {
   }
 
   if (isAuthenticated && user) {
-    const target =
-      canReportTime(user) && user.role !== 'admin' ? '/time-reporting' : from;
-    return <Navigate to={target} replace />;
+    return <Navigate to={getPostLoginTarget(user, from)} replace />;
   }
 
   const handleSubmit = async (e) => {

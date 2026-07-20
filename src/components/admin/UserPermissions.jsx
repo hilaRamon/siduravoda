@@ -5,11 +5,12 @@ import { Button } from '@/components/ui/button';
 import { Shield, UserCheck, Loader2, Trash2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/lib/AuthContext';
-import { isAdmin } from '@/lib/permissions';
+import { isAdmin, isRegularUser } from '@/lib/permissions';
 
 function getUserLevel(u) {
   if (u.role === 'admin') return 'admin';
   if (u.can_report_time) return 'reporter';
+  if (u.can_manage_workplaces) return 'workplace_manager';
   return 'user';
 }
 
@@ -28,6 +29,13 @@ const ADMIN_LEVELS = [
     description: 'גישה לקישור דיווח הזמנים בלבד',
     color: 'bg-blue-50 text-blue-700 border-blue-200',
     activeColor: 'bg-blue-600 text-white border-blue-600',
+  },
+  {
+    value: 'workplace_manager',
+    label: 'מקומות עבודה',
+    description: 'גישה לעמוד מקומות עבודה בלבד',
+    color: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    activeColor: 'bg-emerald-600 text-white border-emerald-600',
   },
 ];
 
@@ -134,7 +142,7 @@ function UserManager({ canManageUsers, inviteOptions }) {
   const levelButtons =
     inviteOptions.includes('user')
       ? ADMIN_LEVELS
-      : ADMIN_LEVELS.filter((l) => l.value === 'reporter');
+      : ADMIN_LEVELS.filter((l) => inviteOptions.includes(l.value));
 
   const handleSetLevel = async (user, level) => {
     setUpdating(user.id);
@@ -164,6 +172,9 @@ function UserManager({ canManageUsers, inviteOptions }) {
       )}
       {inviteOptions.includes('reporter') && (
         <InviteBox allowedLevel="reporter" label="הוספת מדווח זמנים" />
+      )}
+      {inviteOptions.includes('workplace_manager') && (
+        <InviteBox allowedLevel="workplace_manager" label="הוספת מנהל מקומות עבודה" />
       )}
 
       <div className="bg-card border border-border rounded-2xl overflow-hidden">
@@ -252,8 +263,10 @@ function UserManager({ canManageUsers, inviteOptions }) {
 export default function UserPermissions() {
   const { user } = useAuth();
   const admin = isAdmin(user);
-  const canManageUsers = admin || user?.role === 'user';
-  const inviteOptions = admin ? ['user', 'reporter'] : ['reporter'];
+  const canManageUsers = admin || isRegularUser(user);
+  const inviteOptions = admin
+    ? ['user', 'reporter', 'workplace_manager']
+    : ['reporter', 'workplace_manager'];
 
   if (!canManageUsers) return null;
 

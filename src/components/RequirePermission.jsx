@@ -1,6 +1,7 @@
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/lib/AuthContext';
 import { ShieldOff } from 'lucide-react';
+import { isReporterOnly, isWorkplaceManagerOnly } from '@/lib/permissions';
 
 export default function RequirePermission({ check, children, fallback }) {
   const { user, isLoadingAuth } = useAuth();
@@ -26,9 +27,10 @@ export default function RequirePermission({ check, children, fallback }) {
   return children;
 }
 
-/** Redirect time-only reporters away from the main app shell */
+/** Redirect restricted users away from the main app shell */
 export function RequireMainApp({ children }) {
   const { user, isLoadingAuth } = useAuth();
+  const location = useLocation();
 
   if (isLoadingAuth) {
     return (
@@ -38,12 +40,11 @@ export function RequireMainApp({ children }) {
     );
   }
 
-  const isReporterOnly =
-    user?.role === 'user' &&
-    user?.can_report_time &&
-    !user?.can_view_time_reports;
+  if (isWorkplaceManagerOnly(user) && location.pathname !== '/workplaces') {
+    return <Navigate to="/workplaces" replace />;
+  }
 
-  if (isReporterOnly) {
+  if (isReporterOnly(user)) {
     return <Navigate to="/time-reporting" replace />;
   }
 

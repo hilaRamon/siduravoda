@@ -2,7 +2,7 @@ import express from "express";
 import { getModel } from "../models/index.js";
 import { hashPassword, verifyPassword, generateTemporaryPassword } from "../lib/password.js";
 import { signToken } from "../lib/jwt.js";
-import { levelToFields, sanitizeUser } from "../config/permissions.js";
+import { levelToFields, sanitizeUser, isRegularUser } from "../config/permissions.js";
 import { attachUser, requireAuth } from "../middleware/auth.js";
 
 const router = express.Router();
@@ -30,18 +30,18 @@ function callerIsEnvAdmin(req) {
   return email && req.user.email === email;
 }
 
-function isUserLike(req) {
-  return req.user?.role === "user";
-}
-
 function getAllowedInviteLevels(req) {
-  if (callerIsEnvAdmin(req)) return new Set(["user", "reporter"]);
-  if (isUserLike(req)) return new Set(["reporter"]);
+  if (callerIsEnvAdmin(req)) return new Set(["user", "reporter", "workplace_manager"]);
+  if (isRegularUser(req.user)) return new Set(["reporter", "workplace_manager"]);
   return new Set();
 }
 
 function isReporterAccount(userDoc) {
   return userDoc?.role === "user" && userDoc?.can_report_time === true;
+}
+
+function isWorkplaceManagerAccount(userDoc) {
+  return userDoc?.role === "user" && userDoc?.can_manage_workplaces === true;
 }
 
 function canManageTargetUser(req, target) {
@@ -50,7 +50,9 @@ function canManageTargetUser(req, target) {
     return false;
   }
   if (callerIsEnvAdmin(req)) return true;
-  if (isUserLike(req)) return isReporterAccount(target);
+  if (isRegularUser(req.user)) {
+    return isReporterAccount(target) || isWorkplaceManagerAccount(target);
+  }
   return false;
 }
 
@@ -83,6 +85,7 @@ router.post("/login", async (req, res, next) => {
           full_name: envAdmin.fullName,
           role: "admin",
           can_report_time: false,
+          can_manage_workplaces: false,
           can_view_time_reports: true,
           is_active: true,
         });
@@ -144,8 +147,8 @@ router.get("/users", requireAuth, async (req, res, next) => {
 
 // ─── Invite ───────────────────────────────────────────────────────────────────
 //
-// Admin can invite: user | reporter
-// Regular user (role=user) can invite: reporter only
+// Admin can invite: user | reporter | workplace_manager
+// Regular user (role=user) can invite: reporter | workplace_manager only
 // Nobody else can invite.
 
 router.post("/invite", requireAuth, async (req, res, next) => {
