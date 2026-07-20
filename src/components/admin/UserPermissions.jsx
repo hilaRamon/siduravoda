@@ -1,16 +1,32 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
-import { Shield, UserCheck, Loader2, Trash2 } from 'lucide-react';
+import { Shield, UserCheck, Loader2, Trash2, KeyRound, Sparkles } from 'lucide-react';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { PasswordField } from '@/components/ui/password-field';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useAuth } from '@/lib/AuthContext';
-import { isAdmin } from '@/lib/permissions';
+import { isAdmin, isRegularUser } from '@/lib/permissions';
 
 function getUserLevel(u) {
   if (u.role === 'admin') return 'admin';
   if (u.can_report_time) return 'reporter';
+  if (u.can_manage_workplaces) return 'workplace_manager';
   return 'user';
+}
+
+/** Same character set / length as server generateTemporaryPassword */
+function generatePassword() {
+  const chars = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKMNPQRSTUVWXYZ23456789';
+  let out = '';
+  for (let i = 0; i < 12; i += 1) {
+    out += chars[Math.floor(Math.random() * chars.length)];
+  }
+  return out;
 }
 
 // Levels available to admin (cannot create another admin)
@@ -29,7 +45,134 @@ const ADMIN_LEVELS = [
     color: 'bg-blue-50 text-blue-700 border-blue-200',
     activeColor: 'bg-blue-600 text-white border-blue-600',
   },
+  {
+    value: 'workplace_manager',
+    label: 'מקומות עבודה',
+    description: 'גישה לעמוד מקומות עבודה בלבד',
+    color: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    activeColor: 'bg-emerald-600 text-white border-emerald-600',
+  },
 ];
+
+// ─── Set password dialog ──────────────────────────────────────────────────────
+
+function SetPasswordDialog({ user, open, onClose }) {
+  const [password, setPassword] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    setPassword('');
+    setConfirm('');
+    setError('');
+    setSuccess(false);
+  }, [open, user?.id]);
+
+  const handleGenerate = () => {
+    const generated = generatePassword();
+    setPassword(generated);
+    setConfirm(generated);
+    setError('');
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    if (password !== confirm) {
+      setError('הסיסמאות אינן תואמות');
+      return;
+    }
+    if (password.length < 4) {
+      setError('הסיסמה חייבת להכיל לפחות 4 תווים');
+      return;
+    }
+    setSaving(true);
+    try {
+      await base44.auth.setUserPassword(user.id, password);
+      setSuccess(true);
+    } catch (err) {
+      setError(err?.message || 'שגיאה בעדכון הסיסמה');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
+      <DialogContent className="max-w-md" dir="rtl">
+        <DialogHeader>
+          <DialogTitle>הגדרת סיסמה</DialogTitle>
+        </DialogHeader>
+
+        {user && (
+          <div className="text-sm text-muted-foreground mb-2">
+            <div className="font-medium text-foreground">{user.full_name || '—'}</div>
+            <div dir="ltr">{user.email}</div>
+          </div>
+        )}
+
+        {success ? (
+          <div className="space-y-4">
+            <p className="text-sm text-green-600">הסיסמה עודכנה בהצלחה.</p>
+            <Button className="w-full" onClick={onClose}>סגור</Button>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="flex items-center gap-2">
+              <Label htmlFor="set-password" className="mb-0">סיסמה חדשה</Label>
+              <TooltipProvider delayDuration={200}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      onClick={handleGenerate}
+                      className="h-7 w-7 inline-flex items-center justify-center rounded-md border border-border text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
+                      aria-label="צור סיסמה אקראית"
+                    >
+                      <Sparkles size={13} />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="max-w-[220px] text-center">
+                    יוצר סיסמה אקראית וממלא את שני השדות. אפשר לערוך לפני השמירה.
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
+            <PasswordField
+              id="set-password"
+              value={password}
+              onValueChange={setPassword}
+              placeholder="לפחות 4 תווים"
+              autoComplete="new-password"
+            />
+            <div className="space-y-2">
+              <Label htmlFor="set-password-confirm">אימות סיסמה</Label>
+              <PasswordField
+                id="set-password-confirm"
+                value={confirm}
+                onValueChange={setConfirm}
+                placeholder="חזור על הסיסמה"
+                autoComplete="new-password"
+              />
+            </div>
+
+            {error && <p className="text-sm text-destructive">{error}</p>}
+
+            <div className="flex gap-2 justify-end">
+              <Button type="button" variant="outline" onClick={onClose}>ביטול</Button>
+              <Button type="submit" disabled={saving || !password}>
+                {saving ? <Loader2 size={15} className="animate-spin" /> : 'שמור סיסמה'}
+              </Button>
+            </div>
+          </form>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 // ─── Invite box (shared) ──────────────────────────────────────────────────────
 
@@ -122,6 +265,7 @@ function UserManager({ canManageUsers, inviteOptions }) {
   const queryClient = useQueryClient();
   const [updating, setUpdating] = useState(null);
   const [deleting, setDeleting] = useState(null);
+  const [passwordUser, setPasswordUser] = useState(null);
 
   const { data: users = [], isLoading } = useQuery({
     queryKey: ['users-list'],
@@ -134,7 +278,7 @@ function UserManager({ canManageUsers, inviteOptions }) {
   const levelButtons =
     inviteOptions.includes('user')
       ? ADMIN_LEVELS
-      : ADMIN_LEVELS.filter((l) => l.value === 'reporter');
+      : ADMIN_LEVELS.filter((l) => inviteOptions.includes(l.value));
 
   const handleSetLevel = async (user, level) => {
     setUpdating(user.id);
@@ -164,6 +308,9 @@ function UserManager({ canManageUsers, inviteOptions }) {
       )}
       {inviteOptions.includes('reporter') && (
         <InviteBox allowedLevel="reporter" label="הוספת מדווח זמנים" />
+      )}
+      {inviteOptions.includes('workplace_manager') && (
+        <InviteBox allowedLevel="workplace_manager" label="הוספת מנהל מקומות עבודה" />
       )}
 
       <div className="bg-card border border-border rounded-2xl overflow-hidden">
@@ -196,6 +343,9 @@ function UserManager({ canManageUsers, inviteOptions }) {
               const isUpdating = updating === u.id;
               const isDeleting = deleting === u.id;
               const currentLevel = getUserLevel(u);
+              const levelMeta =
+                levelButtons.find((l) => l.value === currentLevel) ||
+                ADMIN_LEVELS.find((l) => l.value === currentLevel);
 
               return (
                 <div key={u.id} className="flex items-center gap-4 px-5 py-4 flex-wrap hover:bg-secondary/10 transition-colors">
@@ -208,26 +358,33 @@ function UserManager({ canManageUsers, inviteOptions }) {
                     <Loader2 size={16} className="animate-spin text-muted-foreground shrink-0" />
                   ) : (
                     <div className="flex items-center gap-2 flex-wrap">
-                      <div className="flex gap-1.5">
-                        {levelButtons.map(level => {
-                          const isActive = currentLevel === level.value;
-                          return (
-                            <button
-                              key={level.value}
-                              disabled={isActive}
-                              onClick={() => handleSetLevel(u, level.value)}
-                              className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all
-                                ${isActive
-                                  ? level.activeColor + ' cursor-default'
-                                  : level.color + ' hover:opacity-80 cursor-pointer'}
-                              `}
-                              title={level.description}
-                            >
+                      <Select
+                        value={currentLevel}
+                        onValueChange={(level) => handleSetLevel(u, level)}
+                      >
+                        <SelectTrigger
+                          className={`h-8 w-auto min-w-[7.5rem] gap-1.5 px-3 text-xs font-medium border rounded-lg shadow-none
+                            ${levelMeta?.activeColor || 'bg-secondary text-secondary-foreground border-border'}
+                          `}
+                          title={levelMeta?.description}
+                        >
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {levelButtons.map((level) => (
+                            <SelectItem key={level.value} value={level.value}>
                               {level.label}
-                            </button>
-                          );
-                        })}
-                      </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <button
+                        onClick={() => setPasswordUser(u)}
+                        className="p-1.5 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
+                        title="הגדר סיסמה"
+                      >
+                        <KeyRound size={14} />
+                      </button>
                       <button
                         onClick={() => handleDelete(u)}
                         className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
@@ -243,6 +400,12 @@ function UserManager({ canManageUsers, inviteOptions }) {
           </div>
         )}
       </div>
+
+      <SetPasswordDialog
+        user={passwordUser}
+        open={!!passwordUser}
+        onClose={() => setPasswordUser(null)}
+      />
     </div>
   );
 }
@@ -252,8 +415,10 @@ function UserManager({ canManageUsers, inviteOptions }) {
 export default function UserPermissions() {
   const { user } = useAuth();
   const admin = isAdmin(user);
-  const canManageUsers = admin || user?.role === 'user';
-  const inviteOptions = admin ? ['user', 'reporter'] : ['reporter'];
+  const canManageUsers = admin || isRegularUser(user);
+  const inviteOptions = admin
+    ? ['user', 'reporter', 'workplace_manager']
+    : ['reporter', 'workplace_manager'];
 
   if (!canManageUsers) return null;
 

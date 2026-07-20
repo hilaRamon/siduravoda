@@ -32,6 +32,7 @@ async function main() {
     existing.role = ROLES.ADMIN;
     existing.can_report_time = false;
     existing.can_view_time_reports = true;
+    existing.can_manage_workplaces = false;
     existing.is_active = true;
     await existing.save();
     console.log("Updated existing admin user.");
@@ -43,6 +44,7 @@ async function main() {
       role: ROLES.ADMIN,
       can_report_time: false,
       can_view_time_reports: true,
+      can_manage_workplaces: false,
       is_active: true,
     });
     console.log("Created new admin user.");

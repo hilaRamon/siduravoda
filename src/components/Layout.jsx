@@ -17,7 +17,7 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { useAuth } from "@/lib/AuthContext";
-import { getVisibleNavItems } from "@/lib/permissions";
+import { getVisibleNavItems, isWorkplaceManagerOnly } from "@/lib/permissions";
 import EditProfileModal from "@/components/EditProfileModal";
 
 const navIcons = {
@@ -37,6 +37,7 @@ export default function Layout() {
   const location = useLocation();
   const { user, logout } = useAuth();
   const [profileOpen, setProfileOpen] = useState(false);
+  const workplaceManagerOnly = isWorkplaceManagerOnly(user);
   const navItems = getVisibleNavItems(user);
 
   const { data: pendingSMS = [] } = useQuery({
@@ -48,6 +49,7 @@ export default function Layout() {
         100,
       ),
     refetchInterval: 60000,
+    enabled: !workplaceManagerOnly,
   });
   const pendingCount = pendingSMS.length;
 
@@ -60,9 +62,46 @@ export default function Layout() {
         100,
       ),
     refetchInterval: 60000,
-    enabled: navItems.some((n) => n.to === "/time-reports"),
+    enabled: !workplaceManagerOnly && navItems.some((n) => n.to === "/time-reports"),
   });
   const pendingTimeReportsCount = pendingTimeReports.length;
+
+  const handleLogout = () => {
+    logout().then(() => {
+      window.location.href = "/login";
+    });
+  };
+
+  if (workplaceManagerOnly) {
+    return (
+      <div
+        className="flex flex-col h-screen bg-background font-heebo overflow-hidden"
+        dir="rtl"
+      >
+        <header className="w-full h-14 flex-shrink-0 border-b border-border bg-card flex items-center justify-between px-6 shadow-sm">
+          <div>
+            <h1 className="text-lg font-bold">מקומות עבודה</h1>
+            {user && (
+              <p className="text-xs text-muted-foreground truncate">
+                {user.full_name || user.email}
+              </p>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+          >
+            <LogOut size={16} />
+            התנתקות
+          </button>
+        </header>
+        <main className="flex-1 overflow-y-auto">
+          <Outlet />
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -127,11 +166,7 @@ export default function Layout() {
           </button> */}
           <button
             type="button"
-            onClick={() =>
-              logout().then(() => {
-                window.location.href = "/login";
-              })
-            }
+            onClick={handleLogout}
             className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-sm text-white/60 hover:bg-white/10 hover:text-white transition-colors"
           >
             <LogOut size={16} />

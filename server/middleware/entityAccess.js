@@ -1,4 +1,4 @@
-import { isAdmin } from "../config/permissions.js";
+import { isAdmin, isRegularUser, isReporterOnly, isWorkplaceManagerOnly } from "../config/permissions.js";
 
 /** Public entity reads (no login) */
 function isPublicRead(entityName, req) {
@@ -11,12 +11,8 @@ function isReadMethod(method) {
 }
 
 /** Reporters: can_report_time users with no broader role access */
-function isReporterOnly(user) {
-  return (
-    user?.role === "user" &&
-    user?.can_report_time === true &&
-    user?.can_view_time_reports !== true
-  );
+function isReporterOnlyUser(user) {
+  return isReporterOnly(user);
 }
 
 const REPORTER_READ_ENTITIES = new Set([
@@ -46,14 +42,13 @@ export function checkEntityAccess(req, res, next) {
     return next();
   }
 
-  // Admins and regular users (role=user, no reporter flag): full access to all other entities
-  const isRegularUser = req.user.role === "user" && !req.user.can_report_time;
-  if (isAdmin(req.user) || isRegularUser) {
+  // Admins and regular users: full access to all other entities
+  if (isAdmin(req.user) || isRegularUser(req.user)) {
     return next();
   }
 
   // Reporter-only users get limited access
-  if (isReporterOnly(req.user)) {
+  if (isReporterOnlyUser(req.user)) {
     if (entityName === "TimeReport") {
       if (method === "DELETE") {
         return res.status(403).json({ message: "Forbidden" });
@@ -64,6 +59,14 @@ export function checkEntityAccess(req, res, next) {
       return next();
     }
     return res.status(403).json({ message: "Reporters can only access time reporting" });
+  }
+
+  // Workplace-manager-only users get Workplace CRUD only
+  if (isWorkplaceManagerOnly(req.user)) {
+    if (entityName === "Workplace") {
+      return next();
+    }
+    return res.status(403).json({ message: "Workplace managers can only access workplaces" });
   }
 
   // Admin (already handled above)

@@ -2,7 +2,7 @@ import express from "express";
 import { getModel } from "../models/index.js";
 import { hashPassword, verifyPassword, generateTemporaryPassword } from "../lib/password.js";
 import { signToken } from "../lib/jwt.js";
-import { levelToFields, sanitizeUser } from "../config/permissions.js";
+import { levelToFields, sanitizeUser, isRegularUser } from "../config/permissions.js";
 import { attachUser, requireAuth } from "../middleware/auth.js";
 
 const router = express.Router();
@@ -30,18 +30,18 @@ function callerIsEnvAdmin(req) {
   return email && req.user.email === email;
 }
 
-function isUserLike(req) {
-  return req.user?.role === "user";
-}
-
 function getAllowedInviteLevels(req) {
-  if (callerIsEnvAdmin(req)) return new Set(["user", "reporter"]);
-  if (isUserLike(req)) return new Set(["reporter"]);
+  if (callerIsEnvAdmin(req)) return new Set(["user", "reporter", "workplace_manager"]);
+  if (isRegularUser(req.user)) return new Set(["reporter", "workplace_manager"]);
   return new Set();
 }
 
 function isReporterAccount(userDoc) {
   return userDoc?.role === "user" && userDoc?.can_report_time === true;
+}
+
+function isWorkplaceManagerAccount(userDoc) {
+  return userDoc?.role === "user" && userDoc?.can_manage_workplaces === true;
 }
 
 function canManageTargetUser(req, target) {
@@ -50,7 +50,9 @@ function canManageTargetUser(req, target) {
     return false;
   }
   if (callerIsEnvAdmin(req)) return true;
-  if (isUserLike(req)) return isReporterAccount(target);
+  if (isRegularUser(req.user)) {
+    return isReporterAccount(target) || isWorkplaceManagerAccount(target);
+  }
   return false;
 }
 
@@ -83,6 +85,7 @@ router.post("/login", async (req, res, next) => {
           full_name: envAdmin.fullName,
           role: "admin",
           can_report_time: false,
+          can_manage_workplaces: false,
           can_view_time_reports: true,
           is_active: true,
         });
@@ -144,8 +147,8 @@ router.get("/users", requireAuth, async (req, res, next) => {
 
 // ─── Invite ───────────────────────────────────────────────────────────────────
 //
-// Admin can invite: user | reporter
-// Regular user (role=user) can invite: reporter only
+// Admin can invite: user | reporter | workplace_manager
+// Regular user (role=user) can invite: reporter | workplace_manager only
 // Nobody else can invite.
 
 router.post("/invite", requireAuth, async (req, res, next) => {
@@ -256,6 +259,34 @@ router.delete("/users/:id", requireAuth, async (req, res, next) => {
 
     await User.findByIdAndDelete(req.params.id);
     return res.status(204).send();
+  } catch (error) {
+    return next(error);
+  }
+});
+
+// ─── Set password for a managed user ──────────────────────────────────────────
+
+router.patch("/users/:id/password", requireAuth, async (req, res, next) => {
+  try {
+    const User = getModel("User");
+    const target = await User.findById(req.params.id).select("+password_hash");
+    if (!target) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    if (!canManageTargetUser(req, target)) {
+      return res.status(403).json({ message: "You cannot set this user's password" });
+    }
+
+    const password = String(req.body.password || "");
+    if (!password || password.length < 4) {
+      return res.status(400).json({ message: "Password must be at least 4 characters" });
+    }
+
+    target.password_hash = await hashPassword(password);
+    await target.save();
+
+    return res.json({ ok: true });
   } catch (error) {
     return next(error);
   }

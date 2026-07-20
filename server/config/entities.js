@@ -8,6 +8,7 @@ export const entityDefinitions = {
       role: { type: String, enum: ["admin", "user"], required: true, default: "user" },
       can_report_time: { type: Boolean, default: false },
       can_view_time_reports: { type: Boolean, default: false },
+      can_manage_workplaces: { type: Boolean, default: false },
       is_active: { type: Boolean, default: true },
     },
     indexes: [{ fields: { email: 1 }, options: { unique: true } }],

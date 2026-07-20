@@ -18,6 +18,7 @@ export async function ensureAdminUser() {
     role: ROLES.ADMIN,
     can_report_time: false,
     can_view_time_reports: true,
+    can_manage_workplaces: false,
     is_active: true,
   });
 
