@@ -43,6 +43,14 @@ import {
 import DailyReportPDFButton from "@/components/reports/DailyReportPDFButton";
 import LogisticsSidebar from "@/components/assignments/LogisticsSidebar";
 import { format, addDays, subDays } from "date-fns";
+import { useAppSettings } from "@/queries/useAppSettings";
+import {
+  getAssignmentDefaults,
+  getDisplayRate,
+  isDailyPricing,
+  normalizeAppSettings,
+  parseDisplayRateInput,
+} from "@/lib/pricing";
 
 async function bulkUpdateAssignments({ toCreate = [], toUpdate = [] }) {
   await Promise.all(
@@ -180,12 +188,15 @@ function EditableNumberCell({
   assignment,
   field,
   onUpdate,
+  formatDisplay,
+  parseCommit,
 }) {
   const [editing, setEditing] = useState(false);
   const [localVal, setLocalVal] = useState("");
 
-  const displayValue =
+  const rawValue =
     value != null && value !== "" && value !== undefined ? value : defaultValue;
+  const displayValue = formatDisplay ? formatDisplay(rawValue) : rawValue;
 
   const startEdit = () => {
     if (!assignment) return;
@@ -196,8 +207,12 @@ function EditableNumberCell({
   const commit = async () => {
     setEditing(false);
     const num = localVal === "" ? null : parseFloat(localVal);
-    if (num !== displayValue) {
-      await onUpdate(assignment, field, num);
+    const stored =
+      num == null ? null : parseCommit ? parseCommit(num) : num;
+    const currentStored =
+      value != null && value !== "" && value !== undefined ? value : null;
+    if (stored !== currentStored) {
+      await onUpdate(assignment, field, stored);
     }
   };
 
@@ -270,6 +285,15 @@ export default function Assignments() {
   const [cohortDialogSelected, setCohortDialogSelected] = useState([]);
 
   const queryClient = useQueryClient();
+  const { data: appSettings = normalizeAppSettings() } = useAppSettings();
+  const assignmentDefaults = getAssignmentDefaults(appSettings);
+  const dailyMode = isDailyPricing(appSettings);
+  const rateColumnLabel = dailyMode ? "תעריף יומי" : "תעריף";
+
+  const formatRateDisplay = (hourlyRate) =>
+    getDisplayRate(hourlyRate, appSettings);
+  const parseRateInput = (displayRate) =>
+    parseDisplayRateInput(displayRate, appSettings);
 
   const { data: assignments = [] } = useQuery({
     queryKey: ["assignments", date],
@@ -443,8 +467,8 @@ export default function Assignments() {
         student_name: student.full_name,
         workplace_id: workplace.id,
         workplace_name: workplace.name,
-        rate: 40,
-        hours: 4.75,
+        rate: assignmentDefaults.rate,
+        hours: assignmentDefaults.hours,
       });
     }
     queryClient.invalidateQueries({ queryKey: ["assignments", date] });
@@ -507,7 +531,12 @@ export default function Assignments() {
           fullRecord.workplace_name = wp.name;
         }
         if (bulkHours !== "") fullRecord.hours = parseFloat(bulkHours);
-        if (bulkRate !== "") fullRecord.rate = parseFloat(bulkRate);
+        if (bulkRate !== "") {
+          const parsedRate = parseFloat(bulkRate);
+          fullRecord.rate = dailyMode
+            ? parseRateInput(parsedRate)
+            : parsedRate;
+        }
         toUpdate.push({ id, fullRecord });
       } else if (wp) {
         const student = studentById[selId];
@@ -518,8 +547,8 @@ export default function Assignments() {
             student_name: student.full_name,
             workplace_id: wp.id,
             workplace_name: wp.name,
-            rate: bulkRate !== "" ? parseFloat(bulkRate) : 40,
-            hours: bulkHours !== "" ? parseFloat(bulkHours) : 4.75,
+            rate: bulkRate !== "" ? (dailyMode ? parseRateInput(parseFloat(bulkRate)) : parseFloat(bulkRate)) : assignmentDefaults.rate,
+            hours: bulkHours !== "" ? parseFloat(bulkHours) : assignmentDefaults.hours,
           });
         }
       }
@@ -583,8 +612,8 @@ export default function Assignments() {
       student_name: guestName.trim(),
       workplace_id: defaultGuestWp?.id ?? "",
       workplace_name: defaultGuestWp?.name ?? "אאא- לפני שיבוץ",
-      rate: 40,
-      hours: 4.75,
+      rate: assignmentDefaults.rate,
+      hours: assignmentDefaults.hours,
     });
     queryClient.invalidateQueries({ queryKey: ["assignments", date] });
     setGuestName("");
@@ -739,8 +768,8 @@ export default function Assignments() {
             student_name: src.student_name,
             workplace_id: targetWp.id,
             workplace_name: targetWp.name,
-            rate: 40,
-            hours: 4.75,
+            rate: assignmentDefaults.rate,
+            hours: assignmentDefaults.hours,
             role: null,
             bonus: null,
           });
@@ -1162,7 +1191,7 @@ export default function Assignments() {
 
               <div>
                 <label className="text-xs font-medium text-muted-foreground mb-1 block">
-                  תעריף
+                  {rateColumnLabel}
                 </label>
                 <Input
                   type="number"
@@ -1296,7 +1325,7 @@ export default function Assignments() {
                   </div>
                 </th>
                 <th className="px-3 py-2 text-right font-semibold text-muted-foreground w-20">
-                  <span className="text-xs">תעריף</span>
+                  <span className="text-xs">{rateColumnLabel}</span>
                 </th>
                 <th className="px-3 py-2 text-right font-semibold text-muted-foreground w-20">
                   <span className="text-xs">שעות</span>
@@ -1378,14 +1407,16 @@ export default function Assignments() {
                       />
                       <EditableNumberCell
                         value={assignment?.rate}
-                        defaultValue={40}
+                        defaultValue={assignmentDefaults.rate}
                         assignment={assignment}
                         field="rate"
                         onUpdate={handleUpdateField}
+                        formatDisplay={dailyMode ? formatRateDisplay : undefined}
+                        parseCommit={dailyMode ? parseRateInput : undefined}
                       />
                       <EditableNumberCell
                         value={assignment?.hours}
-                        defaultValue={4.75}
+                        defaultValue={assignmentDefaults.hours}
                         assignment={assignment}
                         field="hours"
                         onUpdate={handleUpdateField}
@@ -1461,14 +1492,16 @@ export default function Assignments() {
                     />
                     <EditableNumberCell
                       value={ga.rate}
-                      defaultValue={40}
+                      defaultValue={assignmentDefaults.rate}
                       assignment={ga}
                       field="rate"
                       onUpdate={handleUpdateField}
+                      formatDisplay={dailyMode ? formatRateDisplay : undefined}
+                      parseCommit={dailyMode ? parseRateInput : undefined}
                     />
                     <EditableNumberCell
                       value={ga.hours}
-                      defaultValue={4.75}
+                      defaultValue={assignmentDefaults.hours}
                       assignment={ga}
                       field="hours"
                       onUpdate={handleUpdateField}

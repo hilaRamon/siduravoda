@@ -2,14 +2,30 @@
   "name": "AppSettings",
   "type": "object",
   "properties": {
+    "pricing_method": {
+      "type": "string",
+      "enum": ["hourly", "daily"],
+      "description": "שיטת תמחור גלובלית",
+      "default": "hourly"
+    },
     "default_rate": {
       "type": "number",
-      "description": "\u05ea\u05e2\u05e8\u05d9\u05e3 \u05e9\u05e2\u05ea\u05d9 \u05d1\u05e8\u05d9\u05e8\u05ea \u05de\u05d7\u05d3\u05dc (\u20aa \u05dc\u05e9\u05e2\u05d4)",
+      "description": "תעריף שעתי ברירת מחדל (₪ לשעה)",
       "default": 40
     },
     "default_hours": {
       "type": "number",
-      "description": "\u05db\u05de\u05d5\u05ea \u05e9\u05e2\u05d5\u05ea \u05d1\u05e8\u05d9\u05e8\u05ea \u05de\u05d7\u05d3\u05dc \u05dc\u05e9\u05d9\u05d1\u05d5\u05e5",
+      "description": "כמות שעות ברירת מחדל לשיבוץ",
+      "default": 4.75
+    },
+    "default_daily_rate": {
+      "type": "number",
+      "description": "תעריף יומי ברירת מחדל (₪ ליום)",
+      "default": 235
+    },
+    "hours_per_daily_unit": {
+      "type": "number",
+      "description": "שעות ליחידה יומית — משמש להמרה בין תעריף יומי לשעתי",
       "default": 4.75
     }
   },

@@ -14,7 +14,8 @@
     "lint:fix": "eslint . --fix",
     "typecheck": "tsc -p ./jsconfig.json",
     "dev:full": "node --watch server/index.js & vite",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "node --test server/lib/pricing.test.js"
   },
   "dependencies": {
     "@base44/sdk": "^0.8.29",
