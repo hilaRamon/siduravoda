@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
-import { Download, Loader2, Database, Archive } from 'lucide-react';
+import { Loader2, Database, Archive } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { format } from 'date-fns';
 import JSZip from 'jszip';
+import { mapAssignmentExportRow, normalizeAppSettings } from '@/lib/pricing';
 
 function downloadWorkbook(wb, filename) {
   XLSX.writeFile(wb, filename);
@@ -15,12 +16,14 @@ function workbookToBuffer(wb) {
 }
 
 async function buildAllWorkbooks() {
-  const [students, workplaces, vehicles, assignments] = await Promise.all([
+  const [students, workplaces, vehicles, assignments, settingsList] = await Promise.all([
     base44.entities.Student.list('full_name', 1000),
     base44.entities.Workplace.list('name', 1000),
     base44.entities.Vehicle.list('name', 1000),
     base44.entities.Assignment.list('date', 10000),
+    base44.entities.AppSettings.list(),
   ]);
+  const appSettings = normalizeAppSettings(settingsList[0]);
 
   const today = format(new Date(), 'yyyy-MM-dd');
 
@@ -53,11 +56,7 @@ async function buildAllWorkbooks() {
     if (a.date !== b.date) return a.date.localeCompare(b.date);
     return (a.student_name || '').localeCompare(b.student_name || '', 'he');
   });
-  const wsAssignments = XLSX.utils.json_to_sheet(sorted.map(a => ({
-    'תאריך': a.date || '', 'שם תלמיד': a.student_name || '', 'מקום עבודה': a.workplace_name || '',
-    'תפקיד': a.role || '', 'תעריף': a.rate ?? '', 'שעות': a.hours ?? '',
-    'תשלום נוסף': a.bonus ?? '', 'הערות': a.notes || '',
-  })));
+  const wsAssignments = XLSX.utils.json_to_sheet(sorted.map(a => mapAssignmentExportRow(a, appSettings)));
   const wbAssignments = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wbAssignments, wsAssignments, 'שיבוצים');
 
@@ -116,23 +115,18 @@ async function exportVehicles() {
 }
 
 async function exportAssignments() {
-  const assignments = await base44.entities.Assignment.list('date', 10000);
+  const [assignments, settingsList] = await Promise.all([
+    base44.entities.Assignment.list('date', 10000),
+    base44.entities.AppSettings.list(),
+  ]);
+  const appSettings = normalizeAppSettings(settingsList[0]);
   // Sort by date asc, then student name
   const sorted = [...assignments].sort((a, b) => {
     if (a.date !== b.date) return a.date.localeCompare(b.date);
     return (a.student_name || '').localeCompare(b.student_name || '', 'he');
   });
 
-  const rows = sorted.map(a => ({
-    'תאריך': a.date || '',
-    'שם תלמיד': a.student_name || '',
-    'מקום עבודה': a.workplace_name || '',
-    'תפקיד': a.role || '',
-    'תעריף': a.rate ?? '',
-    'שעות': a.hours ?? '',
-    'תשלום נוסף': a.bonus ?? '',
-    'הערות': a.notes || '',
-  }));
+  const rows = sorted.map(a => mapAssignmentExportRow(a, appSettings));
 
   const ws = XLSX.utils.json_to_sheet(rows);
   const wb = XLSX.utils.book_new();

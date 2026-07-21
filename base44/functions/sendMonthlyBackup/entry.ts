@@ -19,19 +19,53 @@ function today() {
   return new Date().toISOString().slice(0, 10);
 }
 
+function normalizeAppSettings(settings = null) {
+  const source = settings || {};
+  return {
+    pricing_method: source.pricing_method === 'daily' ? 'daily' : 'hourly',
+    default_rate: Number.isFinite(Number(source.default_rate)) ? Number(source.default_rate) : 40,
+    default_hours: Number.isFinite(Number(source.default_hours)) ? Number(source.default_hours) : 4.75,
+    default_daily_rate: Number.isFinite(Number(source.default_daily_rate)) ? Number(source.default_daily_rate) : 235,
+    hours_per_daily_unit: Number.isFinite(Number(source.hours_per_daily_unit)) ? Number(source.hours_per_daily_unit) : 4.75,
+  };
+}
+
+function formatAssignmentRateForExport(hourlyRate, appSettings) {
+  if (appSettings.pricing_method === 'daily') {
+    return Math.round((hourlyRate ?? 0) * appSettings.hours_per_daily_unit * 100) / 100;
+  }
+  return hourlyRate ?? '';
+}
+
+function mapAssignmentExportRow(assignment, appSettings) {
+  const rateLabel = appSettings.pricing_method === 'daily' ? 'תעריף יומי' : 'תעריף';
+  return {
+    'תאריך': assignment.date || '',
+    'שם תלמיד': assignment.student_name || '',
+    'מקום עבודה': assignment.workplace_name || '',
+    'תפקיד': assignment.role || '',
+    [rateLabel]: formatAssignmentRateForExport(assignment.rate, appSettings),
+    'שעות': assignment.hours ?? '',
+    'תשלום נוסף': assignment.bonus ?? '',
+    'הערות': assignment.notes || '',
+  };
+}
+
 Deno.serve(async (req) => {
   const base44 = createClientFromRequest(req);
   try {
 
-  const [students, workplaces, vehicles, assignments, settingsList] = await Promise.all([
+  const [students, workplaces, vehicles, assignments, appSettingsList, backupSettingsList] = await Promise.all([
     base44.asServiceRole.entities.Student.list('full_name', 1000),
     base44.asServiceRole.entities.Workplace.list('name', 1000),
     base44.asServiceRole.entities.Vehicle.list('name', 1000),
     base44.asServiceRole.entities.Assignment.list('date', 10000),
+    base44.asServiceRole.entities.AppSettings.list(),
     base44.asServiceRole.entities.BackupSettings.list(),
   ]);
 
-  const settings = settingsList[0];
+  const settings = backupSettingsList[0];
+  const appSettings = normalizeAppSettings(appSettingsList[0]);
   const emails = settings?.emails || [];
 
   if (emails.length === 0) {
@@ -59,11 +93,7 @@ Deno.serve(async (req) => {
     if (a.date !== b.date) return a.date.localeCompare(b.date);
     return (a.student_name || '').localeCompare(b.student_name || '', 'he');
   });
-  const wbAssignments = buildSheet(sortedAssignments, a => ({
-    'תאריך': a.date || '', 'שם תלמיד': a.student_name || '', 'מקום עבודה': a.workplace_name || '',
-    'תפקיד': a.role || '', 'תעריף': a.rate ?? '', 'שעות': a.hours ?? '',
-    'תשלום נוסף': a.bonus ?? '', 'הערות': a.notes || '',
-  }));
+  const wbAssignments = buildSheet(sortedAssignments, a => mapAssignmentExportRow(a, appSettings));
 
   const fileDefs = [
     { name: `גיבוי_תלמידים_${dateStr}.xlsx`, wb: wbStudents, label: 'תלמידים וצוות' },

@@ -1,14 +1,20 @@
 import { getModel } from "../models/index.js";
 import { SKIP_WORKPLACES } from "../lib/reportConstants.js";
+import {
+  calcAvgDailyUnits,
+  calcTotalPrice,
+  getAssignmentDefaults,
+  hourlyToDailyRate,
+  normalizeAppSettings,
+  round2,
+} from "../lib/pricing.js";
 
-function round2(value) {
-  return Math.round(value * 100) / 100;
-}
-
-async function getDefaultRate() {
+async function getAppSettings() {
   const AppSettings = getModel("AppSettings");
-  const settings = await AppSettings.findOne().lean();
-  return settings?.default_rate ?? 40;
+  const settings = await AppSettings.findOne()
+    .sort({ updated_date: -1, created_date: -1 })
+    .lean();
+  return normalizeAppSettings(settings);
 }
 
 async function getWorkplaceMaps() {
@@ -38,15 +44,20 @@ function resolveWorkplaceName(workplaceId, assignmentName, byId) {
   return assignmentName || "";
 }
 
-function buildTotals(rows) {
-  return {
-    totalHours: round2(rows.reduce((sum, row) => sum + row.totalHours, 0)),
+function buildTotals(rows, pricingMethod) {
+  const totals = {
     bonus: round2(rows.reduce((sum, row) => sum + row.bonus, 0)),
     totalPrice: round2(rows.reduce((sum, row) => sum + row.totalPrice, 0)),
   };
+  if (pricingMethod === "hourly") {
+    totals.totalHours = round2(
+      rows.reduce((sum, row) => sum + row.totalHours, 0),
+    );
+  }
+  return totals;
 }
 
-function toWorkplaceGroups(rowBuckets) {
+function toWorkplaceGroups(rowBuckets, pricingMethod) {
   return Object.values(rowBuckets)
     .map((group) => {
       const rows = [...group.rows].sort((a, b) => a.date.localeCompare(b.date));
@@ -54,13 +65,13 @@ function toWorkplaceGroups(rowBuckets) {
         workplaceName: group.workplaceName,
         farmName: group.farmName,
         rows,
-        totals: buildTotals(rows),
+        totals: buildTotals(rows, pricingMethod),
       };
     })
     .sort((a, b) => a.workplaceName.localeCompare(b.workplaceName, "he"));
 }
 
-function toFarmGroups(rowBuckets) {
+function toFarmGroups(rowBuckets, pricingMethod) {
   const farmBuckets = {};
 
   for (const wpGroup of Object.values(rowBuckets)) {
@@ -84,7 +95,7 @@ function toFarmGroups(rowBuckets) {
       return {
         farmName: group.farmName,
         rows,
-        totals: buildTotals(rows),
+        totals: buildTotals(rows, pricingMethod),
       };
     })
     .sort((a, b) => a.farmName.localeCompare(b.farmName, "he"));
@@ -101,10 +112,11 @@ export async function getWorkByWorkplaceReport({
   groupBy = "workplace",
 }) {
   const Assignment = getModel("Assignment");
-  const [defaultRate, { byId, skipIds }] = await Promise.all([
-    getDefaultRate(),
+  const [appSettings, { byId, skipIds }] = await Promise.all([
+    getAppSettings(),
     getWorkplaceMaps(),
   ]);
+  const assignmentDefaults = getAssignmentDefaults(appSettings);
 
   let farmWorkplaceIds = null;
   if (farms.length > 0) {
@@ -112,7 +124,7 @@ export async function getWorkByWorkplaceReport({
       .filter(([, info]) => farms.includes(info.farmName))
       .map(([id]) => id);
     if (farmWorkplaceIds.length === 0) {
-      return { groups: [], workplaceOptions: [] };
+      return { groups: [], workplaceOptions: [], pricingMethod: appSettings.pricing_method };
     }
   }
 
@@ -171,21 +183,32 @@ export async function getWorkByWorkplaceReport({
       continue;
     }
 
-    const rate = item.rate ?? defaultRate;
+    const hourlyRate = item.rate ?? assignmentDefaults.rate;
     const totalHours = round2(item.totalHours);
     const bonus = round2(item.totalBonus);
     const studentCount = item.studentCount;
     const avgHours = studentCount ? round2(totalHours / studentCount) : 0;
-    const totalPrice = round2(totalHours * rate + bonus);
+    const totalPrice = calcTotalPrice(totalHours, hourlyRate, bonus);
+    const dailyRate = hourlyToDailyRate(
+      hourlyRate,
+      appSettings.hours_per_daily_unit,
+    );
+    const avgDailyUnits = calcAvgDailyUnits(
+      totalHours,
+      studentCount,
+      appSettings.hours_per_daily_unit,
+    );
 
     const row = {
       date: item._id.date,
       workplaceName,
-      rate,
+      rate: hourlyRate,
+      dailyRate,
       bonus,
       studentCount,
       totalHours,
       avgHours,
+      avgDailyUnits,
       totalPrice,
     };
 
@@ -201,12 +224,16 @@ export async function getWorkByWorkplaceReport({
 
   const groups =
     groupBy === "farm"
-      ? toFarmGroups(rowBuckets)
-      : toWorkplaceGroups(rowBuckets);
+      ? toFarmGroups(rowBuckets, appSettings.pricing_method)
+      : toWorkplaceGroups(rowBuckets, appSettings.pricing_method);
 
   const workplaceOptions = [...workplaceOptionsSet].sort((a, b) =>
     a.localeCompare(b, "he"),
   );
 
-  return { groups, workplaceOptions };
+  return {
+    groups,
+    workplaceOptions,
+    pricingMethod: appSettings.pricing_method,
+  };
 }

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { X, ChevronsUpDown } from 'lucide-react';
+import { X } from 'lucide-react';
 
 export default function ForbiddenWorkplacesCell({ student, workplaces, onSave }) {
   const [open, setOpen] = useState(false);

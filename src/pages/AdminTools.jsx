@@ -12,6 +12,7 @@ import ImportAssignments from '@/components/reports/ImportAssignments';
 import SRSViewer from '@/components/reports/SRSViewer';
 import DefaultSettings from '@/components/admin/DefaultSettings';
 import UserPermissions from '@/components/admin/UserPermissions';
+import { getAssignmentDefaults, normalizeAppSettings } from '@/lib/pricing';
 
 export default function AdminTools() {
   const { user: currentUser } = useAuth();
@@ -26,6 +27,11 @@ export default function AdminTools() {
     if (!confirm('פעולה זו תמחק את כל השיבוצים הקיימים מ-01/04/2026 ותיצור שיבוצים רנדומליים חדשים. להמשיך?')) return;
     setRandomizing(true);
     setRandomStatus('טוען נתונים...');
+
+    const settingsList = await base44.entities.AppSettings.list();
+    const assignmentDefaults = getAssignmentDefaults(
+      normalizeAppSettings(settingsList[0]),
+    );
 
     const allStudents = await base44.entities.Student.list();
     const activeStudents = allStudents.filter(s => s.is_active !== false);
@@ -67,7 +73,7 @@ export default function AdminTools() {
         if (idx === 0) wp = SPECIAL_WP[0];
         else if (idx === 1) wp = SPECIAL_WP[1];
         else wp = pool[Math.floor(Math.random() * pool.length)];
-        return { date, student_id: student.id, student_name: student.full_name, workplace_id: wp.id, workplace_name: wp.name, rate: 40, hours: 4.5 };
+        return { date, student_id: student.id, student_name: student.full_name, workplace_id: wp.id, workplace_name: wp.name, rate: assignmentDefaults.rate, hours: assignmentDefaults.hours };
       });
       allNew.push(...assignments);
     }

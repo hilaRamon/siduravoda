@@ -91,6 +91,28 @@ export default function PeriodicWorkReport() {
   });
 
   const groups = data?.groups ?? [];
+  const isDailyPricing = data?.pricingMethod === "daily";
+
+  const tableHeaders = isDailyPricing
+    ? [
+        "תאריך",
+        "שם מקום עבודה",
+        "תעריף יומי",
+        "תשלום נוסף",
+        "כמות תלמידים",
+        "ממוצע יחידות יומיות לתלמיד",
+        "מחיר",
+      ]
+    : [
+        "תאריך",
+        "שם מקום עבודה",
+        "תעריף",
+        "תשלום נוסף",
+        "כמות תלמידים",
+        "סך שעות",
+        "ממוצע שעות",
+        "מחיר",
+      ];
 
   const toggleFarm = (farm) => {
     setSelectedFarms((prev) =>
@@ -171,29 +193,55 @@ export default function PeriodicWorkReport() {
       const farm = group.farmName;
       const farmRows = group.rows;
       farmRows.forEach((r) =>
-        rows.push({
-          משק: farm,
-          תאריך: formatDate(r.date),
-          "מקום עבודה": r.workplaceName,
-          תעריף: r.rate,
-          "תשלום נוסף": r.bonus,
-          "כמות תלמידים": r.studentCount,
-          "סך שעות": r.totalHours,
-          "ממוצע שעות": r.avgHours,
-          מחיר: r.totalPrice,
-        }),
+        rows.push(
+          isDailyPricing
+            ? {
+                משק: farm,
+                תאריך: formatDate(r.date),
+                "מקום עבודה": r.workplaceName,
+                "תעריף יומי": r.dailyRate,
+                "תשלום נוסף": r.bonus,
+                "כמות תלמידים": r.studentCount,
+                "ממוצע יחידות יומיות לתלמיד": r.avgDailyUnits,
+                מחיר: r.totalPrice,
+              }
+            : {
+                משק: farm,
+                תאריך: formatDate(r.date),
+                "מקום עבודה": r.workplaceName,
+                תעריף: r.rate,
+                "תשלום נוסף": r.bonus,
+                "כמות תלמידים": r.studentCount,
+                "סך שעות": r.totalHours,
+                "ממוצע שעות": r.avgHours,
+                מחיר: r.totalPrice,
+              },
+        ),
       );
-      rows.push({
-        משק: "",
-        תאריך: "",
-        "מקום עבודה": 'סה"כ',
-        תעריף: "",
-        "תשלום נוסף": group.totals.bonus,
-        "כמות תלמידים": "",
-        "סך שעות": group.totals.totalHours,
-        "ממוצע שעות": "",
-        מחיר: group.totals.totalPrice,
-      });
+      rows.push(
+        isDailyPricing
+          ? {
+              משק: "",
+              תאריך: "",
+              "מקום עבודה": 'סה"כ',
+              "תעריף יומי": "",
+              "תשלום נוסף": group.totals.bonus,
+              "כמות תלמידים": "",
+              "ממוצע יחידות יומיות לתלמיד": "",
+              מחיר: group.totals.totalPrice,
+            }
+          : {
+              משק: "",
+              תאריך: "",
+              "מקום עבודה": 'סה"כ',
+              תעריף: "",
+              "תשלום נוסף": group.totals.bonus,
+              "כמות תלמידים": "",
+              "סך שעות": group.totals.totalHours,
+              "ממוצע שעות": "",
+              מחיר: group.totals.totalPrice,
+            },
+      );
       rows.push({});
     });
     const ws = XLSX.utils.json_to_sheet(rows);
@@ -390,16 +438,7 @@ export default function PeriodicWorkReport() {
                   <table className="w-full text-xs border-collapse">
                     <thead>
                       <tr className="bg-gray-100">
-                        {[
-                          "תאריך",
-                          "שם מקום עבודה",
-                          "תעריף",
-                          "תשלום נוסף",
-                          "כמות תלמידים",
-                          "סך שעות",
-                          "ממוצע שעות",
-                          "מחיר",
-                        ].map((h) => (
+                        {tableHeaders.map((h) => (
                           <th
                             key={h}
                             className="border border-gray-300 px-2 py-1.5 text-right font-semibold"
@@ -422,7 +461,7 @@ export default function PeriodicWorkReport() {
                             {r.workplaceName}
                           </td>
                           <td className="border border-gray-300 px-2 py-1.5 text-center">
-                            {r.rate}
+                            {isDailyPricing ? r.dailyRate : r.rate}
                           </td>
                           <td className="border border-gray-300 px-2 py-1.5 text-center">
                             {r.bonus}
@@ -430,12 +469,20 @@ export default function PeriodicWorkReport() {
                           <td className="border border-gray-300 px-2 py-1.5 text-center">
                             {r.studentCount}
                           </td>
-                          <td className="border border-gray-300 px-2 py-1.5 text-center">
-                            {r.totalHours}
-                          </td>
-                          <td className="border border-gray-300 px-2 py-1.5 text-center">
-                            {r.avgHours}
-                          </td>
+                          {isDailyPricing ? (
+                            <td className="border border-gray-300 px-2 py-1.5 text-center">
+                              {r.avgDailyUnits}
+                            </td>
+                          ) : (
+                            <>
+                              <td className="border border-gray-300 px-2 py-1.5 text-center">
+                                {r.totalHours}
+                              </td>
+                              <td className="border border-gray-300 px-2 py-1.5 text-center">
+                                {r.avgHours}
+                              </td>
+                            </>
+                          )}
                           <td className="border border-gray-300 px-2 py-1.5 text-center">
                             {r.totalPrice} ₪
                           </td>
@@ -454,9 +501,11 @@ export default function PeriodicWorkReport() {
                           {group.totals.bonus}
                         </td>
                         <td className="border border-gray-300 px-2 py-1.5"></td>
-                        <td className="border border-gray-300 px-2 py-1.5 text-center">
-                          {group.totals.totalHours}
-                        </td>
+                        {!isDailyPricing && (
+                          <td className="border border-gray-300 px-2 py-1.5 text-center">
+                            {group.totals.totalHours}
+                          </td>
+                        )}
                         <td className="border border-gray-300 px-2 py-1.5"></td>
                         <td className="border border-gray-300 px-2 py-1.5 text-center">
                           {group.totals.totalPrice} ₪

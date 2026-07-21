@@ -11,7 +11,6 @@ import {
   HeadingLevel,
   AlignmentType,
   BorderStyle,
-  convertInchesToTwip,
 } from "docx";
 
 const SECTIONS = [

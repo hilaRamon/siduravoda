@@ -4,6 +4,10 @@ import * as XLSX from "xlsx";
 import JSZip from "jszip";
 import { getModel } from "../models/index.js";
 import { sendVerificationToRecipients, sendWeeklyBackupToRecipients } from "../lib/email.js";
+import {
+  mapAssignmentExportRow,
+  normalizeAppSettings,
+} from "../lib/pricing.js";
 
 const BACKUP_DIR = path.resolve(process.cwd(), "uploads", "backups");
 const ISRAEL_TZ = "Asia/Jerusalem";
@@ -25,32 +29,31 @@ async function loadBackupData() {
   const Workplace = getModel("Workplace");
   const Vehicle = getModel("Vehicle");
   const Assignment = getModel("Assignment");
+  const AppSettings = getModel("AppSettings");
 
-  const [students, workplaces, vehicles, assignments] = await Promise.all([
+  const [students, workplaces, vehicles, assignments, settingsDoc] = await Promise.all([
     Student.find().sort({ full_name: 1 }).limit(1000).lean(),
     Workplace.find().sort({ name: 1 }).limit(1000).lean(),
     Vehicle.find().sort({ name: 1 }).limit(1000).lean(),
     Assignment.find().sort({ date: 1 }).lean(),
+    AppSettings.findOne().sort({ updated_date: -1, created_date: -1 }).lean(),
   ]);
 
-  return { students, workplaces, vehicles, assignments };
+  return {
+    students,
+    workplaces,
+    vehicles,
+    assignments,
+    appSettings: normalizeAppSettings(settingsDoc),
+  };
 }
 
-function mapAssignmentRows(assignments) {
-  return assignments.map((a) => ({
-    תאריך: a.date || "",
-    "שם תלמיד": a.student_name || "",
-    "מקום עבודה": a.workplace_name || "",
-    תפקיד: a.role || "",
-    תעריף: a.rate ?? "",
-    שעות: a.hours ?? "",
-    "תשלום נוסף": a.bonus ?? "",
-    הערות: a.notes || "",
-  }));
+function mapAssignmentRows(assignments, appSettings) {
+  return assignments.map((assignment) => mapAssignmentExportRow(assignment, appSettings));
 }
 
 function buildWorkbookFiles(data, exportDateStr) {
-  const { students, workplaces, vehicles, assignments } = data;
+  const { students, workplaces, vehicles, assignments, appSettings } = data;
 
   const wsStudents = XLSX.utils.json_to_sheet(
     students.map((s) => ({
@@ -93,7 +96,7 @@ function buildWorkbookFiles(data, exportDateStr) {
     if (a.date !== b.date) return a.date.localeCompare(b.date);
     return (a.student_name || "").localeCompare(b.student_name || "", "he");
   });
-  const wsAssignments = XLSX.utils.json_to_sheet(mapAssignmentRows(sorted));
+  const wsAssignments = XLSX.utils.json_to_sheet(mapAssignmentRows(sorted, appSettings));
   const wbAssignments = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wbAssignments, wsAssignments, "שיבוצים");
 

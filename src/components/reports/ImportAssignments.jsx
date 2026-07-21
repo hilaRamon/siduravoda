@@ -3,11 +3,14 @@ import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import { Upload, Loader2, FileSpreadsheet, CheckCircle2, AlertCircle } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import { normalizeAppSettings, parseImportedAssignmentRate } from '@/lib/pricing';
+import { useAppSettings } from '@/queries/useAppSettings';
 
 // Expected columns from backup file:
-// 'תאריך', 'שם תלמיד', 'מקום עבודה', 'תפקיד', 'תעריף', 'שעות', 'תשלום נוסף', 'הערות'
+// 'תאריך', 'שם תלמיד', 'מקום עבודה', 'תפקיד', 'תעריף' | 'תעריף יומי', 'שעות', 'תשלום נוסף', 'הערות'
 
 export default function ImportAssignments() {
+  const { data: appSettings = normalizeAppSettings() } = useAppSettings();
   const [status, setStatus] = useState('idle'); // idle | parsing | previewing | importing | done | error
   const [rows, setRows] = useState([]);
   const [progress, setProgress] = useState('');
@@ -50,7 +53,7 @@ export default function ImportAssignments() {
             studentName: String(r['שם תלמיד'] || '').trim(),
             workplaceName: String(r['מקום עבודה'] || '').trim(),
             role: String(r['תפקיד'] || '').trim(),
-            rate: r['תעריף'] !== '' ? parseFloat(r['תעריף']) : null,
+            rate: parseImportedAssignmentRate(r, appSettings),
             hours: r['שעות'] !== '' ? parseFloat(r['שעות']) : null,
             bonus: r['תשלום נוסף'] !== '' ? parseFloat(r['תשלום נוסף']) : null,
             notes: String(r['הערות'] || '').trim(),
