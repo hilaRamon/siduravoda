@@ -1,12 +1,13 @@
 import { Toaster } from "@/components/ui/toaster"
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClientInstance } from '@/lib/query-client'
-import { BrowserRouter as Router, Route, Routes, Navigate, MemoryRouter } from 'react-router-dom';
+import { BrowserRouter as Router, Route, Routes, Navigate, MemoryRouter, useLocation } from 'react-router-dom';
+import { useEffect } from 'react';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider } from '@/lib/AuthContext';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import RequirePermission, { RequireMainApp } from '@/components/RequirePermission';
-import { canAccessAdminTools, canViewTimeReports, canReportTime } from '@/lib/permissions';
+import { canAccessAdminTools, canViewTimeReports, canReportTime, getDocumentTitle } from '@/lib/permissions';
 import Layout from './components/Layout';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
@@ -23,6 +24,13 @@ import TimeReporting from './pages/TimeReporting';
 import TimeReportsAdmin from './pages/TimeReportsAdmin';
 import AdminTools from './pages/AdminTools';
 
+function DocumentTitle() {
+  const { pathname } = useLocation();
+  useEffect(() => {
+    document.title = getDocumentTitle(pathname);
+  }, [pathname]);
+  return null;
+}
 
 function MainAppShell() {
   return (
@@ -36,7 +44,9 @@ function MainAppShell() {
 
 function AppRoutes() {
   return (
-    <Routes>
+    <>
+      <DocumentTitle />
+      <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/schedule" element={<PublicSchedule />} />
 
@@ -81,6 +91,7 @@ function AppRoutes() {
 
       <Route path="*" element={<PageNotFound />} />
     </Routes>
+    </>
   );
 }
 
@@ -88,6 +99,7 @@ function ScheduleApp() {
   return (
     <QueryClientProvider client={queryClientInstance}>
       <MemoryRouter initialEntries={['/schedule']}>
+        <DocumentTitle />
         <Routes>
           <Route path="/schedule" element={<PublicSchedule />} />
           <Route path="*" element={<Navigate to="/schedule" replace />} />
@@ -103,6 +115,7 @@ function TimeReportingApp() {
     <AuthProvider>
       <QueryClientProvider client={queryClientInstance}>
         <MemoryRouter initialEntries={['/time-reporting']}>
+          <DocumentTitle />
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route

@@ -49,21 +49,38 @@ export function canAccessMainApp(user) {
   return user?.is_active !== false && (isAdmin(user) || isRegularUser(user));
 }
 
+/** All main-app nav items (path → label) */
+export const NAV_ITEMS = [
+  { to: '/', label: 'שיבוצים יומיים' },
+  { to: '/calendar', label: 'יומן' },
+  { to: '/students', label: 'תלמידים וצוות' },
+  { to: '/workplaces', label: 'מקומות עבודה' },
+  { to: '/roles', label: 'תפקידים' },
+  { to: '/vehicles', label: 'רכבים' },
+  { to: '/reports', label: 'דוחות' },
+  { to: '/absence-requests', label: 'בקשות היעדרות' },
+  { to: '/time-reports', label: 'עדכון זמנים' },
+  { to: '/admin-tools', label: 'כלי ניהול' },
+];
+
+const EXTRA_PAGE_TITLES = {
+  '/login': 'התחברות',
+  '/schedule': 'סידור יומי',
+  '/time-reporting': 'דיווח זמנים',
+  '/dashboard': 'לוח בקרה',
+};
+
+/** Browser tab title: "סידור עבודה - {page}" */
+export function getDocumentTitle(pathname) {
+  const path = pathname.replace(/\/$/, '') || '/';
+  const page =
+    NAV_ITEMS.find((n) => n.to === path)?.label ||
+    EXTRA_PAGE_TITLES[path];
+  return page ? `סידור עבודה - ${page}` : 'סידור עבודה';
+}
+
 /** Nav items visible per user */
 export function getVisibleNavItems(user) {
-  const all = [
-    { to: '/', label: 'שיבוצים יומיים' },
-    { to: '/calendar', label: 'יומן' },
-    { to: '/students', label: 'תלמידים וצוות' },
-    { to: '/workplaces', label: 'מקומות עבודה' },
-    { to: '/roles', label: 'תפקידים' },
-    { to: '/vehicles', label: 'רכבים' },
-    { to: '/reports', label: 'דוחות' },
-    { to: '/absence-requests', label: 'בקשות היעדרות' },
-    { to: '/time-reports', label: 'עדכון זמנים' },
-    { to: '/admin-tools', label: 'כלי ניהול' },
-  ];
-
-  if (isAdmin(user) || isRegularUser(user)) return all;
+  if (isAdmin(user) || isRegularUser(user)) return NAV_ITEMS;
   return [];
 }
