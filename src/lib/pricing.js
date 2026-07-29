@@ -108,6 +108,15 @@ export function calcTotalPrice(totalHours, hourlyRate, bonus = 0) {
   return round2(totalHours * hourlyRate + (bonus || 0));
 }
 
+export function calcTotalPriceDaily(
+  studentCount,
+  avgDailyUnits,
+  dailyRate,
+  bonus = 0,
+) {
+  return round2(studentCount * avgDailyUnits * dailyRate + (bonus || 0));
+}
+
 export function formatAssignmentRateForExport(hourlyRate, settings) {
   const normalized = normalizeAppSettings(settings);
   if (normalized.pricing_method === PRICING_METHODS.DAILY) {

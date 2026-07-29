@@ -47,3 +47,12 @@
 .sidebar-bg {
   background: hsl(var(--sidebar-bg));
 }
+
+.sidebar-nav-scroll {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.sidebar-nav-scroll::-webkit-scrollbar {
+  display: none;
+}

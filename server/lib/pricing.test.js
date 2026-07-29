@@ -4,6 +4,7 @@ import {
   PRICING_METHODS,
   calcAvgDailyUnits,
   calcTotalPrice,
+  calcTotalPriceDaily,
   dailyToHourlyRate,
   getAssignmentDefaults,
   getDisplayRate,
@@ -47,16 +48,58 @@ test("display and input conversion round-trip for daily mode", () => {
   assert.equal(getDisplayRate(stored, settings), 235);
 });
 
-test("report totals stay hour-based while daily averages are derived", () => {
+test("avg daily units stays totalHours / unit / students", () => {
+  const totalHours = 13.5;
+  const studentCount = 3;
+  const hoursPerDailyUnit = 4.75;
+  const avgDailyUnits = calcAvgDailyUnits(
+    totalHours,
+    studentCount,
+    hoursPerDailyUnit,
+  );
+
+  assert.equal(avgDailyUnits, 0.95);
+  assert.equal(
+    avgDailyUnits,
+    Math.round((totalHours / hoursPerDailyUnit / studentCount) * 100) / 100,
+  );
+});
+
+test("hourly report totalPrice stays hours × rate + bonus", () => {
   const totalHours = 9.5;
   const hourlyRate = dailyToHourlyRate(235, 4.75);
   const bonus = 10;
-  const studentCount = 2;
   const totalPrice = calcTotalPrice(totalHours, hourlyRate, bonus);
-  const avgDailyUnits = calcAvgDailyUnits(totalHours, studentCount, 4.75);
 
   assert.equal(totalPrice, 480);
-  assert.equal(avgDailyUnits, 1);
+});
+
+test("daily report totalPrice equals students × avg × dailyRate + bonus", () => {
+  const totalHours = 13.5;
+  const studentCount = 3;
+  const hoursPerDailyUnit = 4.75;
+  const hourlyRate = dailyToHourlyRate(235, hoursPerDailyUnit);
+  const dailyRate = hourlyToDailyRate(hourlyRate, hoursPerDailyUnit);
+  const bonus = 10;
+  const avgDailyUnits = calcAvgDailyUnits(
+    totalHours,
+    studentCount,
+    hoursPerDailyUnit,
+  );
+  const totalPrice = calcTotalPriceDaily(
+    studentCount,
+    avgDailyUnits,
+    dailyRate,
+    bonus,
+  );
+
+  assert.equal(avgDailyUnits, 0.95);
+  assert.equal(dailyRate, 235);
+  assert.equal(totalPrice, 679.75);
+  assert.equal(
+    totalPrice,
+    Math.round((studentCount * avgDailyUnits * dailyRate + bonus) * 100) / 100,
+  );
 });
 
 test("assignment export stores hourly rate internally and daily label in daily mode", () => {

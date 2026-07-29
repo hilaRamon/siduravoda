@@ -116,7 +116,7 @@ export default function Layout() {
             ניהול תלמידים ומקומות עבודה
           </p>
         </div>
-        <nav className="flex-1 px-3 py-6 space-y-1">
+        <nav className="sidebar-nav-scroll flex-1 min-h-0 overflow-y-auto px-3 py-6 space-y-1">
           {navItems.map(({ to, label }) => {
             const Icon = navIcons[to] || CalendarDays;
             const active = location.pathname === to;

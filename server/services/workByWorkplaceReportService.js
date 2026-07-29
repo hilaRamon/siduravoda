@@ -3,9 +3,11 @@ import { SKIP_WORKPLACES } from "../lib/reportConstants.js";
 import {
   calcAvgDailyUnits,
   calcTotalPrice,
+  calcTotalPriceDaily,
   getAssignmentDefaults,
   hourlyToDailyRate,
   normalizeAppSettings,
+  PRICING_METHODS,
   round2,
 } from "../lib/pricing.js";
 
@@ -188,7 +190,6 @@ export async function getWorkByWorkplaceReport({
     const bonus = round2(item.totalBonus);
     const studentCount = item.studentCount;
     const avgHours = studentCount ? round2(totalHours / studentCount) : 0;
-    const totalPrice = calcTotalPrice(totalHours, hourlyRate, bonus);
     const dailyRate = hourlyToDailyRate(
       hourlyRate,
       appSettings.hours_per_daily_unit,
@@ -198,6 +199,10 @@ export async function getWorkByWorkplaceReport({
       studentCount,
       appSettings.hours_per_daily_unit,
     );
+    const totalPrice =
+      appSettings.pricing_method === PRICING_METHODS.DAILY
+        ? calcTotalPriceDaily(studentCount, avgDailyUnits, dailyRate, bonus)
+        : calcTotalPrice(totalHours, hourlyRate, bonus);
 
     const row = {
       date: item._id.date,
