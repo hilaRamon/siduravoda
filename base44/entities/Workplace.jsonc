@@ -29,6 +29,11 @@
     "accounting_email": {
       "type": "string",
       "description": "\u05de\u05d9\u05d9\u05dc \u05d4\u05e0\u05d4\"\u05d7"
+    },
+    "has_agreement": {
+      "type": "boolean",
+      "description": "\u05d4\u05e1\u05db\u05dd",
+      "default": false
     }
   },
   "required": [

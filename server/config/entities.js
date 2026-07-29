@@ -75,6 +75,7 @@ export const entityDefinitions = {
       contact_phone: { type: String },
       accounting_phone: { type: String },
       accounting_email: { type: String },
+      has_agreement: { type: Boolean, default: false },
     },
   },
   WorkplaceLogistics: {
