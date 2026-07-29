@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ChevronsUpDown, Plus, Search, Pencil, Trash2, Building2, Upload } from 'lucide-react';
@@ -153,6 +154,13 @@ export default function Workplaces() {
     queryClient.invalidateQueries({ queryKey: ['workplaces'] });
   };
 
+  const handleToggleAgreement = async (workplace) => {
+    await base44.entities.Workplace.update(workplace.id, {
+      has_agreement: !workplace.has_agreement,
+    });
+    queryClient.invalidateQueries({ queryKey: ['workplaces'] });
+  };
+
   return (
     <div className="p-8">
       <div className="flex items-center justify-between mb-8">
@@ -196,6 +204,7 @@ export default function Workplaces() {
                 <th className="text-right px-5 py-3 text-sm font-semibold text-muted-foreground">טלפון איש קשר</th>
                 <th className="text-right px-5 py-3 text-sm font-semibold text-muted-foreground">טלפון הנה"ח</th>
                 <th className="text-right px-5 py-3 text-sm font-semibold text-muted-foreground">מייל הנה"ח</th>
+                <th className="text-center px-5 py-3 text-sm font-semibold text-muted-foreground">הסכם</th>
                 <th className="px-5 py-3"></th>
               </tr>
             </thead>
@@ -209,6 +218,12 @@ export default function Workplaces() {
                   <td className="px-5 py-3 text-sm text-muted-foreground">{w.contact_phone || '—'}</td>
                   <td className="px-5 py-3 text-sm text-muted-foreground">{w.accounting_phone || '—'}</td>
                   <td className="px-5 py-3 text-sm text-muted-foreground">{w.accounting_email || '—'}</td>
+                  <td className="px-5 py-3 text-center">
+                    <Switch
+                      checked={!!w.has_agreement}
+                      onCheckedChange={() => handleToggleAgreement(w)}
+                    />
+                  </td>
                   <td className="px-5 py-3">
                     <div className="flex gap-1 justify-end">
                       <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-primary"
