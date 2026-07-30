@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/select";
 import { Upload, AlertCircle, CheckCircle2 } from "lucide-react";
 import { base44 } from "@/api/base44Client";
+import { showAlert } from "@/components/AppAlert";
 import * as XLSX from "xlsx";
 
 /**
@@ -326,7 +327,7 @@ export default function ImportModal({ open, onClose, onImported }) {
       setStep("done");
       onImported();
     } catch (error) {
-      alert(error?.message || "שגיאה בייבוא. בדוק את הנתונים ונסה שוב.");
+      await showAlert(error?.message || "שגיאה בייבוא. בדוק את הנתונים ונסה שוב.");
     } finally {
       setImporting(false);
     }
