@@ -13,6 +13,7 @@ import SRSViewer from '@/components/reports/SRSViewer';
 import DefaultSettings from '@/components/admin/DefaultSettings';
 import UserPermissions from '@/components/admin/UserPermissions';
 import { getAssignmentDefaults, normalizeAppSettings } from '@/lib/pricing';
+import { showAlert } from '@/components/AppAlert';
 
 export default function AdminTools() {
   const { user: currentUser } = useAuth();
@@ -35,7 +36,7 @@ export default function AdminTools() {
 
     const allStudents = await base44.entities.Student.list();
     const activeStudents = allStudents.filter(s => s.is_active !== false);
-    if (!activeStudents.length) { alert('אין תלמידים פעילים'); setRandomizing(false); return; }
+    if (!activeStudents.length) { await showAlert('אין תלמידים פעילים'); setRandomizing(false); return; }
 
     const SPECIAL_WP = [
       { id: '69e5bf0070786e7ad489a574', name: 'לא עובד' },
@@ -85,7 +86,7 @@ export default function AdminTools() {
 
     setRandomizing(false);
     setRandomStatus('');
-    alert(`נוצרו ${allNew.length} שיבוצים רנדומליים בהצלחה!`);
+    await showAlert(`נוצרו ${allNew.length} שיבוצים רנדומליים בהצלחה!`);
   };
 
   // --- Assign Roles ---
@@ -127,7 +128,7 @@ export default function AdminTools() {
 
     setAssigningRoles(false);
     setRolesStatus('');
-    alert(`עודכנו תפקידים ל-${dates.length} ימים בהצלחה!`);
+    await showAlert(`עודכנו תפקידים ל-${dates.length} ימים בהצלחה!`);
   };
 
   const tabs = [

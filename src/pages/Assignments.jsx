@@ -51,6 +51,7 @@ import {
   normalizeAppSettings,
   parseDisplayRateInput,
 } from "@/lib/pricing";
+import { showAlert } from "@/components/AppAlert";
 
 async function bulkUpdateAssignments({ toCreate = [], toUpdate = [] }) {
   await Promise.all(
@@ -61,6 +62,39 @@ async function bulkUpdateAssignments({ toCreate = [], toUpdate = [] }) {
   if (toCreate.length > 0) {
     await base44.entities.Assignment.bulkCreate(toCreate);
   }
+}
+
+const NO_AGREEMENT_WARNED_KEY = (date) => `no_agreement_warned_${date}`;
+
+function getNoAgreementWarnedIds(date) {
+  try {
+    const raw = localStorage.getItem(NO_AGREEMENT_WARNED_KEY(date));
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+function markNoAgreementWarned(date, workplaceId) {
+  const ids = getNoAgreementWarnedIds(date);
+  if (ids.includes(workplaceId)) return;
+  localStorage.setItem(
+    NO_AGREEMENT_WARNED_KEY(date),
+    JSON.stringify([...ids, workplaceId]),
+  );
+}
+
+/** Alert once per workplace per schedule date when assigning to a workplace without agreement.
+ *  Returns false if the user clicks ביטול (assignment should not proceed).
+ *  X / overlay only closes the alert and allows the assignment. */
+async function warnIfNoAgreement(date, workplace) {
+  if (!workplace || workplace.has_agreement) return true;
+  if (getNoAgreementWarnedIds(date).includes(workplace.id)) return true;
+  const confirmed = await showAlert(`ל${workplace.name} אין הסכם`, {
+    onCancel: () => {},
+  });
+  markNoAgreementWarned(date, workplace.id);
+  return confirmed;
 }
 
 function WorkplaceCell({
@@ -434,11 +468,14 @@ export default function Assignments() {
 
   const handleAssign = async (student, workplace, existingAssignment) => {
     if (student.forbidden_workplaces?.includes(workplace.id)) {
-      alert(
-        `⛔ לא ניתן לשבץ את ${student.full_name} ל-${workplace.name} — זה מקום עבודה אסור`,
+      await showAlert(
+        `לא ניתן לשבץ את ${student.full_name} ל-${workplace.name} — זה מקום עבודה אסור`,
       );
       return false;
     }
+
+    const canAssign = await warnIfNoAgreement(date, workplace);
+    if (!canAssign) return false;
 
     // Find ALL assignments for this student on this date (there may be duplicates)
     const allForStudent = assignments.filter(
@@ -502,6 +539,9 @@ export default function Assignments() {
       setShowBulkDialog(false);
       return;
     }
+
+    const canAssign = await warnIfNoAgreement(date, wp);
+    if (!canAssign) return;
 
     // Build a map: assignmentId -> assignment, and studentId -> assignment
     const assignmentById = {};
@@ -791,7 +831,7 @@ export default function Assignments() {
       const totalCloned = toCreate.length + toUpdate.length;
       queryClient.invalidateQueries({ queryKey: ["assignments"] });
     } catch (error) {
-      alert(`❌ שגיאה בשכפול: ${error.message || "נסה שוב"}`);
+      await showAlert(`שגיאה בשכפול: ${error.message || "נסה שוב"}`);
     } finally {
       setCloning(false);
       setCloneProgress(0);

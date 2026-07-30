@@ -1,4 +1,5 @@
 import { Toaster } from "@/components/ui/toaster"
+import { AppAlertHost } from "@/components/AppAlert"
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClientInstance } from '@/lib/query-client'
 import { BrowserRouter as Router, Route, Routes, Navigate, MemoryRouter, useLocation } from 'react-router-dom';
@@ -106,6 +107,7 @@ function ScheduleApp() {
         </Routes>
       </MemoryRouter>
       <Toaster />
+      <AppAlertHost />
     </QueryClientProvider>
   );
 }
@@ -132,6 +134,7 @@ function TimeReportingApp() {
           </Routes>
         </MemoryRouter>
         <Toaster />
+        <AppAlertHost />
       </QueryClientProvider>
     </AuthProvider>
   );
@@ -155,6 +158,7 @@ function App() {
           <AppRoutes />
         </Router>
         <Toaster />
+        <AppAlertHost />
       </QueryClientProvider>
     </AuthProvider>
   );
