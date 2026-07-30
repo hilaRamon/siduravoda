@@ -14,14 +14,14 @@ let openAlert = null;
 
 /**
  * Site-styled modal alert.
- * - אישור / X / overlay → returns true (close only; no onCancel)
- * - ביטול without onCancel → same as close
- * - ביטול with onCancel → runs onCancel, returns false
+ * - X / overlay → only closes the dialog
+ * - אישור → closes; runs onConfirm if provided
+ * - ביטול → closes; runs onCancel if provided
  */
 export async function showAlert(message, options = {}) {
   if (!openAlert) {
     window.alert(message);
-    return true;
+    return;
   }
   return openAlert(message, options);
 }
@@ -30,6 +30,7 @@ export function AppAlertHost() {
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("שים לב");
   const [message, setMessage] = useState("");
+  const onConfirmRef = useRef(null);
   const onCancelRef = useRef(null);
   const resolveRef = useRef(null);
 
@@ -37,6 +38,7 @@ export function AppAlertHost() {
     openAlert = (msg, options = {}) => {
       setTitle(options.title ?? "שים לב");
       setMessage(String(msg ?? ""));
+      onConfirmRef.current = options.onConfirm ?? null;
       onCancelRef.current = options.onCancel ?? null;
       setOpen(true);
 
@@ -50,31 +52,29 @@ export function AppAlertHost() {
     };
   }, []);
 
-  function finish(confirmed) {
+  function finish() {
     if (!resolveRef.current) return;
     const resolve = resolveRef.current;
     resolveRef.current = null;
+    onConfirmRef.current = null;
     onCancelRef.current = null;
     setOpen(false);
     setMessage("");
-    resolve(confirmed);
+    resolve();
   }
 
   function handleClose() {
-    finish(true);
+    finish();
   }
 
   function handleConfirm() {
-    finish(true);
+    onConfirmRef.current?.();
+    finish();
   }
 
   function handleCancel() {
-    if (onCancelRef.current) {
-      onCancelRef.current();
-      finish(false);
-      return;
-    }
-    finish(true);
+    onCancelRef.current?.();
+    finish();
   }
 
   return (

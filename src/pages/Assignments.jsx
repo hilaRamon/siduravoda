@@ -85,13 +85,18 @@ function markNoAgreementWarned(date, workplaceId) {
 }
 
 /** Alert once per workplace per schedule date when assigning to a workplace without agreement.
- *  Returns false if the user clicks ביטול (assignment should not proceed).
- *  X / overlay only closes the alert and allows the assignment. */
+ *  Returns false if the user does not confirm (ביטול or X) — assignment should not proceed. */
 async function warnIfNoAgreement(date, workplace) {
   if (!workplace || workplace.has_agreement) return true;
   if (getNoAgreementWarnedIds(date).includes(workplace.id)) return true;
-  const confirmed = await showAlert(`ל${workplace.name} אין הסכם`, {
-    onCancel: () => {},
+  let confirmed = false;
+  await showAlert(`ל${workplace.name} אין הסכם`, {
+    onConfirm: () => {
+      confirmed = true;
+    },
+    onCancel: () => {
+      confirmed = false;
+    },
   });
   markNoAgreementWarned(date, workplace.id);
   return confirmed;
