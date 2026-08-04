@@ -1,6 +1,14 @@
 import { useState, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
+import {
+  absenceKeys,
+  useAbsenceRequests,
+  useApproveAbsence,
+  useRejectAbsence,
+  useUpdateAbsence,
+  useBulkAbsenceStatus,
+} from '@/queries/absenceQueries';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -21,30 +29,67 @@ const STATUS_ICONS = {
   'נדחה': <X size={12} />,
 };
 
-function RequestRow({ request, students, selected, onToggleSelect }) {
+function studentDisplayName(request, studentsById) {
+  if (request.student_id && studentsById[request.student_id]) {
+    return studentsById[request.student_id].full_name;
+  }
+  return request.submitted_name || '—';
+}
+
+function RequestRow({ request, students, studentsById, selected, onToggleSelect }) {
   const [showDetail, setShowDetail] = useState(false);
   const [notes, setNotes] = useState(request.notes || '');
   const [linkedStudent, setLinkedStudent] = useState(request.student_id || '');
-  const queryClient = useQueryClient();
+  const [dateValue, setDateValue] = useState(request.date || '');
+  const [error, setError] = useState('');
 
-  const handleStatusChange = async (status) => {
-    await base44.entities.IncomingSMS.update(request.id, { status });
-    queryClient.invalidateQueries({ queryKey: ['incoming-sms'] });
-    queryClient.invalidateQueries({ queryKey: ['incoming-sms-pending'] });
+  const approveMutation = useApproveAbsence();
+  const rejectMutation = useRejectAbsence();
+  const updateMutation = useUpdateAbsence();
+
+  const handleApprove = async () => {
+    setError('');
+    try {
+      const student_id = linkedStudent && linkedStudent !== 'none' ? linkedStudent : request.student_id;
+      await approveMutation.mutateAsync({
+        id: request.id,
+        student_id: student_id || undefined,
+        date: dateValue || request.date || undefined,
+      });
+      setShowDetail(false);
+    } catch (err) {
+      setError(err.message || 'לא ניתן לאשר');
+    }
+  };
+
+  const handleReject = async () => {
+    setError('');
+    try {
+      await rejectMutation.mutateAsync(request.id);
+      setShowDetail(false);
+    } catch (err) {
+      setError(err.message || 'לא ניתן לדחות');
+    }
   };
 
   const handleSaveDetail = async () => {
-    const student = students.find(s => s.id === linkedStudent);
-    await base44.entities.IncomingSMS.update(request.id, {
-      notes,
-      student_id: linkedStudent || null,
-      student_name: student?.full_name || null,
-    });
-    queryClient.invalidateQueries({ queryKey: ['incoming-sms'] });
-    setShowDetail(false);
+    setError('');
+    try {
+      await updateMutation.mutateAsync({
+        id: request.id,
+        data: {
+          notes,
+          student_id: linkedStudent && linkedStudent !== 'none' ? linkedStudent : null,
+          date: dateValue || null,
+        },
+      });
+      setShowDetail(false);
+    } catch (err) {
+      setError(err.message || 'שמירה נכשלה');
+    }
   };
 
-  const displayName = request.student_name || request.parsed_student_name || '—';
+  const displayName = studentDisplayName(request, studentsById);
 
   return (
     <>
@@ -56,13 +101,13 @@ function RequestRow({ request, students, selected, onToggleSelect }) {
           <div className="font-medium text-sm">{displayName}</div>
         </td>
         <td className="px-4 py-3 border-b border-border text-sm cursor-pointer" onClick={() => setShowDetail(true)}>
-          {request.parsed_date
-            ? new Date(request.parsed_date + 'T12:00:00').toLocaleDateString('he-IL', { weekday: 'short', day: 'numeric', month: 'numeric', year: '2-digit' })
+          {request.date
+            ? new Date(request.date + 'T12:00:00').toLocaleDateString('he-IL', { weekday: 'short', day: 'numeric', month: 'numeric', year: '2-digit' })
             : <span className="text-muted-foreground text-xs">לא זוהה</span>
           }
         </td>
         <td className="px-4 py-3 border-b border-border text-sm max-w-xs cursor-pointer" onClick={() => setShowDetail(true)}>
-          <div className="truncate">{request.parsed_reason || <span className="text-muted-foreground text-xs">—</span>}</div>
+          <div className="truncate">{request.reason || <span className="text-muted-foreground text-xs">—</span>}</div>
         </td>
         <td className="px-4 py-3 border-b border-border text-xs text-muted-foreground cursor-pointer" onClick={() => setShowDetail(true)}>
           {request.sms_date || new Date(request.created_date).toLocaleString('he-IL')}
@@ -77,13 +122,13 @@ function RequestRow({ request, students, selected, onToggleSelect }) {
           <div className="flex gap-1">
             {request.status !== 'אושר' && (
               <Button size="sm" variant="ghost" className="h-7 px-2 text-success hover:bg-success/10"
-                onClick={() => handleStatusChange('אושר')}>
+                onClick={handleApprove}>
                 <Check size={13} />
               </Button>
             )}
             {request.status !== 'נדחה' && (
               <Button size="sm" variant="ghost" className="h-7 px-2 text-destructive hover:bg-destructive/10"
-                onClick={() => handleStatusChange('נדחה')}>
+                onClick={handleReject}>
                 <X size={13} />
               </Button>
             )}
@@ -97,26 +142,33 @@ function RequestRow({ request, students, selected, onToggleSelect }) {
             <DialogTitle>פרטי בקשת היעדרות</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 mt-2">
-            <div className="bg-secondary/40 rounded-lg p-3 text-sm">
-              <div className="text-xs text-muted-foreground mb-1">הודעה מקורית</div>
-              <p className="font-medium">{request.message}</p>
-              <div className="text-xs text-muted-foreground mt-2">מ: {request.phone} | {request.sms_date}</div>
-            </div>
+            {request.message && (
+              <div className="bg-secondary/40 rounded-lg p-3 text-sm">
+                <div className="text-xs text-muted-foreground mb-1">הודעה מקורית</div>
+                <p className="font-medium">{request.message}</p>
+                <div className="text-xs text-muted-foreground mt-2">מ: {request.phone} | {request.sms_date}</div>
+              </div>
+            )}
 
             <div className="grid grid-cols-2 gap-3 text-sm">
               <div>
-                <div className="text-xs text-muted-foreground mb-1">תאריך יעדרות (AI)</div>
-                <div className="font-medium">{request.parsed_date || '—'}</div>
+                <label className="text-xs text-muted-foreground mb-1 block">תאריך היעדרות</label>
+                <input
+                  type="date"
+                  value={dateValue}
+                  onChange={e => setDateValue(e.target.value)}
+                  className="w-full h-9 border border-border rounded-md px-2 text-sm bg-card"
+                />
               </div>
               <div>
-                <div className="text-xs text-muted-foreground mb-1">סיבה (AI)</div>
-                <div className="font-medium">{request.parsed_reason || '—'}</div>
+                <div className="text-xs text-muted-foreground mb-1">סיבה</div>
+                <div className="font-medium mt-2">{request.reason || '—'}</div>
               </div>
             </div>
 
             <div>
               <label className="text-xs font-medium text-muted-foreground mb-1 block">קישור לתלמיד</label>
-              <Select value={linkedStudent} onValueChange={setLinkedStudent}>
+              <Select value={linkedStudent || 'none'} onValueChange={setLinkedStudent}>
                 <SelectTrigger className="h-9 text-sm">
                   <SelectValue placeholder="— בחר תלמיד —" />
                 </SelectTrigger>
@@ -127,6 +179,9 @@ function RequestRow({ request, students, selected, onToggleSelect }) {
                   ))}
                 </SelectContent>
               </Select>
+              {request.submitted_name && !request.student_id && (
+                <p className="text-xs text-muted-foreground mt-1">שם מה-SMS: {request.submitted_name}</p>
+              )}
             </div>
 
             <div>
@@ -139,14 +194,18 @@ function RequestRow({ request, students, selected, onToggleSelect }) {
               />
             </div>
 
+            {error && (
+              <p className="text-sm text-destructive">{error}</p>
+            )}
+
             <div className="flex gap-2 justify-between pt-1">
               <div className="flex gap-1">
                 <Button size="sm" className="bg-success hover:bg-success/90 text-white"
-                  onClick={() => { handleStatusChange('אושר'); setShowDetail(false); }}>
+                  onClick={handleApprove}>
                   <Check size={13} className="ml-1" /> אשר
                 </Button>
                 <Button size="sm" variant="destructive"
-                  onClick={() => { handleStatusChange('נדחה'); setShowDetail(false); }}>
+                  onClick={handleReject}>
                   <X size={13} className="ml-1" /> דחה
                 </Button>
               </div>
@@ -162,18 +221,22 @@ function RequestRow({ request, students, selected, onToggleSelect }) {
 export default function AbsenceRequests() {
   const [activeTab, setActiveTab] = useState(null);
   const [selectedIds, setSelectedIds] = useState(new Set());
-  const [bulkProcessing, setBulkProcessing] = useState(false);
+  const [bulkError, setBulkError] = useState('');
   const queryClient = useQueryClient();
+  const bulkMutation = useBulkAbsenceStatus();
 
-  const { data: requests = [], isLoading } = useQuery({
-    queryKey: ['incoming-sms'],
-    queryFn: () => base44.entities.IncomingSMS.list('-created_date', 500),
-  });
+  const { data: requests = [], isLoading } = useAbsenceRequests();
 
   const { data: students = [] } = useQuery({
     queryKey: ['students'],
     queryFn: () => base44.entities.Student.list('full_name', 1000),
   });
+
+  const studentsById = useMemo(() => {
+    const map = {};
+    students.forEach(s => { map[s.id] = s; });
+    return map;
+  }, [students]);
 
   const counts = useMemo(() => ({
     pending: requests.filter(r => r.status === 'ממתין').length,
@@ -206,15 +269,20 @@ export default function AbsenceRequests() {
   };
 
   const handleBulkStatus = async (status) => {
-    setBulkProcessing(true);
+    setBulkError('');
     try {
       const ids = [...selectedIds];
-      await Promise.all(ids.map(id => base44.entities.IncomingSMS.update(id, { status })));
-      queryClient.invalidateQueries({ queryKey: ['incoming-sms'] });
-      queryClient.invalidateQueries({ queryKey: ['incoming-sms-pending'] });
+      const studentById = {};
+      if (status === 'אושר') {
+        ids.forEach(id => {
+          const req = requests.find(r => r.id === id);
+          if (req?.student_id) studentById[id] = req.student_id;
+        });
+      }
+      await bulkMutation.mutateAsync({ ids, status, studentById });
       setSelectedIds(new Set());
-    } finally {
-      setBulkProcessing(false);
+    } catch (err) {
+      setBulkError(err.message || 'פעולה מרובה נכשלה — ודא שכל הבקשות מקושרות לתלמיד ותאריך');
     }
   };
 
@@ -234,14 +302,13 @@ export default function AbsenceRequests() {
             <MessageSquare size={24} className="text-primary" />
             בקשות היעדרות
           </h2>
-          <p className="text-muted-foreground mt-1 text-sm">הודעות SMS נכנסות שנותחו אוטומטית</p>
+          <p className="text-muted-foreground mt-1 text-sm">בקשות מהודעות SMS ובקשות ידניות</p>
         </div>
-        <Button variant="outline" size="sm" onClick={() => queryClient.invalidateQueries({ queryKey: ['incoming-sms'] })}>
+        <Button variant="outline" size="sm" onClick={() => queryClient.invalidateQueries({ queryKey: absenceKeys.all })}>
           <RefreshCw size={14} className="ml-1" /> רענן
         </Button>
       </div>
 
-      {/* Stat Cards */}
       <div className="grid grid-cols-3 gap-3 mb-6">
         {statCards.map(stat => {
           const isActive = activeTab === stat.tab;
@@ -262,7 +329,6 @@ export default function AbsenceRequests() {
         })}
       </div>
 
-      {/* Table header + bulk actions */}
       <div className="flex items-center justify-between gap-2 mb-3">
         <div className="flex items-center gap-2">
           <span className="text-sm font-semibold">{activeLabel}</span>
@@ -272,11 +338,11 @@ export default function AbsenceRequests() {
           <div className="flex items-center gap-2">
             <span className="text-sm text-primary font-medium">{selectedIds.size} נבחרו</span>
             <Button size="sm" className="h-8 gap-1 bg-success hover:bg-success/90 text-white"
-              onClick={() => handleBulkStatus('אושר')} disabled={bulkProcessing}>
+              onClick={() => handleBulkStatus('אושר')} disabled={bulkMutation.isPending}>
               <Check size={13} /> אשר הכל
             </Button>
             <Button size="sm" variant="destructive" className="h-8 gap-1"
-              onClick={() => handleBulkStatus('נדחה')} disabled={bulkProcessing}>
+              onClick={() => handleBulkStatus('נדחה')} disabled={bulkMutation.isPending}>
               <X size={13} /> דחה הכל
             </Button>
             <Button size="sm" variant="ghost" className="h-8 text-muted-foreground"
@@ -286,6 +352,10 @@ export default function AbsenceRequests() {
           </div>
         )}
       </div>
+
+      {bulkError && (
+        <p className="text-sm text-destructive mb-3">{bulkError}</p>
+      )}
 
       <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden">
         <table className="w-full text-sm">
@@ -319,6 +389,7 @@ export default function AbsenceRequests() {
                   key={req.id}
                   request={req}
                   students={students}
+                  studentsById={studentsById}
                   selected={selectedIds.has(req.id)}
                   onToggleSelect={toggleSelect}
                 />

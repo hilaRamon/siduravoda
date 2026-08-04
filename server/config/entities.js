@@ -113,26 +113,6 @@ export const entityDefinitions = {
       last_backup_filename: { type: String },
     },
   },
-  IncomingSMS: {
-    required: [],
-    schema: {
-      message: { type: String, default: "" },
-      phone: { type: String, trim: true },
-      sms_date: { type: String, trim: true },
-      parsed_date: { type: String, trim: true },
-      parsed_reason: { type: String, trim: true },
-      parsed_student_name: { type: String, trim: true },
-      status: {
-        type: String,
-        enum: ["ממתין", "אושר", "נדחה"],
-        default: "ממתין",
-      },
-      notes: { type: String },
-      student_id: { type: String },
-      student_name: { type: String, trim: true },
-    },
-    indexes: [{ fields: { status: 1, created_date: -1 } }],
-  },
   FarmerRequest: {
     required: ["date", "workplace_id"],
     schema: {

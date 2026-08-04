@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
+import { absenceApi } from "@/api/absenceApi";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -45,6 +46,10 @@ import LogisticsSidebar from "@/components/assignments/LogisticsSidebar";
 import { format, addDays, subDays } from "date-fns";
 import { useAppSettings } from "@/queries/useAppSettings";
 import {
+  useAbsenceRequests,
+  absenceKeys,
+} from "@/queries/absenceQueries";
+import {
   getAssignmentDefaults,
   getDisplayRate,
   isDailyPricing,
@@ -52,6 +57,8 @@ import {
   parseDisplayRateInput,
 } from "@/lib/pricing";
 import { showAlert } from "@/components/AppAlert";
+
+const NOT_WORKING_WORKPLACE_NAME = "תתת - לא עובד";
 
 async function bulkUpdateAssignments({ toCreate = [], toUpdate = [] }) {
   await Promise.all(
@@ -359,6 +366,40 @@ export default function Assignments() {
     queryFn: () => base44.entities.Role.list(),
   });
 
+  const { data: approvedAbsences = [] } = useAbsenceRequests({
+    startDate: date,
+    endDate: date,
+    status: "אושר",
+  });
+
+  const absentByStudentId = useMemo(() => {
+    const map = {};
+    approvedAbsences.forEach((a) => {
+      if (a.student_id) map[a.student_id] = a;
+    });
+    return map;
+  }, [approvedAbsences]);
+
+  const offerRejectAbsence = async (student, absenceRequest) => {
+    let confirmed = false;
+    await showAlert(
+      `ל${student.full_name} יש היעדרות מאושרת בתאריך זה. לא ניתן לשבץ. האם לבטל את בקשת ההיעדרות?`,
+      {
+        onConfirm: () => {
+          confirmed = true;
+        },
+        onCancel: () => {
+          confirmed = false;
+        },
+      },
+    );
+    if (!confirmed) return false;
+    await absenceApi.reject(absenceRequest.id);
+    queryClient.invalidateQueries({ queryKey: absenceKeys.all });
+    queryClient.invalidateQueries({ queryKey: ["assignments", date] });
+    return true;
+  };
+
   const assignmentByStudent = useMemo(() => {
     const map = {};
     assignments.forEach((a) => {
@@ -472,6 +513,12 @@ export default function Assignments() {
   };
 
   const handleAssign = async (student, workplace, existingAssignment) => {
+    const absence = absentByStudentId[student.id];
+    if (absence && workplace.name !== NOT_WORKING_WORKPLACE_NAME) {
+      await offerRejectAbsence(student, absence);
+      return false;
+    }
+
     if (student.forbidden_workplaces?.includes(workplace.id)) {
       await showAlert(
         `לא ניתן לשבץ את ${student.full_name} ל-${workplace.name} — זה מקום עבודה אסור`,
@@ -518,6 +565,17 @@ export default function Assignments() {
   };
 
   const handleRemove = async (id) => {
+    const assignment = assignments.find((a) => a.id === id);
+    const absence =
+      assignment?.student_id && absentByStudentId[assignment.student_id];
+    if (absence) {
+      const student =
+        students.find((s) => s.id === assignment.student_id) || {
+          full_name: assignment.student_name || "התלמיד",
+        };
+      await offerRejectAbsence(student, absence);
+      return;
+    }
     await base44.entities.Assignment.delete(id);
     queryClient.invalidateQueries({ queryKey: ["assignments", date] });
   };
@@ -562,10 +620,20 @@ export default function Assignments() {
 
     const toCreate = [];
     const toUpdate = []; // { id, updates }
+    let skippedAbsent = 0;
 
     for (const selId of selectedIds) {
       const existingAssignment =
         assignmentById[selId] || assignmentByStudentId[selId];
+      const studentId = existingAssignment?.student_id || selId;
+      const isAbsent = !!absentByStudentId[studentId];
+      const changingWorkplace =
+        wp && wp.name !== NOT_WORKING_WORKPLACE_NAME;
+
+      if (isAbsent && changingWorkplace) {
+        skippedAbsent++;
+        continue;
+      }
 
       if (existingAssignment) {
         const { id, created_date, updated_date, created_by, ...rest } =
@@ -597,6 +665,13 @@ export default function Assignments() {
           });
         }
       }
+    }
+
+    if (skippedAbsent > 0 && toCreate.length === 0 && toUpdate.length === 0) {
+      await showAlert(
+        `${skippedAbsent} תלמידים עם היעדרות מאושרת דולגו. יש לבטל את ההיעדרות לפני שיבוץ.`,
+      );
+      return;
     }
 
     setBulkSaving(true);
@@ -640,6 +715,11 @@ export default function Assignments() {
       setBulkHours("");
       setBulkRate("");
       setBulkProgress(0);
+      if (skippedAbsent > 0) {
+        await showAlert(
+          `${skippedAbsent} תלמידים עם היעדרות מאושרת דולגו. יש לבטל את ההיעדרות לפני שיבוץ.`,
+        );
+      }
     } finally {
       setBulkSaving(false);
     }
@@ -699,11 +779,11 @@ export default function Assignments() {
 
       setCloneProgress(25);
       setCloneStep("בודק היעדרויות...");
-      const approvedAbsences = await base44.entities.IncomingSMS.filter(
-        { parsed_date: cloneTargetDate, status: "אושר" },
-        "-created_date",
-        2000,
-      );
+      const approvedAbsences = await absenceApi.list({
+        startDate: cloneTargetDate,
+        endDate: cloneTargetDate,
+        status: "אושר",
+      });
       const absentStudentIds = new Set(
         approvedAbsences.map((a) => a.student_id).filter(Boolean),
       );
@@ -770,7 +850,9 @@ export default function Assignments() {
 
         let targetWp;
         if (absentStudentIds.has(src.student_id)) {
-          targetWp = { id: "", name: "" };
+          targetWp = notWorkingWp
+            ? { id: notWorkingWp.id, name: notWorkingWp.name }
+            : { id: "", name: NOT_WORKING_WORKPLACE_NAME };
         } else if (isSunday) {
           const distanceStatus = student?.distance_status;
           if (distanceStatus && DISTANCE_WORKPLACE_MAP[distanceStatus]) {

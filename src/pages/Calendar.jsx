@@ -1,13 +1,16 @@
 import { useState, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
+import {
+  useAbsenceRequests,
+  useCreateManualAbsence,
+} from '@/queries/absenceQueries';
 import { Button } from '@/components/ui/button';
 import { ChevronRight, ChevronLeft, Plus, Trash2, CalendarDays } from 'lucide-react';
 import { format, addWeeks, subWeeks, startOfWeek, addDays } from 'date-fns';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
-// Returns Sun–Thu for the week containing `baseDate`
 function getWeekDays(baseDate) {
   const sunday = startOfWeek(baseDate, { weekStartsOn: 0 });
   return Array.from({ length: 5 }, (_, i) => addDays(sunday, i));
@@ -15,7 +18,7 @@ function getWeekDays(baseDate) {
 
 const DAY_NAMES = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי'];
 
-function AddFarmerRequestForm({ date, workplaces, existingRequests, onAdded }) {
+function AddFarmerRequestForm({ date, workplaces }) {
   const [open, setOpen] = useState(false);
   const [popoverOpen, setPopoverOpen] = useState(false);
   const [search, setSearch] = useState('');
@@ -40,7 +43,6 @@ function AddFarmerRequestForm({ date, workplaces, existingRequests, onAdded }) {
     setVolunteers('');
     setSearch('');
     setOpen(false);
-    if (onAdded) onAdded();
   };
 
   if (!open) {
@@ -112,13 +114,116 @@ function AddFarmerRequestForm({ date, workplaces, existingRequests, onAdded }) {
   );
 }
 
-function DayColumn({ day, farmerRequests, absences, workplaces }) {
+function AddAbsenceForm({ date, students }) {
+  const [open, setOpen] = useState(false);
+  const [popoverOpen, setPopoverOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const [selectedStudent, setSelectedStudent] = useState(null);
+  const [reason, setReason] = useState('');
+  const [error, setError] = useState('');
+  const createMutation = useCreateManualAbsence();
+
+  const filtered = students.filter(s =>
+    !search || (s.full_name || '').includes(search)
+  );
+
+  const handleAdd = async () => {
+    if (!selectedStudent) return;
+    setError('');
+    try {
+      await createMutation.mutateAsync({
+        date,
+        student_id: selectedStudent.id,
+        reason: reason || '',
+      });
+      setSelectedStudent(null);
+      setReason('');
+      setSearch('');
+      setOpen(false);
+    } catch (err) {
+      setError(err.message || 'הוספה נכשלה');
+    }
+  };
+
+  if (!open) {
+    return (
+      <button
+        onClick={() => setOpen(true)}
+        className="flex items-center gap-1 text-xs text-primary hover:opacity-70 mt-1"
+      >
+        <Plus size={13} /> הוסף היעדרות
+      </button>
+    );
+  }
+
+  return (
+    <div className="mt-1 space-y-1.5 bg-secondary/30 rounded-lg p-2">
+      <Popover open={popoverOpen} onOpenChange={(v) => { setPopoverOpen(v); if (!v) setSearch(''); }}>
+        <PopoverTrigger asChild>
+          <button className="w-full h-7 border border-border rounded-md px-2 text-xs flex items-center justify-between bg-card hover:bg-secondary/40">
+            <span className={selectedStudent ? '' : 'text-muted-foreground'}>
+              {selectedStudent ? selectedStudent.full_name : 'בחר תלמיד...'}
+            </span>
+          </button>
+        </PopoverTrigger>
+        <PopoverContent className="w-56 p-0" align="start" dir="rtl">
+          <Command shouldFilter={false}>
+            <CommandInput
+              placeholder="חיפוש..."
+              className="h-7 text-xs"
+              value={search}
+              onValueChange={setSearch}
+            />
+            <CommandList>
+              <CommandEmpty>לא נמצא</CommandEmpty>
+              <CommandGroup>
+                {filtered.map(s => (
+                  <CommandItem
+                    key={s.id}
+                    value={s.full_name}
+                    onSelect={() => { setSelectedStudent(s); setPopoverOpen(false); setSearch(''); }}
+                    className="text-xs cursor-pointer"
+                  >
+                    {s.full_name}
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            </CommandList>
+          </Command>
+        </PopoverContent>
+      </Popover>
+
+      <input
+        type="text"
+        value={reason}
+        onChange={e => setReason(e.target.value)}
+        placeholder="סיבה (אופציונלי)"
+        className="w-full h-7 border border-border rounded-md px-2 text-xs bg-card focus:outline-none focus:ring-1 focus:ring-primary/40"
+      />
+
+      {error && <p className="text-xs text-destructive">{error}</p>}
+
+      <div className="flex gap-1">
+        <Button size="sm" className="h-6 text-xs flex-1" onClick={handleAdd} disabled={!selectedStudent || createMutation.isPending}>
+          אישור
+        </Button>
+        <Button size="sm" variant="ghost" className="h-6 text-xs" onClick={() => { setOpen(false); setSelectedStudent(null); setReason(''); setError(''); }}>
+          ביטול
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function DayColumn({ day, farmerRequests, absences, workplaces, students, studentsById }) {
   const queryClient = useQueryClient();
   const dateStr = format(day, 'yyyy-MM-dd');
   const isToday = dateStr === format(new Date(), 'yyyy-MM-dd');
 
   const dayFarmerRequests = farmerRequests.filter(r => r.date === dateStr);
-  const dayAbsences = absences.filter(a => a.parsed_date === dateStr && a.status === 'אושר');
+  const dayAbsences = absences.filter(
+    a => a.date === dateStr && a.status === 'אושר' && a.student_id,
+  );
 
   const handleDeleteRequest = async (id) => {
     await base44.entities.FarmerRequest.delete(id);
@@ -127,7 +232,6 @@ function DayColumn({ day, farmerRequests, absences, workplaces }) {
 
   return (
     <div className={`flex-1 min-w-0 bg-card rounded-xl border ${isToday ? 'border-primary shadow-sm' : 'border-border'} p-3 space-y-3`}>
-      {/* Header */}
       <div className={`text-center pb-2 border-b border-border`}>
         <div className={`text-lg font-semibold ${isToday ? 'text-primary' : 'text-muted-foreground'}`}>
           {DAY_NAMES[day.getDay()]}
@@ -137,7 +241,6 @@ function DayColumn({ day, farmerRequests, absences, workplaces }) {
         </div>
       </div>
 
-      {/* Farmers section */}
       <div>
         <div className="text-base font-bold text-foreground mb-2">🌾 חקלאים</div>
         {dayFarmerRequests.length === 0 ? (
@@ -162,10 +265,9 @@ function DayColumn({ day, farmerRequests, absences, workplaces }) {
             ))}
           </div>
         )}
-        <AddFarmerRequestForm date={dateStr} workplaces={workplaces} existingRequests={dayFarmerRequests} />
+        <AddFarmerRequestForm date={dateStr} workplaces={workplaces} />
       </div>
 
-      {/* Absences section */}
       <div>
         <div className="text-base font-bold text-foreground mb-2">🚫 היעדרויות</div>
         {dayAbsences.length === 0 ? (
@@ -174,14 +276,17 @@ function DayColumn({ day, farmerRequests, absences, workplaces }) {
           <div className="space-y-1">
             {dayAbsences.map(abs => (
               <div key={abs.id} className="bg-destructive/5 border border-destructive/15 rounded-md px-2 py-1">
-                <div className="text-sm font-medium">{abs.student_name || abs.parsed_student_name || '—'}</div>
-                {abs.parsed_reason && (
-                  <div className="text-sm text-muted-foreground truncate">{abs.parsed_reason}</div>
+                <div className="text-sm font-medium">
+                  {studentsById[abs.student_id]?.full_name || '—'}
+                </div>
+                {abs.reason && (
+                  <div className="text-sm text-muted-foreground truncate">{abs.reason}</div>
                 )}
               </div>
             ))}
           </div>
         )}
+        <AddAbsenceForm date={dateStr} students={students} />
       </div>
     </div>
   );
@@ -199,10 +304,22 @@ export default function Calendar() {
     queryFn: () => base44.entities.FarmerRequest.list('-date', 500),
   });
 
-  const { data: absences = [] } = useQuery({
-    queryKey: ['incoming-sms'],
-    queryFn: () => base44.entities.IncomingSMS.list('-created_date', 500),
+  const { data: absences = [] } = useAbsenceRequests({
+    startDate,
+    endDate,
+    status: 'אושר',
   });
+
+  const { data: students = [] } = useQuery({
+    queryKey: ['students'],
+    queryFn: () => base44.entities.Student.list('full_name', 1000),
+  });
+
+  const studentsById = useMemo(() => {
+    const map = {};
+    students.forEach(s => { map[s.id] = s; });
+    return map;
+  }, [students]);
 
   const { data: workplaces = [] } = useQuery({
     queryKey: ['workplaces'],
@@ -243,6 +360,8 @@ export default function Calendar() {
             farmerRequests={farmerRequests}
             absences={absences}
             workplaces={workplaces}
+            students={students}
+            studentsById={studentsById}
           />
         ))}
       </div>
