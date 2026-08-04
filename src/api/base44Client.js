@@ -17,7 +17,7 @@ export function setAuthToken(token) {
   }
 }
 
-async function request(path, options = {}) {
+export async function apiRequest(path, options = {}) {
   const headers = { ...(options.headers || {}) };
   const token = getAuthToken();
   if (token) {
@@ -75,36 +75,36 @@ function buildQuery(params) {
 function createEntityClient(entityName) {
   return {
     list(sort, limit = 1000) {
-      return request(
+      return apiRequest(
         `/api/entities/${entityName}${buildQuery({ sort, limit })}`,
       );
     },
     filter(filter = {}, sort, limit = 1000) {
-      return request(`/api/entities/${entityName}/filter`, {
+      return apiRequest(`/api/entities/${entityName}/filter`, {
         method: "POST",
         body: JSON.stringify({ filter, sort, limit }),
       });
     },
     create(data) {
-      return request(`/api/entities/${entityName}`, {
+      return apiRequest(`/api/entities/${entityName}`, {
         method: "POST",
         body: JSON.stringify(data),
       });
     },
     bulkCreate(items) {
-      return request(`/api/entities/${entityName}/bulk`, {
+      return apiRequest(`/api/entities/${entityName}/bulk`, {
         method: "POST",
         body: JSON.stringify(items),
       });
     },
     update(id, data) {
-      return request(`/api/entities/${entityName}/${id}`, {
+      return apiRequest(`/api/entities/${entityName}/${id}`, {
         method: "PATCH",
         body: JSON.stringify(data),
       });
     },
     delete(id) {
-      return request(`/api/entities/${entityName}/${id}`, {
+      return apiRequest(`/api/entities/${entityName}/${id}`, {
         method: "DELETE",
       });
     },
@@ -115,7 +115,7 @@ async function uploadFile({ file }) {
   const formData = new FormData();
   formData.append("file", file);
 
-  return request("/api/integrations/core/upload-file", {
+  return apiRequest("/api/integrations/core/upload-file", {
     method: "POST",
     body: formData,
   });
@@ -159,7 +159,7 @@ function joinList(values) {
 export const base44 = {
   public: {
     getPublishedSchedule() {
-      return request("/api/public/schedule", { cache: "no-store" });
+      return apiRequest("/api/public/schedule", { cache: "no-store" });
     },
   },
   entities: {
@@ -172,7 +172,6 @@ export const base44 = {
     WorkplaceLogistics: createEntityClient("WorkplaceLogistics"),
     PublishedSchedule: createEntityClient("PublishedSchedule"),
     BackupSettings: createEntityClient("BackupSettings"),
-    IncomingSMS: createEntityClient("IncomingSMS"),
     FarmerRequest: createEntityClient("FarmerRequest"),
     TimeReport: createEntityClient("TimeReport"),
     AppSettings: createEntityClient("AppSettings"),
@@ -185,7 +184,7 @@ export const base44 = {
   },
   reports: {
     workByWorkplace({ startDate, endDate, workplaces, farms, groupBy }) {
-      return request(
+      return apiRequest(
         `/api/reports/work-by-workplace${buildQuery({
           startDate,
           endDate,
@@ -196,7 +195,7 @@ export const base44 = {
       );
     },
     studentWork({ startDate, endDate, students }) {
-      return request(
+      return apiRequest(
         `/api/reports/student-work${buildQuery({
           startDate,
           endDate,
@@ -205,14 +204,14 @@ export const base44 = {
       );
     },
     arzenu({ startDate, endDate }) {
-      return request(
+      return apiRequest(
         `/api/reports/arzenu${buildQuery({ startDate, endDate })}`,
       );
     },
   },
   auth: {
     async login(email, password) {
-      const result = await request("/api/auth/login", {
+      const result = await apiRequest("/api/auth/login", {
         method: "POST",
         body: JSON.stringify({ email, password }),
       });
@@ -221,46 +220,46 @@ export const base44 = {
     },
     async logout() {
       try {
-        await request("/api/auth/logout", { method: "POST" });
+        await apiRequest("/api/auth/logout", { method: "POST" });
       } finally {
         setAuthToken(null);
       }
     },
     me() {
-      return request("/api/auth/me");
+      return apiRequest("/api/auth/me");
     },
     listUsers() {
-      return request("/api/auth/users");
+      return apiRequest("/api/auth/users");
     },
     inviteUser(email, level = "user", fullName = "") {
-      return request("/api/auth/invite", {
+      return apiRequest("/api/auth/invite", {
         method: "POST",
         body: JSON.stringify({ email, level, full_name: fullName }),
       });
     },
     updateUser(id, data) {
-      return request(`/api/auth/users/${id}`, {
+      return apiRequest(`/api/auth/users/${id}`, {
         method: "PATCH",
         body: JSON.stringify(data),
       });
     },
     deleteUser(id) {
-      return request(`/api/auth/users/${id}`, { method: "DELETE" });
+      return apiRequest(`/api/auth/users/${id}`, { method: "DELETE" });
     },
     setUserPassword(userId, password) {
-      return request(`/api/auth/users/${userId}/password`, {
+      return apiRequest(`/api/auth/users/${userId}/password`, {
         method: "PATCH",
         body: JSON.stringify({ password }),
       });
     },
     updateMe(data) {
-      return request("/api/auth/me", {
+      return apiRequest("/api/auth/me", {
         method: "PATCH",
         body: JSON.stringify(data),
       });
     },
     changePassword(currentPassword, newPassword) {
-      return request("/api/auth/me/password", {
+      return apiRequest("/api/auth/me/password", {
         method: "PATCH",
         body: JSON.stringify({
           current_password: currentPassword,
@@ -271,10 +270,10 @@ export const base44 = {
   },
   admin: {
     runBackup() {
-      return request("/api/admin/backup/run", { method: "POST" });
+      return apiRequest("/api/admin/backup/run", { method: "POST" });
     },
     sendBackupVerification(emails) {
-      return request("/api/admin/backup/verify", {
+      return apiRequest("/api/admin/backup/verify", {
         method: "POST",
         body: JSON.stringify({ emails }),
       });

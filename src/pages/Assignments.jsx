@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
+import { absenceApi } from "@/api/absenceApi";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -699,11 +700,11 @@ export default function Assignments() {
 
       setCloneProgress(25);
       setCloneStep("בודק היעדרויות...");
-      const approvedAbsences = await base44.entities.IncomingSMS.filter(
-        { parsed_date: cloneTargetDate, status: "אושר" },
-        "-created_date",
-        2000,
-      );
+      const approvedAbsences = await absenceApi.list({
+        startDate: cloneTargetDate,
+        endDate: cloneTargetDate,
+        status: "אושר",
+      });
       const absentStudentIds = new Set(
         approvedAbsences.map((a) => a.student_id).filter(Boolean),
       );

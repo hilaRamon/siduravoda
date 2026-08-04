@@ -33,10 +33,9 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    // Use service role to save (no user auth in webhook context)
+    // Use service role for AI parse (no user auth in webhook context)
     const base44 = createClientFromRequest(req);
 
-    // Parse with AI
     const today = new Date().toLocaleDateString('he-IL', { timeZone: 'Asia/Jerusalem' });
     const parsed = await base44.asServiceRole.integrations.Core.InvokeLLM({
       prompt: `אתה מנתח הודעות SMS מתלמידים בישראל שרוצים לבקש היעדרות.
@@ -56,16 +55,40 @@ Deno.serve(async (req) => {
       }
     });
 
-    await base44.asServiceRole.entities.IncomingSMS.create({
-      phone,
-      dest: dest || '',
-      message,
-      sms_date: smsDate || new Date().toISOString(),
-      parsed_student_name: parsed?.student_name || null,
-      parsed_date: parsed?.absence_date || null,
-      parsed_reason: parsed?.reason || null,
-      status: 'ממתין'
+    const apiBase = Deno.env.get('API_BASE_URL') || Deno.env.get('VITE_API_BASE_URL');
+    const ingestSecret = Deno.env.get('ABSENCE_INGEST_SECRET');
+
+    if (!apiBase || !ingestSecret) {
+      return Response.json(
+        { error: 'Missing API_BASE_URL or ABSENCE_INGEST_SECRET' },
+        { status: 500 },
+      );
+    }
+
+    const response = await fetch(`${apiBase.replace(/\/$/, '')}/api/absence-requests/from-sms`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Absence-Ingest-Key': ingestSecret,
+      },
+      body: JSON.stringify({
+        phone,
+        dest: dest || '',
+        message,
+        sms_date: smsDate || new Date().toISOString(),
+        date: parsed?.absence_date || null,
+        reason: parsed?.reason || null,
+        submitted_name: parsed?.student_name || null,
+      }),
     });
+
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({}));
+      return Response.json(
+        { error: payload.message || `Ingest failed: ${response.status}` },
+        { status: 500 },
+      );
+    }
 
     return Response.json({ success: true });
   } catch (error) {

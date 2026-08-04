@@ -1,0 +1,56 @@
+{
+  "name": "AbsenceRequest",
+  "type": "object",
+  "properties": {
+    "date": {
+      "type": "string",
+      "format": "date",
+      "description": "תאריך ההיעדרות"
+    },
+    "student_id": {
+      "type": "string",
+      "description": "מזהה תלמיד (חובה לאישור ולהצגה ביומן)"
+    },
+    "submitted_name": {
+      "type": "string",
+      "description": "שם תלמיד כפי שנותח מ-SMS עד לקישור תלמיד"
+    },
+    "reason": {
+      "type": "string",
+      "description": "סיבת ההיעדרות"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["ממתין", "אושר", "נדחה"],
+      "default": "ממתין",
+      "description": "סטטוס הבקשה"
+    },
+    "source": {
+      "type": "string",
+      "enum": ["sms", "manual"],
+      "default": "manual",
+      "description": "מקור הבקשה"
+    },
+    "phone": {
+      "type": "string",
+      "description": "מספר טלפון השולח (רק ל-SMS)"
+    },
+    "dest": {
+      "type": "string",
+      "description": "מספר היעד (רק ל-SMS)"
+    },
+    "message": {
+      "type": "string",
+      "description": "תוכן ה-SMS הגולמי (רק ל-SMS)"
+    },
+    "sms_date": {
+      "type": "string",
+      "description": "תאריך ושעת קבלת SMS מ-019"
+    },
+    "notes": {
+      "type": "string",
+      "description": "הערות מנהל"
+    }
+  },
+  "required": []
+}

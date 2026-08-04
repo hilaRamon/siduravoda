@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
+import { usePendingAbsenceCount } from "@/queries/absenceQueries";
 import { useAuth } from "@/lib/AuthContext";
 import { getVisibleNavItems, isWorkplaceManagerOnly } from "@/lib/permissions";
 import EditProfileModal from "@/components/EditProfileModal";
@@ -39,18 +40,9 @@ export default function Layout() {
   const workplaceManagerOnly = isWorkplaceManagerOnly(user);
   const navItems = getVisibleNavItems(user);
 
-  const { data: pendingSMS = [] } = useQuery({
-    queryKey: ["incoming-sms-pending"],
-    queryFn: () =>
-      base44.entities.IncomingSMS.filter(
-        { status: "ממתין" },
-        "-created_date",
-        100,
-      ),
-    refetchInterval: 60000,
+  const { data: pendingCount = 0 } = usePendingAbsenceCount({
     enabled: !workplaceManagerOnly,
   });
-  const pendingCount = pendingSMS.length;
 
   const { data: pendingTimeReports = [] } = useQuery({
     queryKey: ["time-reports-pending"],
