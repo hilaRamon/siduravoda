@@ -1,7 +1,12 @@
 import { getModel } from "../models/index.js";
+import {
+  getAssignmentDefaults,
+  normalizeAppSettings,
+} from "../lib/pricing.js";
 import * as absenceRequestRepository from "../repositories/absenceRequestRepository.js";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const NOT_WORKING_WORKPLACE_NAME = "תתת - לא עובד";
 
 export class AbsenceRequestError extends Error {
   constructor(message, status = 400) {
@@ -42,6 +47,76 @@ async function findStudentIdByPhone(phone) {
   return matches[0]._id.toString();
 }
 
+async function getNotWorkingWorkplace() {
+  const Workplace = getModel("Workplace");
+  const workplace = await Workplace.findOne({
+    name: NOT_WORKING_WORKPLACE_NAME,
+  }).lean();
+  if (!workplace) {
+    throw new AbsenceRequestError(
+      `Workplace "${NOT_WORKING_WORKPLACE_NAME}" not found`,
+    );
+  }
+  return {
+    id: workplace._id.toString(),
+    name: workplace.name,
+  };
+}
+
+async function getAssignmentDefaultsFromSettings() {
+  const AppSettings = getModel("AppSettings");
+  const settings = await AppSettings.findOne()
+    .sort({ updated_date: -1, created_date: -1 })
+    .lean();
+  return getAssignmentDefaults(normalizeAppSettings(settings));
+}
+
+async function assignNotWorking(studentId, date) {
+  const Assignment = getModel("Assignment");
+  const Student = getModel("Student");
+  const workplace = await getNotWorkingWorkplace();
+  const student = await Student.findById(studentId).select("full_name").lean();
+  const studentName = student?.full_name || "";
+
+  const existing = await Assignment.find({
+    date,
+    student_id: studentId,
+  })
+    .sort({ updated_date: -1, created_date: -1 })
+    .exec();
+
+  if (existing.length > 0) {
+    const [keep, ...extras] = existing;
+    if (extras.length > 0) {
+      await Assignment.deleteMany({
+        _id: { $in: extras.map((doc) => doc._id) },
+      });
+    }
+    keep.workplace_id = workplace.id;
+    keep.workplace_name = workplace.name;
+    if (studentName) keep.student_name = studentName;
+    await keep.save();
+    return;
+  }
+
+  const defaults = await getAssignmentDefaultsFromSettings();
+  await Assignment.create({
+    date,
+    student_id: studentId,
+    student_name: studentName,
+    workplace_id: workplace.id,
+    workplace_name: workplace.name,
+    rate: defaults.rate,
+    hours: defaults.hours,
+  });
+}
+
+async function clearAssignmentForDate(studentId, date) {
+  if (!studentId || !date) return;
+  const Assignment = getModel("Assignment");
+  await Assignment.deleteMany({ date, student_id: studentId });
+}
+
 export async function listAbsenceRequests(query = {}) {
   const filter = {};
 
@@ -76,7 +151,7 @@ export async function createManualAbsence({ date, student_id, reason, notes }) {
     throw new AbsenceRequestError("student_id is required for manual absences");
   }
 
-  return absenceRequestRepository.create({
+  const created = await absenceRequestRepository.create({
     date,
     student_id,
     reason: reason || "",
@@ -84,6 +159,8 @@ export async function createManualAbsence({ date, student_id, reason, notes }) {
     source: "manual",
     status: "אושר",
   });
+  await assignNotWorking(student_id, date);
+  return created;
 }
 
 export async function createFromSms({
@@ -163,12 +240,17 @@ export async function approveAbsenceRequest(id, { student_id, date } = {}) {
     date: nextDate,
     status: "אושר",
   });
+  await assignNotWorking(nextStudentId, nextDate);
   return updated;
 }
 
 export async function rejectAbsenceRequest(id) {
-  await getAbsenceRequest(id);
-  return absenceRequestRepository.updateById(id, { status: "נדחה" });
+  const existing = await getAbsenceRequest(id);
+  const updated = await absenceRequestRepository.updateById(id, {
+    status: "נדחה",
+  });
+  await clearAssignmentForDate(existing.student_id, existing.date);
+  return updated;
 }
 
 export async function deleteAbsenceRequest(id) {

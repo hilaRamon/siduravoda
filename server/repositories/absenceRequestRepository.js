@@ -24,7 +24,7 @@ export async function find(filter = {}, { sort = { created_date: -1 }, limit } =
 
 export async function updateById(id, data) {
   const doc = await AbsenceRequest.findByIdAndUpdate(id, data, {
-    new: true,
+    returnDocument: "after",
     runValidators: true,
   });
   return toJson(doc);

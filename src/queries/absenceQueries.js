@@ -10,6 +10,7 @@ export const absenceKeys = {
 
 function invalidateAbsenceQueries(queryClient) {
   queryClient.invalidateQueries({ queryKey: absenceKeys.all });
+  queryClient.invalidateQueries({ queryKey: ["assignments"] });
 }
 
 export function useAbsenceRequests(filters = {}, options = {}) {
