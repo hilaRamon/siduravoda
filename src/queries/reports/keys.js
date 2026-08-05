@@ -6,7 +6,6 @@ export const reportKeys = {
     { startDate, endDate, workplaces, farms, groupBy },
   ],
   workplaces: () => [...reportKeys.all, "workplaces"],
-  students: () => [...reportKeys.all, "students"],
   studentWork: ({ startDate, endDate, students }) => [
     ...reportKeys.all,
     "student-work",

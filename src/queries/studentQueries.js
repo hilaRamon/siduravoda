@@ -1,12 +1,16 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
-import { reportKeys } from "./keys";
 
-export function useStudents() {
+export const studentKeys = {
+  all: ["students"],
+};
+
+export function useStudents(options = {}) {
   const query = useQuery({
-    queryKey: reportKeys.students(),
-    queryFn: () => base44.entities.Student.list(),
+    queryKey: studentKeys.all,
+    queryFn: () => base44.entities.Student.list("-created_date"),
+    ...options,
   });
 
   const students = query.data ?? [];
