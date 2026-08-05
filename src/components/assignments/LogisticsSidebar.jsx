@@ -3,8 +3,18 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Truck, Clock, Check, ChevronDown, ChevronUp } from 'lucide-react';
 import VehicleSlot from './VehicleSlot';
+import { useFarmerRequestsByDate } from '@/queries/farmerRequestQueries';
 
-function WorkplaceLogisticsCard({ date, workplaceId, workplaceName, studentCount, logistics, allLogistics, onSave }) {
+function WorkplaceLogisticsCard({
+  date,
+  workplaceId,
+  workplaceName,
+  studentCount,
+  requestedVolunteers,
+  logistics,
+  allLogistics,
+  onSave,
+}) {
   const [expanded, setExpanded] = useState(false);
 
   const { data: vehicles = [] } = useQuery({
@@ -63,6 +73,14 @@ function WorkplaceLogisticsCard({ date, workplaceId, workplaceName, studentCount
           <span className="text-xs bg-primary/10 text-primary font-medium px-2 py-0.5 rounded-full shrink-0 leading-none">
             {studentCount}
           </span>
+          {requestedVolunteers != null && (
+            <span
+              className="text-xs bg-orange-100 text-orange-600 font-medium px-2 py-0.5 rounded-full shrink-0 leading-none"
+              title="מתנדבים מבוקשים"
+            >
+              {requestedVolunteers}
+            </span>
+          )}
         </div>
         {expanded
           ? <ChevronUp size={14} className="text-muted-foreground shrink-0" />
@@ -128,6 +146,8 @@ export default function LogisticsSidebar({ date, assignments }) {
     queryFn: () => base44.entities.WorkplaceLogistics.filter({ date }),
   });
 
+  const { data: farmerRequests = [] } = useFarmerRequestsByDate(date);
+
   const logisticsMap = useMemo(() => {
     const map = {};
     logisticsList.forEach(l => {
@@ -138,6 +158,25 @@ export default function LogisticsSidebar({ date, assignments }) {
     });
     return map;
   }, [logisticsList]);
+
+  const requestByWorkplace = useMemo(() => {
+    const map = {};
+    farmerRequests.forEach((r) => {
+      if (!r.workplace_id) return;
+      if (!map[r.workplace_id]) {
+        map[r.workplace_id] = {
+          name: r.workplace_name || '',
+          requested: null,
+        };
+      }
+      if (r.workplace_name) map[r.workplace_id].name = r.workplace_name;
+      if (r.requested_volunteers != null) {
+        map[r.workplace_id].requested =
+          (map[r.workplace_id].requested ?? 0) + r.requested_volunteers;
+      }
+    });
+    return map;
+  }, [farmerRequests]);
 
   const activeWorkplaces = useMemo(() => {
     const assignmentByStudent = {};
@@ -156,11 +195,25 @@ export default function LogisticsSidebar({ date, assignments }) {
         if (!map[a.workplace_id]) map[a.workplace_id] = { name: a.workplace_name, students: new Set() };
         map[a.workplace_id].students.add(a.student_id);
       });
+
+    Object.entries(requestByWorkplace).forEach(([id, req]) => {
+      if (!map[id]) {
+        map[id] = { name: req.name, students: new Set() };
+      } else if (req.name && !map[id].name) {
+        map[id].name = req.name;
+      }
+    });
+
     return Object.entries(map)
-      .filter(([, v]) => v.students.size > 0)
+      .filter(([id, v]) => v.students.size > 0 || requestByWorkplace[id])
       .sort(([, a], [, b]) => a.name.localeCompare(b.name, 'he'))
-      .map(([id, v]) => ({ id, name: v.name, count: v.students.size }));
-  }, [assignments]);
+      .map(([id, v]) => ({
+        id,
+        name: v.name,
+        count: v.students.size,
+        requestedVolunteers: requestByWorkplace[id]?.requested ?? null,
+      }));
+  }, [assignments, requestByWorkplace]);
 
   const handleSave = async (workplaceId, workplaceName, data) => {
     const existing = logisticsMap[workplaceId];
@@ -198,6 +251,7 @@ export default function LogisticsSidebar({ date, assignments }) {
             workplaceId={wp.id}
             workplaceName={wp.name}
             studentCount={wp.count}
+            requestedVolunteers={wp.requestedVolunteers}
             logistics={logisticsMap[wp.id]}
             allLogistics={logisticsList}
             onSave={handleSave}

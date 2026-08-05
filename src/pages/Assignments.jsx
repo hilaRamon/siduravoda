@@ -1,5 +1,5 @@
-import { useState, useMemo } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState, useMemo, useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { absenceApi } from "@/api/absenceApi";
 import { Button } from "@/components/ui/button";
@@ -11,44 +11,36 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   ChevronRight,
   ChevronLeft,
   Copy,
   CalendarDays,
-  X,
-  ChevronsUpDown,
   Pencil,
   UserPlus,
 } from "lucide-react";
 import DailyReportPDFButton from "@/components/reports/DailyReportPDFButton";
 import LogisticsSidebar from "@/components/assignments/LogisticsSidebar";
+import {
+  EditableNumberCell,
+  RoleCell,
+  WorkplaceCell,
+} from "@/components/assignments/AssignmentCells";
+import {
+  AddGuestDialog,
+  BulkEditDialog,
+  CloneDialog,
+  CohortSelectDialog,
+} from "@/components/assignments/AssignmentDialogs";
 import { format, addDays, subDays } from "date-fns";
 import { useAppSettings } from "@/queries/useAppSettings";
-import {
-  useAbsenceRequests,
-  absenceKeys,
-} from "@/queries/absenceQueries";
+import { useAbsenceRequests, absenceKeys } from "@/queries/absenceQueries";
+import { assignmentKeys, useAssignments } from "@/queries/assignmentQueries";
+import { useStudents } from "@/queries/studentQueries";
+import { useWorkplaces } from "@/queries/workplaceQueries";
+import { useRoles } from "@/queries/roleQueries";
+import { useFarmerRequestsByDate } from "@/queries/farmerRequestQueries";
 import {
   getAssignmentDefaults,
   getDisplayRate,
@@ -59,6 +51,40 @@ import {
 import { showAlert } from "@/components/AppAlert";
 
 const NOT_WORKING_WORKPLACE_NAME = "תתת - לא עובד";
+const REQUEST_FULFILLED_SNACKBAR_MS = 4000;
+
+function dedupeLatestAssignments(assignmentList) {
+  const byStudent = {};
+  assignmentList.forEach((a) => {
+    const existing = byStudent[a.student_id];
+    if (
+      !existing ||
+      (a.updated_date || a.created_date) >
+        (existing.updated_date || existing.created_date)
+    ) {
+      byStudent[a.student_id] = a;
+    }
+  });
+  return Object.values(byStudent);
+}
+
+function countStudentsAtWorkplace(assignmentList, workplaceId) {
+  return dedupeLatestAssignments(assignmentList).filter(
+    (a) => a.workplace_id === workplaceId,
+  ).length;
+}
+
+function getRequestedVolunteers(farmerRequests, workplaceId) {
+  const forWp = farmerRequests.filter((r) => r.workplace_id === workplaceId);
+  if (forWp.length === 0) return null;
+  let sum = null;
+  forWp.forEach((r) => {
+    if (r.requested_volunteers != null) {
+      sum = (sum ?? 0) + r.requested_volunteers;
+    }
+  });
+  return sum;
+}
 
 async function bulkUpdateAssignments({ toCreate = [], toUpdate = [] }) {
   await Promise.all(
@@ -109,199 +135,6 @@ async function warnIfNoAgreement(date, workplace) {
   return confirmed;
 }
 
-function WorkplaceCell({
-  student,
-  assignment,
-  workplaces,
-  onAssign,
-  onRemove,
-}) {
-  const [open, setOpen] = useState(false);
-  const [search, setSearch] = useState("");
-
-  const filteredWorkplaces = workplaces.filter(
-    (w) => !search || w.name.includes(search),
-  );
-
-  const handleSelect = async (workplace) => {
-    setOpen(false);
-    setSearch("");
-    if (!workplace) return;
-    const canAssign = await onAssign(student, workplace, assignment);
-    if (!canAssign) setOpen(true);
-  };
-
-  const selectedName = assignment
-    ? workplaces.find((w) => w.id === assignment.workplace_id)?.name ||
-      assignment.workplace_name
-    : null;
-
-  return (
-    <td className="px-3 py-2 border-b border-border">
-      <div className="flex items-center gap-1">
-        <Popover
-          open={open}
-          onOpenChange={(v) => {
-            setOpen(v);
-            if (!v) setSearch("");
-          }}
-        >
-          <PopoverTrigger asChild>
-            <button
-              className={`h-8 text-xs w-full border rounded-md px-2 flex items-center justify-between transition-colors ${
-                assignment
-                  ? "bg-primary/10 border-primary/30 text-primary font-medium hover:bg-primary/20"
-                  : "bg-secondary/50 border-dashed text-muted-foreground hover:bg-secondary hover:border-border"
-              }`}
-            >
-              <span className="truncate">{selectedName || "+ שבץ"}</span>
-              <ChevronsUpDown size={12} className="shrink-0 opacity-50 mr-1" />
-            </button>
-          </PopoverTrigger>
-          <PopoverContent className="w-64 p-0" align="start">
-            <Command shouldFilter={false}>
-              <CommandInput
-                placeholder="חיפוש מקום עבודה..."
-                className="h-8 text-xs"
-                value={search}
-                onValueChange={setSearch}
-              />
-              <CommandList>
-                <CommandEmpty>לא נמצא</CommandEmpty>
-                <CommandGroup>
-                  {filteredWorkplaces.map((w) => (
-                    <CommandItem
-                      key={w.id}
-                      value={w.name}
-                      onSelect={() => handleSelect(w)}
-                      className="text-xs cursor-pointer"
-                    >
-                      {w.name}
-                    </CommandItem>
-                  ))}
-                </CommandGroup>
-              </CommandList>
-            </Command>
-          </PopoverContent>
-        </Popover>
-        {assignment && (
-          <button
-            onClick={() => onRemove(assignment.id)}
-            className="shrink-0 p-1 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
-          >
-            <X size={12} />
-          </button>
-        )}
-      </div>
-    </td>
-  );
-}
-
-function RoleCell({ assignment, roles, onUpdateRole }) {
-  const handleRoleChange = (v) => {
-    if (!assignment) return;
-    onUpdateRole(assignment, v);
-  };
-
-  return (
-    <td className="px-3 py-2 border-b border-border">
-      <Select
-        value={assignment?.role || ""}
-        onValueChange={handleRoleChange}
-        disabled={!assignment}
-      >
-        <SelectTrigger
-          className={`h-8 text-xs w-full border ${assignment ? "bg-secondary/50 border-border" : "bg-transparent border-dashed text-muted-foreground opacity-50"}`}
-        >
-          <SelectValue placeholder="— בחר תפקיד —" />
-        </SelectTrigger>
-        <SelectContent align="start">
-          <SelectItem value="none">— ללא תפקיד —</SelectItem>
-          {roles.map((r) => (
-            <SelectItem key={r.id} value={r.name}>
-              {r.name}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </td>
-  );
-}
-
-function EditableNumberCell({
-  value,
-  defaultValue,
-  assignment,
-  field,
-  onUpdate,
-  formatDisplay,
-  parseCommit,
-}) {
-  const [editing, setEditing] = useState(false);
-  const [localVal, setLocalVal] = useState("");
-
-  const rawValue =
-    value != null && value !== "" && value !== undefined ? value : defaultValue;
-  const displayValue = formatDisplay ? formatDisplay(rawValue) : rawValue;
-
-  const startEdit = () => {
-    if (!assignment) return;
-    setLocalVal(displayValue != null ? String(displayValue) : "");
-    setEditing(true);
-  };
-
-  const commit = async () => {
-    setEditing(false);
-    const num = localVal === "" ? null : parseFloat(localVal);
-    const stored =
-      num == null ? null : parseCommit ? parseCommit(num) : num;
-    const currentStored =
-      value != null && value !== "" && value !== undefined ? value : null;
-    if (stored !== currentStored) {
-      await onUpdate(assignment, field, stored);
-    }
-  };
-
-  if (!assignment) {
-    return (
-      <td className="px-3 py-2 border-b border-border text-muted-foreground text-xs text-center">
-        —
-      </td>
-    );
-  }
-
-  return (
-    <td className="px-3 py-2 border-b border-border">
-      {editing ? (
-        <input
-          autoFocus
-          type="number"
-          value={localVal}
-          onChange={(e) => setLocalVal(e.target.value)}
-          onBlur={commit}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") commit();
-            if (e.key === "Escape") setEditing(false);
-          }}
-          className="w-full h-8 border border-primary rounded-md px-2 text-xs focus:outline-none focus:ring-1 focus:ring-primary bg-card"
-          step="0.5"
-        />
-      ) : (
-        <button
-          onClick={startEdit}
-          className="w-full h-8 text-xs text-right px-2 rounded-md hover:bg-secondary/60 transition-colors flex items-center justify-between group"
-        >
-          <span>{displayValue ?? "—"}</span>
-          <Pencil
-            size={10}
-            className="opacity-0 group-hover:opacity-40 transition-opacity"
-          />
-        </button>
-      )}
-    </td>
-  );
-}
-
 export default function Assignments() {
   const [date, setDate] = useState(format(new Date(), "yyyy-MM-dd"));
   const [cloning, setCloning] = useState(false);
@@ -329,6 +162,7 @@ export default function Assignments() {
   const [guestName, setGuestName] = useState("");
   const [showCohortSelectDialog, setShowCohortSelectDialog] = useState(false);
   const [cohortDialogSelected, setCohortDialogSelected] = useState([]);
+  const [snackbar, setSnackbar] = useState(null);
 
   const queryClient = useQueryClient();
   const { data: appSettings = normalizeAppSettings() } = useAppSettings();
@@ -341,36 +175,46 @@ export default function Assignments() {
   const parseRateInput = (displayRate) =>
     parseDisplayRateInput(displayRate, appSettings);
 
-  const { data: assignments = [] } = useQuery({
-    queryKey: ["assignments", date],
-    queryFn: () =>
-      base44.entities.Assignment.filter({ date }, "-created_date", 2000),
-  });
+  const { data: assignments = [] } = useAssignments(date);
 
-  const { data: students = [] } = useQuery({
-    queryKey: ["students"],
-    queryFn: () => base44.entities.Student.list("-created_date"),
-  });
+  const { students } = useStudents();
 
-  const { data: workplaces = [] } = useQuery({
-    queryKey: ["workplaces"],
-    queryFn: () => base44.entities.Workplace.list("name", 1000),
-    select: (data) =>
-      [...data].sort((a, b) =>
-        (a.name || "").localeCompare(b.name || "", "he"),
-      ),
-  });
+  const { data: workplaces = [] } = useWorkplaces();
 
-  const { data: roles = [] } = useQuery({
-    queryKey: ["roles"],
-    queryFn: () => base44.entities.Role.list(),
-  });
+  const { data: roles = [] } = useRoles();
+
+  const { data: farmerRequests = [] } = useFarmerRequestsByDate(date);
 
   const { data: approvedAbsences = [] } = useAbsenceRequests({
     startDate: date,
     endDate: date,
     status: "אושר",
   });
+
+  useEffect(() => {
+    if (!snackbar) return;
+    const timer = setTimeout(
+      () => setSnackbar(null),
+      REQUEST_FULFILLED_SNACKBAR_MS,
+    );
+    return () => clearTimeout(timer);
+  }, [snackbar]);
+
+  const notifyIfRequestFulfilled = (
+    workplaceId,
+    workplaceName,
+    prevCount,
+    nextCount,
+  ) => {
+    const requested = getRequestedVolunteers(farmerRequests, workplaceId);
+    if (requested == null) return;
+    if (prevCount >= requested || nextCount < requested) return;
+    const message =
+      nextCount > requested
+        ? `השיבוץ ל${workplaceName} עבר את הבקשה (${nextCount} משובצים מתוך ${requested})`
+        : `השיבוץ ל${workplaceName} הושלם לפי הבקשה (${requested} מתנדבים)`;
+    setSnackbar(message);
+  };
 
   const absentByStudentId = useMemo(() => {
     const map = {};
@@ -396,7 +240,7 @@ export default function Assignments() {
     if (!confirmed) return false;
     await absenceApi.reject(absenceRequest.id);
     queryClient.invalidateQueries({ queryKey: absenceKeys.all });
-    queryClient.invalidateQueries({ queryKey: ["assignments", date] });
+    queryClient.invalidateQueries({ queryKey: assignmentKeys.byDate(date) });
     return true;
   };
 
@@ -560,7 +404,23 @@ export default function Assignments() {
         hours: assignmentDefaults.hours,
       });
     }
-    queryClient.invalidateQueries({ queryKey: ["assignments", date] });
+
+    const prevCount = countStudentsAtWorkplace(assignments, workplace.id);
+    const currentForStudent = dedupeLatestAssignments(assignments).find(
+      (a) => a.student_id === student.id,
+    );
+    const nextCount =
+      currentForStudent?.workplace_id === workplace.id
+        ? prevCount
+        : prevCount + 1;
+    notifyIfRequestFulfilled(
+      workplace.id,
+      workplace.name,
+      prevCount,
+      nextCount,
+    );
+
+    queryClient.invalidateQueries({ queryKey: assignmentKeys.byDate(date) });
     return true;
   };
 
@@ -569,27 +429,26 @@ export default function Assignments() {
     const absence =
       assignment?.student_id && absentByStudentId[assignment.student_id];
     if (absence) {
-      const student =
-        students.find((s) => s.id === assignment.student_id) || {
-          full_name: assignment.student_name || "התלמיד",
-        };
+      const student = students.find((s) => s.id === assignment.student_id) || {
+        full_name: assignment.student_name || "התלמיד",
+      };
       await offerRejectAbsence(student, absence);
       return;
     }
     await base44.entities.Assignment.delete(id);
-    queryClient.invalidateQueries({ queryKey: ["assignments", date] });
+    queryClient.invalidateQueries({ queryKey: assignmentKeys.byDate(date) });
   };
 
   const handleUpdateRole = async (assignment, roleName) => {
     await base44.entities.Assignment.update(assignment.id, {
       role: roleName === "none" ? "" : roleName,
     });
-    queryClient.invalidateQueries({ queryKey: ["assignments", date] });
+    queryClient.invalidateQueries({ queryKey: assignmentKeys.byDate(date) });
   };
 
   const handleUpdateField = async (assignment, field, value) => {
     await base44.entities.Assignment.update(assignment.id, { [field]: value });
-    queryClient.invalidateQueries({ queryKey: ["assignments", date] });
+    queryClient.invalidateQueries({ queryKey: assignmentKeys.byDate(date) });
   };
 
   const handleBulkSave = async () => {
@@ -627,8 +486,7 @@ export default function Assignments() {
         assignmentById[selId] || assignmentByStudentId[selId];
       const studentId = existingAssignment?.student_id || selId;
       const isAbsent = !!absentByStudentId[studentId];
-      const changingWorkplace =
-        wp && wp.name !== NOT_WORKING_WORKPLACE_NAME;
+      const changingWorkplace = wp && wp.name !== NOT_WORKING_WORKPLACE_NAME;
 
       if (isAbsent && changingWorkplace) {
         skippedAbsent++;
@@ -646,9 +504,7 @@ export default function Assignments() {
         if (bulkHours !== "") fullRecord.hours = parseFloat(bulkHours);
         if (bulkRate !== "") {
           const parsedRate = parseFloat(bulkRate);
-          fullRecord.rate = dailyMode
-            ? parseRateInput(parsedRate)
-            : parsedRate;
+          fullRecord.rate = dailyMode ? parseRateInput(parsedRate) : parsedRate;
         }
         toUpdate.push({ id, fullRecord });
       } else if (wp) {
@@ -660,8 +516,16 @@ export default function Assignments() {
             student_name: student.full_name,
             workplace_id: wp.id,
             workplace_name: wp.name,
-            rate: bulkRate !== "" ? (dailyMode ? parseRateInput(parseFloat(bulkRate)) : parseFloat(bulkRate)) : assignmentDefaults.rate,
-            hours: bulkHours !== "" ? parseFloat(bulkHours) : assignmentDefaults.hours,
+            rate:
+              bulkRate !== ""
+                ? dailyMode
+                  ? parseRateInput(parseFloat(bulkRate))
+                  : parseFloat(bulkRate)
+                : assignmentDefaults.rate,
+            hours:
+              bulkHours !== ""
+                ? parseFloat(bulkHours)
+                : assignmentDefaults.hours,
           });
         }
       }
@@ -708,7 +572,32 @@ export default function Assignments() {
       }
       setBulkProgress(100);
       await new Promise((r) => setTimeout(r, 400)); // brief moment to show 100%
-      queryClient.invalidateQueries({ queryKey: ["assignments", date] });
+
+      if (wp) {
+        const byStudent = {};
+        dedupeLatestAssignments(assignments).forEach((a) => {
+          byStudent[a.student_id] = a;
+        });
+        const prevCount = Object.values(byStudent).filter(
+          (a) => a.workplace_id === wp.id,
+        ).length;
+        toUpdate.forEach(({ fullRecord }) => {
+          if (!fullRecord.student_id) return;
+          byStudent[fullRecord.student_id] = {
+            ...byStudent[fullRecord.student_id],
+            ...fullRecord,
+          };
+        });
+        toCreate.forEach((record) => {
+          byStudent[record.student_id] = record;
+        });
+        const nextCount = Object.values(byStudent).filter(
+          (a) => a.workplace_id === wp.id,
+        ).length;
+        notifyIfRequestFulfilled(wp.id, wp.name, prevCount, nextCount);
+      }
+
+      queryClient.invalidateQueries({ queryKey: assignmentKeys.byDate(date) });
       setSelectedIds(new Set());
       setShowBulkDialog(false);
       setBulkWorkplace("");
@@ -728,9 +617,7 @@ export default function Assignments() {
   const handleAddGuest = async () => {
     if (!guestName.trim()) return;
     const guestId = `guest_${Date.now()}`;
-    const defaultGuestWp = workplaces.find(
-      (w) => w.name === "אאא- לפני שיבוץ",
-    );
+    const defaultGuestWp = workplaces.find((w) => w.name === "אאא- לפני שיבוץ");
     await base44.entities.Assignment.create({
       date,
       student_id: guestId,
@@ -740,7 +627,7 @@ export default function Assignments() {
       rate: assignmentDefaults.rate,
       hours: assignmentDefaults.hours,
     });
-    queryClient.invalidateQueries({ queryKey: ["assignments", date] });
+    queryClient.invalidateQueries({ queryKey: assignmentKeys.byDate(date) });
     setGuestName("");
     setShowAddGuestDialog(false);
   };
@@ -916,7 +803,7 @@ export default function Assignments() {
       }
 
       const totalCloned = toCreate.length + toUpdate.length;
-      queryClient.invalidateQueries({ queryKey: ["assignments"] });
+      queryClient.invalidateQueries({ queryKey: assignmentKeys.all });
     } catch (error) {
       await showAlert(`שגיאה בשכפול: ${error.message || "נסה שוב"}`);
     } finally {
@@ -965,7 +852,11 @@ export default function Assignments() {
             </p>
           </div>
           <div className="flex gap-2 flex-wrap">
-            <DailyReportPDFButton key={date} date={date} assignments={assignments} />
+            <DailyReportPDFButton
+              key={date}
+              date={date}
+              assignments={assignments}
+            />
             <Button
               variant="outline"
               onClick={() => {
@@ -1052,315 +943,60 @@ export default function Assignments() {
           </div>
         )}
 
-        {/* Cohort Select Dialog */}
-        <Dialog
+        <CohortSelectDialog
           open={showCohortSelectDialog}
           onOpenChange={setShowCohortSelectDialog}
-        >
-          <DialogContent className="max-w-sm" dir="rtl">
-            <DialogHeader>
-              <DialogTitle>בחירה לפי מחזור</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-3 mt-2">
-              <p className="text-xs text-muted-foreground">
-                בחר מחזורים — כל תלמידי המחזור יסומנו בטבלה.
-              </p>
-              <div className="grid grid-cols-2 gap-1">
-                {cohorts.map((c) => (
-                  <label
-                    key={c}
-                    className="flex items-center gap-2 cursor-pointer hover:bg-secondary/30 rounded-lg px-3 py-2 transition-colors"
-                  >
-                    <Checkbox
-                      checked={cohortDialogSelected.includes(c)}
-                      onCheckedChange={(checked) => {
-                        setCohortDialogSelected((prev) =>
-                          checked ? [...prev, c] : prev.filter((x) => x !== c),
-                        );
-                      }}
-                    />
-                    <span className="text-sm font-medium truncate">{c}</span>
-                  </label>
-                ))}
-              </div>
-              <div className="flex gap-2 justify-end pt-2">
-                <Button
-                  variant="outline"
-                  onClick={() => setShowCohortSelectDialog(false)}
-                >
-                  ביטול
-                </Button>
-                <Button
-                  disabled={cohortDialogSelected.length === 0}
-                  onClick={() => {
-                    const ids = new Set();
-                    filteredStudents.forEach((s) => {
-                      if (cohortDialogSelected.includes(s.cohort)) {
-                        ids.add(assignmentByStudent[s.id]?.id || s.id);
-                      }
-                    });
-                    setSelectedIds(ids);
-                    setShowCohortSelectDialog(false);
-                  }}
-                >
-                  אשר (
-                  {cohortDialogSelected.length > 0
-                    ? filteredStudents.filter((s) =>
-                        cohortDialogSelected.includes(s.cohort),
-                      ).length
-                    : 0}{" "}
-                  תלמידים)
-                </Button>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
+          cohorts={cohorts}
+          selected={cohortDialogSelected}
+          onSelectedChange={setCohortDialogSelected}
+          filteredStudents={filteredStudents}
+          assignmentByStudent={assignmentByStudent}
+          onConfirm={setSelectedIds}
+        />
 
-        {/* Add Guest Dialog */}
-        <Dialog open={showAddGuestDialog} onOpenChange={setShowAddGuestDialog}>
-          <DialogContent className="max-w-sm" dir="rtl">
-            <DialogHeader>
-              <DialogTitle>הוספת תלמיד יומי</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4 mt-2">
-              <p className="text-xs text-muted-foreground">
-                תלמיד זה יופיע רק ביום {date} ולא יועתק בשכפול שיבוצים.
-              </p>
-              <Input
-                autoFocus
-                placeholder="שם התלמיד..."
-                value={guestName}
-                onChange={(e) => setGuestName(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") handleAddGuest();
-                }}
-                className="h-9 text-sm"
-              />
-              <div className="flex gap-2 justify-end pt-1">
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setShowAddGuestDialog(false);
-                    setGuestName("");
-                  }}
-                >
-                  ביטול
-                </Button>
-                <Button onClick={handleAddGuest} disabled={!guestName.trim()}>
-                  <UserPlus size={14} className="ml-2" /> הוסף
-                </Button>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
+        <AddGuestDialog
+          open={showAddGuestDialog}
+          onOpenChange={setShowAddGuestDialog}
+          date={date}
+          guestName={guestName}
+          onGuestNameChange={setGuestName}
+          onAdd={handleAddGuest}
+        />
 
-        {/* Clone Dialog */}
-        <Dialog
+        <CloneDialog
           open={showCloneDialog}
           onOpenChange={(v) => {
             setShowCloneDialog(v);
             if (!v) setCloning(false);
           }}
-        >
-          <DialogContent className="max-w-sm" dir="rtl">
-            <DialogHeader>
-              <DialogTitle>שכפול שיבוצים</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4 mt-2">
-              <p className="text-sm text-muted-foreground">
-                שכפל את{" "}
-                {
-                  Object.values(assignmentByStudent).filter(
-                    (a) => !a.student_id?.startsWith("guest_"),
-                  ).length
-                }{" "}
-                השיבוצים מתאריך <strong>{date}</strong> לתאריך:
-              </p>
-              <input
-                type="date"
-                value={cloneTargetDate}
-                onChange={(e) => setCloneTargetDate(e.target.value)}
-                className="w-full border border-border rounded-lg px-3 py-2 text-sm bg-card focus:outline-none focus:ring-2 focus:ring-primary/30"
-              />
-              {cloneTargetDate &&
-                new Date(cloneTargetDate + "T12:00:00").getDay() === 0 && (
-                  <div className="bg-primary/10 border border-primary/30 rounded-lg px-3 py-2 text-xs text-primary">
-                    📅 יום ראשון — שיבוץ אוטומטי לפי <strong>סטטוס מרחק</strong>{" "}
-                    (קרוב / רחוק)
-                  </div>
-                )}
-              {cloneTargetDate &&
-                new Date(cloneTargetDate + "T12:00:00").getDay() !== 0 && (
-                  <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-800">
-                    👥 תלמידי <strong>צוות</strong>: אם היום הוא יום חופשי שלהם
-                    → יוגדרו "תתת - לא עובד". אחרת → יישארו ללא שיבוץ.
-                  </div>
-                )}
-              {cloning && (
-                <div className="space-y-2 pt-1">
-                  <div className="flex justify-between items-center text-xs">
-                    <span className="text-muted-foreground">{cloneStep}</span>
-                    <span className="font-semibold text-primary">
-                      {cloneProgress}%
-                    </span>
-                  </div>
-                  <div className="w-full h-3 bg-secondary rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-primary rounded-full transition-all duration-500 ease-out"
-                      style={{ width: `${cloneProgress}%` }}
-                    />
-                  </div>
-                </div>
-              )}
-              <div className="flex gap-2 justify-end pt-1">
-                <Button
-                  variant="outline"
-                  onClick={() => setShowCloneDialog(false)}
-                  disabled={cloning}
-                >
-                  ביטול
-                </Button>
-                <Button
-                  onClick={handleCloneDay}
-                  disabled={!cloneTargetDate || cloning}
-                >
-                  <Copy size={14} className="ml-2" />{" "}
-                  {cloning ? "משכפל..." : "שכפל"}
-                </Button>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
+          assignmentByStudent={assignmentByStudent}
+          date={date}
+          cloneTargetDate={cloneTargetDate}
+          onCloneTargetDateChange={setCloneTargetDate}
+          cloning={cloning}
+          cloneStep={cloneStep}
+          cloneProgress={cloneProgress}
+          onClone={handleCloneDay}
+        />
 
-        {/* Bulk Edit Dialog */}
-        <Dialog open={showBulkDialog} onOpenChange={setShowBulkDialog}>
-          <DialogContent className="max-w-sm" dir="rtl">
-            <DialogHeader>
-              <DialogTitle>עריכה מרובה — {selectedIds.size} שורות</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4 mt-2">
-              <p className="text-xs text-muted-foreground">
-                השדות שתמלא יעודכנו בכל השורות הנבחרות. שדה ריק לא ישתנה.
-              </p>
-
-              <div>
-                <label className="text-xs font-medium text-muted-foreground mb-1 block">
-                  מקום עבודה
-                </label>
-                <Popover
-                  open={bulkWorkplaceOpen}
-                  onOpenChange={setBulkWorkplaceOpen}
-                >
-                  <PopoverTrigger asChild>
-                    <button className="h-9 w-full border border-border rounded-md px-3 text-sm flex items-center justify-between bg-card hover:bg-secondary/40 transition-colors">
-                      <span
-                        className={bulkWorkplace ? "" : "text-muted-foreground"}
-                      >
-                        {bulkWorkplace
-                          ? workplaces.find((w) => w.id === bulkWorkplace)?.name
-                          : "— ללא שינוי —"}
-                      </span>
-                      <ChevronsUpDown size={14} className="opacity-50" />
-                    </button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-72 p-0" align="start">
-                    <Command>
-                      <CommandInput
-                        placeholder="חיפוש..."
-                        className="h-8 text-xs"
-                      />
-                      <CommandList>
-                        <CommandEmpty>לא נמצא</CommandEmpty>
-                        <CommandGroup>
-                          <CommandItem
-                            value="__clear__"
-                            onSelect={() => {
-                              setBulkWorkplace("");
-                              setBulkWorkplaceOpen(false);
-                            }}
-                            className="text-xs text-muted-foreground"
-                          >
-                            — ללא שינוי —
-                          </CommandItem>
-                          {workplaces.map((w) => (
-                            <CommandItem
-                              key={w.id}
-                              value={w.name}
-                              onSelect={() => {
-                                setBulkWorkplace(w.id);
-                                setBulkWorkplaceOpen(false);
-                              }}
-                              className="text-xs"
-                            >
-                              {w.name}
-                            </CommandItem>
-                          ))}
-                        </CommandGroup>
-                      </CommandList>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
-              </div>
-
-              <div>
-                <label className="text-xs font-medium text-muted-foreground mb-1 block">
-                  כמות שעות
-                </label>
-                <Input
-                  type="number"
-                  step="0.5"
-                  value={bulkHours}
-                  onChange={(e) => setBulkHours(e.target.value)}
-                  placeholder="— ללא שינוי —"
-                  className="h-9 text-sm"
-                />
-              </div>
-
-              <div>
-                <label className="text-xs font-medium text-muted-foreground mb-1 block">
-                  {rateColumnLabel}
-                </label>
-                <Input
-                  type="number"
-                  value={bulkRate}
-                  onChange={(e) => setBulkRate(e.target.value)}
-                  placeholder="— ללא שינוי —"
-                  className="h-9 text-sm"
-                />
-              </div>
-
-              {bulkSaving && (
-                <div className="space-y-2">
-                  <div className="flex justify-between text-xs text-muted-foreground">
-                    <span>מעדכן שורות...</span>
-                    <span className="font-medium text-primary">
-                      {bulkProgress}%
-                    </span>
-                  </div>
-                  <div className="w-full h-3 bg-secondary rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-primary rounded-full transition-all duration-500 ease-out"
-                      style={{ width: `${bulkProgress}%` }}
-                    />
-                  </div>
-                </div>
-              )}
-
-              <div className="flex gap-2 justify-end pt-1">
-                <Button
-                  variant="outline"
-                  onClick={() => setShowBulkDialog(false)}
-                  disabled={bulkSaving}
-                >
-                  ביטול
-                </Button>
-                <Button onClick={handleBulkSave} disabled={bulkSaving}>
-                  {bulkSaving ? "מעדכן..." : "שמור שינויים"}
-                </Button>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
+        <BulkEditDialog
+          open={showBulkDialog}
+          onOpenChange={setShowBulkDialog}
+          selectedCount={selectedIds.size}
+          workplaces={workplaces}
+          bulkWorkplace={bulkWorkplace}
+          onBulkWorkplaceChange={setBulkWorkplace}
+          bulkWorkplaceOpen={bulkWorkplaceOpen}
+          onBulkWorkplaceOpenChange={setBulkWorkplaceOpen}
+          bulkHours={bulkHours}
+          onBulkHoursChange={setBulkHours}
+          bulkRate={bulkRate}
+          onBulkRateChange={setBulkRate}
+          rateColumnLabel={rateColumnLabel}
+          bulkSaving={bulkSaving}
+          bulkProgress={bulkProgress}
+          onSave={handleBulkSave}
+        />
 
         {/* Main Table */}
         <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden">
@@ -1538,7 +1174,9 @@ export default function Assignments() {
                         assignment={assignment}
                         field="rate"
                         onUpdate={handleUpdateField}
-                        formatDisplay={dailyMode ? formatRateDisplay : undefined}
+                        formatDisplay={
+                          dailyMode ? formatRateDisplay : undefined
+                        }
                         parseCommit={dailyMode ? parseRateInput : undefined}
                       />
                       <EditableNumberCell
@@ -1651,6 +1289,11 @@ export default function Assignments() {
         </div>
       </div>
       <LogisticsSidebar date={date} assignments={assignments} />
+      {snackbar && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[100] bg-card border border-border shadow-lg rounded-xl px-4 py-3 text-sm font-medium max-w-md text-center">
+          {snackbar}
+        </div>
+      )}
     </div>
   );
 }

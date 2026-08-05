@@ -5,7 +5,7 @@ import { X, Download, Loader2 } from 'lucide-react';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { useStudentWorkReport } from '@/queries/reports/useStudentWorkReport';
-import { useStudents } from '@/queries/reports/useStudents';
+import { useStudents } from '@/queries/studentQueries';
 
 export default function StudentWorkReport() {
   const today = new Date().toISOString().slice(0, 10);
