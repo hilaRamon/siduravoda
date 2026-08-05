@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { absenceApi } from "@/api/absenceApi";
@@ -35,17 +35,12 @@ import {
 } from "@/components/assignments/AssignmentDialogs";
 import { format, addDays, subDays } from "date-fns";
 import { useAppSettings } from "@/queries/useAppSettings";
-import {
-  useAbsenceRequests,
-  absenceKeys,
-} from "@/queries/absenceQueries";
-import {
-  assignmentKeys,
-  useAssignments,
-} from "@/queries/assignmentQueries";
+import { useAbsenceRequests, absenceKeys } from "@/queries/absenceQueries";
+import { assignmentKeys, useAssignments } from "@/queries/assignmentQueries";
 import { useStudents } from "@/queries/studentQueries";
 import { useWorkplaces } from "@/queries/workplaceQueries";
 import { useRoles } from "@/queries/roleQueries";
+import { useFarmerRequestsByDate } from "@/queries/farmerRequestQueries";
 import {
   getAssignmentDefaults,
   getDisplayRate,
@@ -56,6 +51,40 @@ import {
 import { showAlert } from "@/components/AppAlert";
 
 const NOT_WORKING_WORKPLACE_NAME = "תתת - לא עובד";
+const REQUEST_FULFILLED_SNACKBAR_MS = 4000;
+
+function dedupeLatestAssignments(assignmentList) {
+  const byStudent = {};
+  assignmentList.forEach((a) => {
+    const existing = byStudent[a.student_id];
+    if (
+      !existing ||
+      (a.updated_date || a.created_date) >
+        (existing.updated_date || existing.created_date)
+    ) {
+      byStudent[a.student_id] = a;
+    }
+  });
+  return Object.values(byStudent);
+}
+
+function countStudentsAtWorkplace(assignmentList, workplaceId) {
+  return dedupeLatestAssignments(assignmentList).filter(
+    (a) => a.workplace_id === workplaceId,
+  ).length;
+}
+
+function getRequestedVolunteers(farmerRequests, workplaceId) {
+  const forWp = farmerRequests.filter((r) => r.workplace_id === workplaceId);
+  if (forWp.length === 0) return null;
+  let sum = null;
+  forWp.forEach((r) => {
+    if (r.requested_volunteers != null) {
+      sum = (sum ?? 0) + r.requested_volunteers;
+    }
+  });
+  return sum;
+}
 
 async function bulkUpdateAssignments({ toCreate = [], toUpdate = [] }) {
   await Promise.all(
@@ -133,6 +162,7 @@ export default function Assignments() {
   const [guestName, setGuestName] = useState("");
   const [showCohortSelectDialog, setShowCohortSelectDialog] = useState(false);
   const [cohortDialogSelected, setCohortDialogSelected] = useState([]);
+  const [snackbar, setSnackbar] = useState(null);
 
   const queryClient = useQueryClient();
   const { data: appSettings = normalizeAppSettings() } = useAppSettings();
@@ -153,11 +183,38 @@ export default function Assignments() {
 
   const { data: roles = [] } = useRoles();
 
+  const { data: farmerRequests = [] } = useFarmerRequestsByDate(date);
+
   const { data: approvedAbsences = [] } = useAbsenceRequests({
     startDate: date,
     endDate: date,
     status: "אושר",
   });
+
+  useEffect(() => {
+    if (!snackbar) return;
+    const timer = setTimeout(
+      () => setSnackbar(null),
+      REQUEST_FULFILLED_SNACKBAR_MS,
+    );
+    return () => clearTimeout(timer);
+  }, [snackbar]);
+
+  const notifyIfRequestFulfilled = (
+    workplaceId,
+    workplaceName,
+    prevCount,
+    nextCount,
+  ) => {
+    const requested = getRequestedVolunteers(farmerRequests, workplaceId);
+    if (requested == null) return;
+    if (prevCount >= requested || nextCount < requested) return;
+    const message =
+      nextCount > requested
+        ? `השיבוץ ל${workplaceName} עבר את הבקשה (${nextCount} משובצים מתוך ${requested})`
+        : `השיבוץ ל${workplaceName} הושלם לפי הבקשה (${requested} מתנדבים)`;
+    setSnackbar(message);
+  };
 
   const absentByStudentId = useMemo(() => {
     const map = {};
@@ -347,6 +404,22 @@ export default function Assignments() {
         hours: assignmentDefaults.hours,
       });
     }
+
+    const prevCount = countStudentsAtWorkplace(assignments, workplace.id);
+    const currentForStudent = dedupeLatestAssignments(assignments).find(
+      (a) => a.student_id === student.id,
+    );
+    const nextCount =
+      currentForStudent?.workplace_id === workplace.id
+        ? prevCount
+        : prevCount + 1;
+    notifyIfRequestFulfilled(
+      workplace.id,
+      workplace.name,
+      prevCount,
+      nextCount,
+    );
+
     queryClient.invalidateQueries({ queryKey: assignmentKeys.byDate(date) });
     return true;
   };
@@ -356,10 +429,9 @@ export default function Assignments() {
     const absence =
       assignment?.student_id && absentByStudentId[assignment.student_id];
     if (absence) {
-      const student =
-        students.find((s) => s.id === assignment.student_id) || {
-          full_name: assignment.student_name || "התלמיד",
-        };
+      const student = students.find((s) => s.id === assignment.student_id) || {
+        full_name: assignment.student_name || "התלמיד",
+      };
       await offerRejectAbsence(student, absence);
       return;
     }
@@ -414,8 +486,7 @@ export default function Assignments() {
         assignmentById[selId] || assignmentByStudentId[selId];
       const studentId = existingAssignment?.student_id || selId;
       const isAbsent = !!absentByStudentId[studentId];
-      const changingWorkplace =
-        wp && wp.name !== NOT_WORKING_WORKPLACE_NAME;
+      const changingWorkplace = wp && wp.name !== NOT_WORKING_WORKPLACE_NAME;
 
       if (isAbsent && changingWorkplace) {
         skippedAbsent++;
@@ -433,9 +504,7 @@ export default function Assignments() {
         if (bulkHours !== "") fullRecord.hours = parseFloat(bulkHours);
         if (bulkRate !== "") {
           const parsedRate = parseFloat(bulkRate);
-          fullRecord.rate = dailyMode
-            ? parseRateInput(parsedRate)
-            : parsedRate;
+          fullRecord.rate = dailyMode ? parseRateInput(parsedRate) : parsedRate;
         }
         toUpdate.push({ id, fullRecord });
       } else if (wp) {
@@ -447,8 +516,16 @@ export default function Assignments() {
             student_name: student.full_name,
             workplace_id: wp.id,
             workplace_name: wp.name,
-            rate: bulkRate !== "" ? (dailyMode ? parseRateInput(parseFloat(bulkRate)) : parseFloat(bulkRate)) : assignmentDefaults.rate,
-            hours: bulkHours !== "" ? parseFloat(bulkHours) : assignmentDefaults.hours,
+            rate:
+              bulkRate !== ""
+                ? dailyMode
+                  ? parseRateInput(parseFloat(bulkRate))
+                  : parseFloat(bulkRate)
+                : assignmentDefaults.rate,
+            hours:
+              bulkHours !== ""
+                ? parseFloat(bulkHours)
+                : assignmentDefaults.hours,
           });
         }
       }
@@ -495,6 +572,31 @@ export default function Assignments() {
       }
       setBulkProgress(100);
       await new Promise((r) => setTimeout(r, 400)); // brief moment to show 100%
+
+      if (wp) {
+        const byStudent = {};
+        dedupeLatestAssignments(assignments).forEach((a) => {
+          byStudent[a.student_id] = a;
+        });
+        const prevCount = Object.values(byStudent).filter(
+          (a) => a.workplace_id === wp.id,
+        ).length;
+        toUpdate.forEach(({ fullRecord }) => {
+          if (!fullRecord.student_id) return;
+          byStudent[fullRecord.student_id] = {
+            ...byStudent[fullRecord.student_id],
+            ...fullRecord,
+          };
+        });
+        toCreate.forEach((record) => {
+          byStudent[record.student_id] = record;
+        });
+        const nextCount = Object.values(byStudent).filter(
+          (a) => a.workplace_id === wp.id,
+        ).length;
+        notifyIfRequestFulfilled(wp.id, wp.name, prevCount, nextCount);
+      }
+
       queryClient.invalidateQueries({ queryKey: assignmentKeys.byDate(date) });
       setSelectedIds(new Set());
       setShowBulkDialog(false);
@@ -515,9 +617,7 @@ export default function Assignments() {
   const handleAddGuest = async () => {
     if (!guestName.trim()) return;
     const guestId = `guest_${Date.now()}`;
-    const defaultGuestWp = workplaces.find(
-      (w) => w.name === "אאא- לפני שיבוץ",
-    );
+    const defaultGuestWp = workplaces.find((w) => w.name === "אאא- לפני שיבוץ");
     await base44.entities.Assignment.create({
       date,
       student_id: guestId,
@@ -752,7 +852,11 @@ export default function Assignments() {
             </p>
           </div>
           <div className="flex gap-2 flex-wrap">
-            <DailyReportPDFButton key={date} date={date} assignments={assignments} />
+            <DailyReportPDFButton
+              key={date}
+              date={date}
+              assignments={assignments}
+            />
             <Button
               variant="outline"
               onClick={() => {
@@ -1070,7 +1174,9 @@ export default function Assignments() {
                         assignment={assignment}
                         field="rate"
                         onUpdate={handleUpdateField}
-                        formatDisplay={dailyMode ? formatRateDisplay : undefined}
+                        formatDisplay={
+                          dailyMode ? formatRateDisplay : undefined
+                        }
                         parseCommit={dailyMode ? parseRateInput : undefined}
                       />
                       <EditableNumberCell
@@ -1183,6 +1289,11 @@ export default function Assignments() {
         </div>
       </div>
       <LogisticsSidebar date={date} assignments={assignments} />
+      {snackbar && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[100] bg-card border border-border shadow-lg rounded-xl px-4 py-3 text-sm font-medium max-w-md text-center">
+          {snackbar}
+        </div>
+      )}
     </div>
   );
 }

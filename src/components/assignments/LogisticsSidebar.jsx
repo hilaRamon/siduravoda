@@ -1,10 +1,9 @@
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Truck, Clock, Check, ChevronDown, ChevronUp } from 'lucide-react';
 import VehicleSlot from './VehicleSlot';
 import { useFarmerRequestsByDate } from '@/queries/farmerRequestQueries';
-import { toast } from '@/components/ui/use-toast';
 
 function WorkplaceLogisticsCard({
   date,
@@ -215,46 +214,6 @@ export default function LogisticsSidebar({ date, assignments }) {
         requestedVolunteers: requestByWorkplace[id]?.requested ?? null,
       }));
   }, [assignments, requestByWorkplace]);
-
-  const matchedRequestRef = useRef(null);
-  const trackedDateRef = useRef(date);
-
-  useEffect(() => {
-    if (trackedDateRef.current !== date) {
-      trackedDateRef.current = date;
-      matchedRequestRef.current = null;
-    }
-
-    const matchedNow = {};
-    activeWorkplaces.forEach((wp) => {
-      if (
-        wp.requestedVolunteers != null &&
-        wp.count === wp.requestedVolunteers
-      ) {
-        matchedNow[wp.id] = wp;
-      }
-    });
-
-    // Seed on first load / date change without toasting existing matches.
-    if (matchedRequestRef.current === null) {
-      matchedRequestRef.current = Object.fromEntries(
-        Object.keys(matchedNow).map((id) => [id, true]),
-      );
-      return;
-    }
-
-    Object.values(matchedNow).forEach((wp) => {
-      if (matchedRequestRef.current[wp.id]) return;
-      const { dismiss } = toast({
-        title: `השיבוץ ל${wp.name} הושלם לפי הבקשה (${wp.requestedVolunteers} מתנדבים)`,
-      });
-      setTimeout(dismiss, 4000);
-    });
-
-    matchedRequestRef.current = Object.fromEntries(
-      Object.keys(matchedNow).map((id) => [id, true]),
-    );
-  }, [activeWorkplaces, date]);
 
   const handleSave = async (workplaceId, workplaceName, data) => {
     const existing = logisticsMap[workplaceId];
