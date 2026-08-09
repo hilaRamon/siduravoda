@@ -10,6 +10,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ChevronsUpDown, Plus, Search, Pencil, Trash2, Building2, Upload } from 'lucide-react';
 import ImportWorkplacesModal from '@/components/workplaces/ImportWorkplacesModal';
+import { showAlert } from '@/components/AppAlert';
 
 function WorkplaceFormModal({ open, onClose, onSave, workplace, existingFarms }) {
   const [form, setForm] = useState(workplace || {
@@ -155,10 +156,23 @@ export default function Workplaces() {
   };
 
   const handleToggleAgreement = async (workplace) => {
-    await base44.entities.Workplace.update(workplace.id, {
-      has_agreement: !workplace.has_agreement,
-    });
-    queryClient.invalidateQueries({ queryKey: ['workplaces'] });
+    const nextValue = !workplace.has_agreement;
+    const previous = queryClient.getQueryData(['workplaces']);
+
+    queryClient.setQueryData(['workplaces'], (current) =>
+      (current || []).map((w) =>
+        w.id === workplace.id ? { ...w, has_agreement: nextValue } : w
+      )
+    );
+
+    try {
+      await base44.entities.Workplace.update(workplace.id, {
+        has_agreement: nextValue,
+      });
+    } catch (error) {
+      queryClient.setQueryData(['workplaces'], previous);
+      await showAlert(error?.message || 'שגיאה בעדכון הסכם. נסה שוב.');
+    }
   };
 
   return (
