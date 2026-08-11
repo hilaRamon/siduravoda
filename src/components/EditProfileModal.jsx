@@ -1,71 +1,76 @@
-import { useEffect, useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { PasswordField } from '@/components/ui/password-field';
-import { base44 } from '@/api/base44Client';
-import { useAuth } from '@/lib/AuthContext';
+import { useEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { PasswordField } from "@/components/ui/password-field";
+import { base44 } from "@/api/base44Client";
+import { useAuth } from "@/lib/AuthContext";
 
 export default function EditProfileModal({ open, onClose }) {
   const { user, checkUserAuth } = useAuth();
   const queryClient = useQueryClient();
 
-  const [name, setName] = useState(user?.full_name || '');
-  const [email, setEmail] = useState(user?.email || '');
-  const [currentPassword, setCurrentPassword] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
+  const [name, setName] = useState(user?.full_name || "");
+  const [email, setEmail] = useState(user?.email || "");
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
 
   const [detailsLoading, setDetailsLoading] = useState(false);
   const [passwordLoading, setPasswordLoading] = useState(false);
-  const [detailsError, setDetailsError] = useState('');
-  const [detailsSuccess, setDetailsSuccess] = useState('');
-  const [passwordError, setPasswordError] = useState('');
-  const [passwordSuccess, setPasswordSuccess] = useState('');
+  const [detailsError, setDetailsError] = useState("");
+  const [detailsSuccess, setDetailsSuccess] = useState("");
+  const [passwordError, setPasswordError] = useState("");
+  const [passwordSuccess, setPasswordSuccess] = useState("");
 
-  const isEnvAdmin = user?.role === 'admin';
+  const isEnvAdmin = user?.role === "admin";
 
   useEffect(() => {
     if (!open || !user) return;
-    setName(user.full_name || '');
-    setEmail(user.email || '');
-    setDetailsError('');
-    setDetailsSuccess('');
-    setPasswordError('');
-    setPasswordSuccess('');
-    setCurrentPassword('');
-    setNewPassword('');
-    setConfirmPassword('');
+    setName(user.full_name || "");
+    setEmail(user.email || "");
+    setDetailsError("");
+    setDetailsSuccess("");
+    setPasswordError("");
+    setPasswordSuccess("");
+    setCurrentPassword("");
+    setNewPassword("");
+    setConfirmPassword("");
   }, [open, user]);
 
   async function handleSaveDetails(e) {
     e.preventDefault();
-    setDetailsError('');
-    setDetailsSuccess('');
+    setDetailsError("");
+    setDetailsSuccess("");
     setDetailsLoading(true);
     try {
-      const previousEmail = user?.email?.trim().toLowerCase() || '';
+      const previousEmail = user?.email?.trim().toLowerCase() || "";
       const nextEmail = email.trim().toLowerCase();
       const updated = await base44.auth.updateMe({
         full_name: name.trim(),
         email: nextEmail,
       });
       if (!updated?.id) {
-        throw new Error('עדכון הפרטים נכשל');
+        throw new Error("עדכון הפרטים נכשל");
       }
       await checkUserAuth();
-      await queryClient.invalidateQueries({ queryKey: ['users-list'] });
+      await queryClient.invalidateQueries({ queryKey: ["users-list"] });
       if (previousEmail && nextEmail !== previousEmail) {
         setDetailsSuccess(
-          'הפרטים עודכנו. להתחברות הבאה השתמש בכתובת האימייל החדשה.',
+          "הפרטים עודכנו. להתחברות הבאה השתמש בכתובת האימייל החדשה.",
         );
       } else {
-        setDetailsSuccess('הפרטים עודכנו בהצלחה');
+        setDetailsSuccess("הפרטים עודכנו בהצלחה");
       }
     } catch (err) {
-      setDetailsError(err.message || 'שגיאה בעדכון הפרטים');
+      setDetailsError(err.message || "שגיאה בעדכון הפרטים");
     } finally {
       setDetailsLoading(false);
     }
@@ -73,25 +78,27 @@ export default function EditProfileModal({ open, onClose }) {
 
   async function handleChangePassword(e) {
     e.preventDefault();
-    setPasswordError('');
-    setPasswordSuccess('');
+    setPasswordError("");
+    setPasswordSuccess("");
     if (newPassword !== confirmPassword) {
-      setPasswordError('הסיסמאות אינן תואמות');
+      setPasswordError("הסיסמאות אינן תואמות");
       return;
     }
-    if (newPassword.length < 6) {
-      setPasswordError('הסיסמה חייבת להכיל לפחות 6 תווים');
+    if (newPassword.length < 4) {
+      setPasswordError("הסיסמה חייבת להכיל לפחות 4 תווים");
       return;
     }
     setPasswordLoading(true);
     try {
       await base44.auth.changePassword(currentPassword, newPassword);
-      setPasswordSuccess('הסיסמה עודכנה בהצלחה. בהתחברות הבאה השתמש בסיסמה החדשה.');
-      setCurrentPassword('');
-      setNewPassword('');
-      setConfirmPassword('');
+      setPasswordSuccess(
+        "הסיסמה עודכנה בהצלחה. בהתחברות הבאה השתמש בסיסמה החדשה.",
+      );
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
     } catch (err) {
-      setPasswordError(err.message || 'שגיאה בעדכון הסיסמה');
+      setPasswordError(err.message || "שגיאה בעדכון הסיסמה");
     } finally {
       setPasswordLoading(false);
     }
@@ -107,7 +114,9 @@ export default function EditProfileModal({ open, onClose }) {
         <div className="space-y-6">
           {/* Personal Details */}
           <form onSubmit={handleSaveDetails} className="space-y-4">
-            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">פרטים אישיים</h3>
+            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+              פרטים אישיים
+            </h3>
 
             <div className="space-y-2">
               <Label htmlFor="profile-name">שם מלא</Label>
@@ -130,15 +139,21 @@ export default function EditProfileModal({ open, onClose }) {
                 disabled={isEnvAdmin}
               />
               {isEnvAdmin && (
-                <p className="text-xs text-muted-foreground">כתובת האימייל של מנהל המערכת מנוהלת דרך הגדרות השרת</p>
+                <p className="text-xs text-muted-foreground">
+                  כתובת האימייל של מנהל המערכת מנוהלת דרך הגדרות השרת
+                </p>
               )}
             </div>
 
-            {detailsError && <p className="text-sm text-destructive">{detailsError}</p>}
-            {detailsSuccess && <p className="text-sm text-green-600">{detailsSuccess}</p>}
+            {detailsError && (
+              <p className="text-sm text-destructive">{detailsError}</p>
+            )}
+            {detailsSuccess && (
+              <p className="text-sm text-green-600">{detailsSuccess}</p>
+            )}
 
             <Button type="submit" disabled={detailsLoading} className="w-full">
-              {detailsLoading ? 'שומר...' : 'שמור פרטים'}
+              {detailsLoading ? "שומר..." : "שמור פרטים"}
             </Button>
           </form>
 
@@ -146,11 +161,14 @@ export default function EditProfileModal({ open, onClose }) {
 
           {/* Password Change */}
           <form onSubmit={handleChangePassword} className="space-y-4">
-            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">שינוי סיסמה</h3>
+            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+              שינוי סיסמה
+            </h3>
 
             {isEnvAdmin ? (
               <p className="text-sm text-muted-foreground">
-                סיסמת מנהל המערכת מנוהלת דרך הגדרות השרת ולא ניתן לשנות אותה כאן.
+                סיסמת מנהל המערכת מנוהלת דרך הגדרות השרת ולא ניתן לשנות אותה
+                כאן.
               </p>
             ) : (
               <>
@@ -171,7 +189,7 @@ export default function EditProfileModal({ open, onClose }) {
                     id="new-password"
                     value={newPassword}
                     onValueChange={setNewPassword}
-                    placeholder="לפחות 6 תווים"
+                    placeholder="לפחות 4 תווים"
                     autoComplete="new-password"
                     showLengthValidation
                   />
@@ -189,11 +207,20 @@ export default function EditProfileModal({ open, onClose }) {
                   />
                 </div>
 
-                {passwordError && <p className="text-sm text-destructive">{passwordError}</p>}
-                {passwordSuccess && <p className="text-sm text-green-600">{passwordSuccess}</p>}
+                {passwordError && (
+                  <p className="text-sm text-destructive">{passwordError}</p>
+                )}
+                {passwordSuccess && (
+                  <p className="text-sm text-green-600">{passwordSuccess}</p>
+                )}
 
-                <Button type="submit" variant="outline" disabled={passwordLoading} className="w-full">
-                  {passwordLoading ? 'מעדכן...' : 'עדכן סיסמה'}
+                <Button
+                  type="submit"
+                  variant="outline"
+                  disabled={passwordLoading}
+                  className="w-full"
+                >
+                  {passwordLoading ? "מעדכן..." : "עדכן סיסמה"}
                 </Button>
               </>
             )}
