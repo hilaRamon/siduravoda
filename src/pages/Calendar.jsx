@@ -1,7 +1,11 @@
 import { useState, useMemo } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { useAbsenceRequests } from '@/queries/absenceQueries';
+import {
+  useFarmerRequests,
+  useDeleteFarmerRequest,
+} from '@/queries/farmerRequestQueries';
 import { AddFarmerRequestForm, AddAbsenceForm } from '@/components/calendar/AddMultiDayForm';
 import { Button } from '@/components/ui/button';
 import { ChevronRight, ChevronLeft, Trash2, CalendarDays, Loader2 } from 'lucide-react';
@@ -15,7 +19,7 @@ function getWeekDays(baseDate) {
 const DAY_NAMES = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי'];
 
 function DayColumn({ day, farmerRequests, absences, workplaces, students, studentsById }) {
-  const queryClient = useQueryClient();
+  const deleteMutation = useDeleteFarmerRequest();
   const [deletingId, setDeletingId] = useState(null);
   const dateStr = format(day, 'yyyy-MM-dd');
   const isToday = dateStr === format(new Date(), 'yyyy-MM-dd');
@@ -29,8 +33,7 @@ function DayColumn({ day, farmerRequests, absences, workplaces, students, studen
     if (deletingId) return;
     setDeletingId(id);
     try {
-      await base44.entities.FarmerRequest.delete(id);
-      await queryClient.invalidateQueries({ queryKey: ['farmer-requests'] });
+      await deleteMutation.mutateAsync(id);
     } finally {
       setDeletingId(null);
     }
@@ -117,9 +120,9 @@ export default function Calendar() {
   const startDate = format(days[0], 'yyyy-MM-dd');
   const endDate = format(days[4], 'yyyy-MM-dd');
 
-  const { data: farmerRequests = [] } = useQuery({
-    queryKey: ['farmer-requests'],
-    queryFn: () => base44.entities.FarmerRequest.list('-date', 500),
+  const { data: farmerRequests = [] } = useFarmerRequests({
+    startDate,
+    endDate,
   });
 
   const { data: absences = [] } = useAbsenceRequests({

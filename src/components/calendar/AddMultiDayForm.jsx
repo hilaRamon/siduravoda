@@ -1,7 +1,6 @@
 import { useState, useMemo } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
-import { base44 } from '@/api/base44Client';
 import { useCreateManualAbsence } from '@/queries/absenceQueries';
+import { useCreateFarmerRequest } from '@/queries/farmerRequestQueries';
 import { Button } from '@/components/ui/button';
 import { Calendar as DayPickerCalendar } from '@/components/ui/calendar';
 import { Plus, X } from 'lucide-react';
@@ -236,7 +235,7 @@ export function AddMultiDayForm({
 }
 
 export function AddFarmerRequestForm({ date, workplaces }) {
-  const queryClient = useQueryClient();
+  const createMutation = useCreateFarmerRequest();
 
   return (
     <AddMultiDayForm
@@ -250,11 +249,14 @@ export function AddFarmerRequestForm({ date, workplaces }) {
         min: 1,
         placeholder: 'כמות מבוקשת',
       }}
+      pending={createMutation.isPending}
       onSubmit={async ({ item, detail, dates }) => {
         const requested_volunteers = detail !== '' ? parseInt(detail, 10) : null;
+        /** @type {(vars: { date: string, workplace_id: string, workplace_name?: string, requested_volunteers?: number|null }) => Promise<unknown>} */
+        const createRequest = createMutation.mutateAsync;
         await Promise.all(
           dates.map((d) =>
-            base44.entities.FarmerRequest.create({
+            createRequest({
               date: dateKey(d),
               workplace_id: item.id,
               workplace_name: item.name,
@@ -262,7 +264,6 @@ export function AddFarmerRequestForm({ date, workplaces }) {
             }),
           ),
         );
-        queryClient.invalidateQueries({ queryKey: ['farmer-requests'] });
       }}
     />
   );

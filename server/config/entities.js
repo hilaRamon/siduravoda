@@ -115,16 +115,6 @@ export const entityDefinitions = {
       last_backup_filename: { type: String },
     },
   },
-  FarmerRequest: {
-    required: ["date", "workplace_id"],
-    schema: {
-      date: { type: String, required: true },
-      workplace_id: { type: String, required: true },
-      workplace_name: { type: String, trim: true },
-      requested_volunteers: { type: Number, default: null },
-    },
-    indexes: [{ fields: { date: 1 } }],
-  },
   TimeReport: {
     required: ["date", "student_id", "workplace_id"],
     schema: {

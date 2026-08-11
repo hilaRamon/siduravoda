@@ -14,6 +14,7 @@ import authRouter from "./routes/auth.js";
 import publicRouter from "./routes/public.js";
 import backupRouter from "./routes/backup.js";
 import absenceRequestsRouter from "./routes/absenceRequests.js";
+import farmerRequestsRouter from "./routes/farmerRequests.js";
 import permissionRulesRouter from "./routes/permissionRules.js";
 import { ensureAdminUser } from "./lib/bootstrap.js";
 import { migrateLegacyUserRoles } from "./lib/migrateUserRoles.js";
@@ -53,6 +54,7 @@ app.use("/api/integrations", uploadsRouter);
 app.use("/api/integrations", reportsRouter);
 app.use("/api/admin/backup", backupRouter);
 app.use("/api/absence-requests", absenceRequestsRouter);
+app.use("/api/farmer-requests", farmerRequestsRouter);
 app.use("/api/permission-rules", permissionRulesRouter);
 
 const distDir = path.resolve(process.cwd(), "dist");
