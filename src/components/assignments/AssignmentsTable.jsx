@@ -61,14 +61,14 @@ export default function AssignmentsTable({
             <th className="px-3 py-2 text-right font-semibold text-muted-foreground w-8 text-xs">
               #
             </th>
-            <th className="px-3 py-2 text-right font-semibold text-muted-foreground">
+            <th className="px-3 py-2 text-right font-semibold text-muted-foreground w-48">
               <div className="flex flex-col gap-1">
                 <span className="text-xs">שם תלמיד</span>
                 <Input
                   value={filterName}
                   onChange={(e) => onFilterNameChange(e.target.value)}
                   placeholder="חיפוש..."
-                  className="h-7 text-xs"
+                  className="h-7 w-full text-xs"
                 />
               </div>
             </th>
