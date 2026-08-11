@@ -1,4 +1,5 @@
 import { getModel } from "../models/index.js";
+import Assignment from "../models/Assignment.js";
 import { SKIP_WORKPLACES } from "../lib/reportConstants.js";
 
 async function getWorkplaceMaps() {
@@ -51,7 +52,6 @@ export async function getStudentWorkReport({
   endDate,
   students = [],
 }) {
-  const Assignment = getModel("Assignment");
   const [{ byId: workplaceById, skipIds }, studentById] = await Promise.all([
     getWorkplaceMaps(),
     getStudentMap(),

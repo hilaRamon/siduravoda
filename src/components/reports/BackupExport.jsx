@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { base44 } from '@/api/base44Client';
+import { assignmentApi } from '@/api/assignmentApi';
 import { Button } from '@/components/ui/button';
 import { Loader2, Database, Archive } from 'lucide-react';
 import * as XLSX from 'xlsx';
@@ -20,7 +21,7 @@ async function buildAllWorkbooks() {
     base44.entities.Student.list('full_name', 1000),
     base44.entities.Workplace.list('name', 1000),
     base44.entities.Vehicle.list('name', 1000),
-    base44.entities.Assignment.list('date', 10000),
+    assignmentApi.list({ sort: 'date', limit: 10000 }),
     base44.entities.AppSettings.list(),
   ]);
   const appSettings = normalizeAppSettings(settingsList[0]);
@@ -116,7 +117,7 @@ async function exportVehicles() {
 
 async function exportAssignments() {
   const [assignments, settingsList] = await Promise.all([
-    base44.entities.Assignment.list('date', 10000),
+    assignmentApi.list({ sort: 'date', limit: 10000 }),
     base44.entities.AppSettings.list(),
   ]);
   const appSettings = normalizeAppSettings(settingsList[0]);

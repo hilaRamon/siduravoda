@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react';
 import { base44 } from '@/api/base44Client';
+import { assignmentApi } from '@/api/assignmentApi';
 import { Button } from '@/components/ui/button';
 import { Upload, Loader2, FileSpreadsheet, CheckCircle2, AlertCircle } from 'lucide-react';
 import * as XLSX from 'xlsx';
@@ -130,7 +131,7 @@ export default function ImportAssignments() {
     let created = 0;
     for (let i = 0; i < toCreate.length; i += 100) {
       setProgress(`מייבא... ${Math.min(i + 100, toCreate.length)} / ${toCreate.length}`);
-      await base44.entities.Assignment.bulkCreate(toCreate.slice(i, i + 100));
+      await assignmentApi.bulkCreate(toCreate.slice(i, i + 100));
       created += Math.min(100, toCreate.length - i);
     }
 

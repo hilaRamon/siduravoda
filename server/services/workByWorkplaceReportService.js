@@ -1,4 +1,5 @@
 import { getModel } from "../models/index.js";
+import Assignment from "../models/Assignment.js";
 import { SKIP_WORKPLACES } from "../lib/reportConstants.js";
 import {
   calcAvgDailyUnits,
@@ -113,7 +114,6 @@ export async function getWorkByWorkplaceReport({
   farms = [],
   groupBy = "workplace",
 }) {
-  const Assignment = getModel("Assignment");
   const [appSettings, { byId, skipIds }] = await Promise.all([
     getAppSettings(),
     getWorkplaceMaps(),

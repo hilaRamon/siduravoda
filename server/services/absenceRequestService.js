@@ -1,4 +1,5 @@
 import { getModel } from "../models/index.js";
+import Assignment from "../models/Assignment.js";
 import {
   getAssignmentDefaults,
   normalizeAppSettings,
@@ -72,7 +73,6 @@ async function getAssignmentDefaultsFromSettings() {
 }
 
 async function assignNotWorking(studentId, date) {
-  const Assignment = getModel("Assignment");
   const Student = getModel("Student");
   const workplace = await getNotWorkingWorkplace();
   const student = await Student.findById(studentId).select("full_name").lean();
@@ -113,7 +113,6 @@ async function assignNotWorking(studentId, date) {
 
 async function clearAssignmentForDate(studentId, date) {
   if (!studentId || !date) return;
-  const Assignment = getModel("Assignment");
   await Assignment.deleteMany({ date, student_id: studentId });
 }
 

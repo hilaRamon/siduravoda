@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { format } from 'date-fns';
 import { Send, Clock, CheckCircle2, ChevronDown, ChevronUp, Search, CalendarDays, Check, ChevronRight, ChevronLeft, ShieldOff, LogOut } from 'lucide-react';
+import { useAssignments } from '@/queries/assignmentQueries';
 
 const DEFAULT_START = '07:00';
 const DEFAULT_END = '11:45';
@@ -173,10 +174,7 @@ export default function TimeReporting() {
     setSearch('');
   }, [selectedDate]);
 
-  const { data: assignments = [], isLoading } = useQuery({
-    queryKey: ['assignments', selectedDate],
-    queryFn: () => base44.entities.Assignment.filter({ date: selectedDate }, '-created_date', 2000),
-  });
+  const { data: assignments = [], isLoading } = useAssignments(selectedDate);
 
   const { data: logisticsList = [] } = useQuery({
     queryKey: ['workplace-logistics', selectedDate],

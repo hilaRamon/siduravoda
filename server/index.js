@@ -16,6 +16,7 @@ import backupRouter from "./routes/backup.js";
 import absenceRequestsRouter from "./routes/absenceRequests.js";
 import farmerRequestsRouter from "./routes/farmerRequests.js";
 import permissionRulesRouter from "./routes/permissionRules.js";
+import assignmentsRouter from "./routes/assignments.js";
 import { ensureAdminUser } from "./lib/bootstrap.js";
 import { migrateLegacyUserRoles } from "./lib/migrateUserRoles.js";
 import { ensurePermissionRulesSeeded } from "./services/permissionRuleService.js";
@@ -56,6 +57,7 @@ app.use("/api/admin/backup", backupRouter);
 app.use("/api/absence-requests", absenceRequestsRouter);
 app.use("/api/farmer-requests", farmerRequestsRouter);
 app.use("/api/permission-rules", permissionRulesRouter);
+app.use("/api/assignments", assignmentsRouter);
 
 const distDir = path.resolve(process.cwd(), "dist");
 const hasFrontendBuild = fs.existsSync(path.join(distDir, "index.html"));

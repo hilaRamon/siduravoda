@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Users, Building2, CalendarDays, TrendingUp } from 'lucide-react';
 import { format } from 'date-fns';
+import { useAssignments } from '@/queries/assignmentQueries';
 
 export default function Dashboard() {
   const today = format(new Date(), 'yyyy-MM-dd');
@@ -16,10 +17,7 @@ export default function Dashboard() {
     queryFn: () => base44.entities.Workplace.list(),
   });
 
-  const { data: todayAssignments = [] } = useQuery({
-    queryKey: ['assignments-today', today],
-    queryFn: () => base44.entities.Assignment.filter({ date: today }),
-  });
+  const { data: todayAssignments = [] } = useAssignments(today);
 
   const stats = [
     {

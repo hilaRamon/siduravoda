@@ -16,7 +16,6 @@ function isReadMethod(method) {
 }
 
 const REPORTER_READ_ENTITIES = new Set([
-  "Assignment",
   "WorkplaceLogistics",
   "Workplace",
   "Student",
