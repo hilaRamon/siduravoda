@@ -6,8 +6,9 @@ import {
   useCreateManualAbsence,
 } from '@/queries/absenceQueries';
 import { Button } from '@/components/ui/button';
-import { ChevronRight, ChevronLeft, Plus, Trash2, CalendarDays } from 'lucide-react';
-import { format, addWeeks, subWeeks, startOfWeek, addDays } from 'date-fns';
+import { Calendar as DayPickerCalendar } from '@/components/ui/calendar';
+import { ChevronRight, ChevronLeft, Plus, Trash2, CalendarDays, X } from 'lucide-react';
+import { format, addWeeks, subWeeks, startOfWeek, addDays, parseISO } from 'date-fns';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
@@ -18,37 +19,80 @@ function getWeekDays(baseDate) {
 
 const DAY_NAMES = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי'];
 
+function isWeekend(day) {
+  const d = day.getDay();
+  return d === 5 || d === 6;
+}
+
+function dateKey(day) {
+  return format(day, 'yyyy-MM-dd');
+}
+
 function AddFarmerRequestForm({ date, workplaces }) {
   const [open, setOpen] = useState(false);
   const [popoverOpen, setPopoverOpen] = useState(false);
+  const [datePickerOpen, setDatePickerOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [selectedWorkplace, setSelectedWorkplace] = useState(null);
   const [volunteers, setVolunteers] = useState('');
+  const [selectedDates, setSelectedDates] = useState([]);
+  const [submitting, setSubmitting] = useState(false);
   const queryClient = useQueryClient();
 
   const filtered = workplaces.filter(w =>
     !search || w.name.includes(search)
   );
 
-  const handleAdd = async () => {
-    if (!selectedWorkplace) return;
-    await base44.entities.FarmerRequest.create({
-      date,
-      workplace_id: selectedWorkplace.id,
-      workplace_name: selectedWorkplace.name,
-      requested_volunteers: volunteers !== '' ? parseInt(volunteers) : null,
-    });
-    queryClient.invalidateQueries({ queryKey: ['farmer-requests'] });
+  const sortedSelectedDates = useMemo(
+    () => [...selectedDates].sort((a, b) => a - b),
+    [selectedDates],
+  );
+
+  const resetForm = () => {
     setSelectedWorkplace(null);
     setVolunteers('');
     setSearch('');
+    setSelectedDates([]);
+    setDatePickerOpen(false);
     setOpen(false);
+  };
+
+  const handleOpen = () => {
+    setSelectedDates([parseISO(date)]);
+    setOpen(true);
+  };
+
+  const removeDate = (day) => {
+    const key = dateKey(day);
+    setSelectedDates(prev => prev.filter(d => dateKey(d) !== key));
+  };
+
+  const handleAdd = async () => {
+    if (!selectedWorkplace || selectedDates.length === 0) return;
+    setSubmitting(true);
+    try {
+      const requested_volunteers = volunteers !== '' ? parseInt(volunteers) : null;
+      await Promise.all(
+        selectedDates.map(d =>
+          base44.entities.FarmerRequest.create({
+            date: dateKey(d),
+            workplace_id: selectedWorkplace.id,
+            workplace_name: selectedWorkplace.name,
+            requested_volunteers,
+          }),
+        ),
+      );
+      queryClient.invalidateQueries({ queryKey: ['farmer-requests'] });
+      resetForm();
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   if (!open) {
     return (
       <button
-        onClick={() => setOpen(true)}
+        onClick={handleOpen}
         className="flex items-center gap-1 text-xs text-primary hover:opacity-70 mt-1"
       >
         <Plus size={13} /> הוסף דרישה
@@ -102,11 +146,56 @@ function AddFarmerRequestForm({ date, workplaces }) {
         className="w-full h-7 border border-border rounded-md px-2 text-xs bg-card focus:outline-none focus:ring-1 focus:ring-primary/40"
       />
 
+      <div className="space-y-1">
+        <div className="flex flex-wrap gap-1">
+          {sortedSelectedDates.map(d => (
+            <span
+              key={dateKey(d)}
+              className="inline-flex items-center gap-0.5 bg-card border border-border rounded px-1.5 py-0.5 text-[11px]"
+            >
+              {d.toLocaleDateString('he-IL', { day: 'numeric', month: 'numeric' })}
+              <button
+                type="button"
+                onClick={() => removeDate(d)}
+                className="text-muted-foreground hover:text-destructive"
+                aria-label="הסר יום"
+              >
+                <X size={10} />
+              </button>
+            </span>
+          ))}
+        </div>
+        <Popover open={datePickerOpen} onOpenChange={setDatePickerOpen}>
+          <PopoverTrigger asChild>
+            <button
+              type="button"
+              className="flex items-center gap-1 text-xs text-primary hover:opacity-70"
+            >
+              <Plus size={12} /> הוסף ימים
+            </button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0" align="start" dir="rtl">
+            <DayPickerCalendar
+              mode="multiple"
+              selected={selectedDates}
+              onSelect={(dates) => setSelectedDates(dates || [])}
+              disabled={isWeekend}
+              defaultMonth={parseISO(date)}
+            />
+          </PopoverContent>
+        </Popover>
+      </div>
+
       <div className="flex gap-1">
-        <Button size="sm" className="h-6 text-xs flex-1" onClick={handleAdd} disabled={!selectedWorkplace}>
-          אישור
+        <Button
+          size="sm"
+          className="h-6 text-xs flex-1"
+          onClick={handleAdd}
+          disabled={!selectedWorkplace || selectedDates.length === 0 || submitting}
+        >
+          {selectedDates.length > 1 ? `אישור (${selectedDates.length})` : 'אישור'}
         </Button>
-        <Button size="sm" variant="ghost" className="h-6 text-xs" onClick={() => { setOpen(false); setSelectedWorkplace(null); setVolunteers(''); }}>
+        <Button size="sm" variant="ghost" className="h-6 text-xs" onClick={resetForm} disabled={submitting}>
           ביטול
         </Button>
       </div>
