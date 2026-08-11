@@ -33,9 +33,14 @@ export function usePendingAbsenceCount(options = {}) {
   });
 }
 
+/**
+ * @typedef {{ date: string, student_id: string, reason?: string }} ManualAbsenceInput
+ */
+
 export function useCreateManualAbsence() {
   const queryClient = useQueryClient();
   return useMutation({
+    /** @param {ManualAbsenceInput} data */
     mutationFn: (data) => absenceApi.createManual(data),
     onSuccess: () => invalidateAbsenceQueries(queryClient),
   });

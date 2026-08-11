@@ -7,7 +7,7 @@ import {
 } from '@/queries/absenceQueries';
 import { Button } from '@/components/ui/button';
 import { Calendar as DayPickerCalendar } from '@/components/ui/calendar';
-import { ChevronRight, ChevronLeft, Plus, Trash2, CalendarDays, X } from 'lucide-react';
+import { ChevronRight, ChevronLeft, Plus, Trash2, CalendarDays, X, Loader2 } from 'lucide-react';
 import { format, addWeeks, subWeeks, startOfWeek, addDays, parseISO } from 'date-fns';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -176,6 +176,8 @@ function AddFarmerRequestForm({ date, workplaces }) {
           </PopoverTrigger>
           <PopoverContent className="w-auto p-0" align="start" dir="rtl">
             <DayPickerCalendar
+              className=""
+              classNames={{}}
               mode="multiple"
               selected={selectedDates}
               onSelect={(dates) => setSelectedDates(dates || [])}
@@ -206,9 +208,11 @@ function AddFarmerRequestForm({ date, workplaces }) {
 function AddAbsenceForm({ date, students }) {
   const [open, setOpen] = useState(false);
   const [popoverOpen, setPopoverOpen] = useState(false);
+  const [datePickerOpen, setDatePickerOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [reason, setReason] = useState('');
+  const [selectedDates, setSelectedDates] = useState([]);
   const [error, setError] = useState('');
   const createMutation = useCreateManualAbsence();
 
@@ -216,19 +220,48 @@ function AddAbsenceForm({ date, students }) {
     !search || (s.full_name || '').includes(search)
   );
 
+  const sortedSelectedDates = useMemo(
+    () => [...selectedDates].sort((a, b) => a - b),
+    [selectedDates],
+  );
+
+  const resetForm = () => {
+    setSelectedStudent(null);
+    setReason('');
+    setSearch('');
+    setSelectedDates([]);
+    setDatePickerOpen(false);
+    setError('');
+    setOpen(false);
+  };
+
+  const handleOpen = () => {
+    setSelectedDates([parseISO(date)]);
+    setError('');
+    setOpen(true);
+  };
+
+  const removeDate = (day) => {
+    const key = dateKey(day);
+    setSelectedDates(prev => prev.filter(d => dateKey(d) !== key));
+  };
+
   const handleAdd = async () => {
-    if (!selectedStudent) return;
+    if (!selectedStudent || selectedDates.length === 0) return;
     setError('');
     try {
-      await createMutation.mutateAsync({
-        date,
-        student_id: selectedStudent.id,
-        reason: reason || '',
-      });
-      setSelectedStudent(null);
-      setReason('');
-      setSearch('');
-      setOpen(false);
+      /** @type {(vars: { date: string, student_id: string, reason?: string }) => Promise<unknown>} */
+      const createAbsence = createMutation.mutateAsync;
+      await Promise.all(
+        selectedDates.map(d =>
+          createAbsence({
+            date: dateKey(d),
+            student_id: selectedStudent.id,
+            reason: reason || '',
+          }),
+        ),
+      );
+      resetForm();
     } catch (err) {
       setError(err.message || 'הוספה נכשלה');
     }
@@ -237,7 +270,7 @@ function AddAbsenceForm({ date, students }) {
   if (!open) {
     return (
       <button
-        onClick={() => setOpen(true)}
+        onClick={handleOpen}
         className="flex items-center gap-1 text-xs text-primary hover:opacity-70 mt-1"
       >
         <Plus size={13} /> הוסף היעדרות
@@ -290,13 +323,66 @@ function AddAbsenceForm({ date, students }) {
         className="w-full h-7 border border-border rounded-md px-2 text-xs bg-card focus:outline-none focus:ring-1 focus:ring-primary/40"
       />
 
+      <div className="space-y-1">
+        <div className="flex flex-wrap gap-1">
+          {sortedSelectedDates.map(d => (
+            <span
+              key={dateKey(d)}
+              className="inline-flex items-center gap-0.5 bg-card border border-border rounded px-1.5 py-0.5 text-[11px]"
+            >
+              {d.toLocaleDateString('he-IL', { day: 'numeric', month: 'numeric' })}
+              <button
+                type="button"
+                onClick={() => removeDate(d)}
+                className="text-muted-foreground hover:text-destructive"
+                aria-label="הסר יום"
+              >
+                <X size={10} />
+              </button>
+            </span>
+          ))}
+        </div>
+        <Popover open={datePickerOpen} onOpenChange={setDatePickerOpen}>
+          <PopoverTrigger asChild>
+            <button
+              type="button"
+              className="flex items-center gap-1 text-xs text-primary hover:opacity-70"
+            >
+              <Plus size={12} /> הוסף ימים
+            </button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0" align="start" dir="rtl">
+            <DayPickerCalendar
+              className=""
+              classNames={{}}
+              mode="multiple"
+              selected={selectedDates}
+              onSelect={(dates) => setSelectedDates(dates || [])}
+              disabled={isWeekend}
+              defaultMonth={parseISO(date)}
+            />
+          </PopoverContent>
+        </Popover>
+      </div>
+
       {error && <p className="text-xs text-destructive">{error}</p>}
 
       <div className="flex gap-1">
-        <Button size="sm" className="h-6 text-xs flex-1" onClick={handleAdd} disabled={!selectedStudent || createMutation.isPending}>
-          אישור
+        <Button
+          size="sm"
+          className="h-6 text-xs flex-1"
+          onClick={handleAdd}
+          disabled={!selectedStudent || selectedDates.length === 0 || createMutation.isPending}
+        >
+          {selectedDates.length > 1 ? `אישור (${selectedDates.length})` : 'אישור'}
         </Button>
-        <Button size="sm" variant="ghost" className="h-6 text-xs" onClick={() => { setOpen(false); setSelectedStudent(null); setReason(''); setError(''); }}>
+        <Button
+          size="sm"
+          variant="ghost"
+          className="h-6 text-xs"
+          onClick={resetForm}
+          disabled={createMutation.isPending}
+        >
           ביטול
         </Button>
       </div>
@@ -306,6 +392,7 @@ function AddAbsenceForm({ date, students }) {
 
 function DayColumn({ day, farmerRequests, absences, workplaces, students, studentsById }) {
   const queryClient = useQueryClient();
+  const [deletingId, setDeletingId] = useState(null);
   const dateStr = format(day, 'yyyy-MM-dd');
   const isToday = dateStr === format(new Date(), 'yyyy-MM-dd');
 
@@ -315,8 +402,14 @@ function DayColumn({ day, farmerRequests, absences, workplaces, students, studen
   );
 
   const handleDeleteRequest = async (id) => {
-    await base44.entities.FarmerRequest.delete(id);
-    queryClient.invalidateQueries({ queryKey: ['farmer-requests'] });
+    if (deletingId) return;
+    setDeletingId(id);
+    try {
+      await base44.entities.FarmerRequest.delete(id);
+      await queryClient.invalidateQueries({ queryKey: ['farmer-requests'] });
+    } finally {
+      setDeletingId(null);
+    }
   };
 
   return (
@@ -336,22 +429,34 @@ function DayColumn({ day, farmerRequests, absences, workplaces, students, studen
           <p className="text-sm text-muted-foreground">אין דרישות</p>
         ) : (
           <div className="space-y-1">
-            {dayFarmerRequests.map(req => (
-              <div key={req.id} className="flex items-center justify-between gap-1 bg-primary/5 border border-primary/15 rounded-md px-2 py-1">
-                <div className="min-w-0">
-                  <div className="text-sm font-medium truncate">{req.workplace_name}</div>
-                  {req.requested_volunteers && (
-                    <div className="text-sm text-muted-foreground">{req.requested_volunteers} מתנדבים</div>
-                  )}
-                </div>
-                <button
-                  onClick={() => handleDeleteRequest(req.id)}
-                  className="shrink-0 text-muted-foreground hover:text-destructive transition-colors"
+            {dayFarmerRequests.map(req => {
+              const isDeleting = deletingId === req.id;
+              return (
+                <div
+                  key={req.id}
+                  className={`flex items-center justify-between gap-1 bg-primary/5 border border-primary/15 rounded-md px-2 py-1 ${isDeleting ? 'opacity-60' : ''}`}
                 >
-                  <Trash2 size={11} />
-                </button>
-              </div>
-            ))}
+                  <div className="min-w-0">
+                    <div className="text-sm font-medium truncate">{req.workplace_name}</div>
+                    {req.requested_volunteers && (
+                      <div className="text-sm text-muted-foreground">{req.requested_volunteers} מתנדבים</div>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => handleDeleteRequest(req.id)}
+                    disabled={!!deletingId}
+                    className="shrink-0 text-muted-foreground hover:text-destructive transition-colors disabled:pointer-events-none"
+                    aria-label="מחק דרישה"
+                  >
+                    {isDeleting ? (
+                      <Loader2 size={11} className="animate-spin" />
+                    ) : (
+                      <Trash2 size={11} />
+                    )}
+                  </button>
+                </div>
+              );
+            })}
           </div>
         )}
         <AddFarmerRequestForm date={dateStr} workplaces={workplaces} />
