@@ -7,7 +7,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { UserPlus } from "lucide-react";
+import { UserPlus, X } from "lucide-react";
 import {
   EditableNumberCell,
   RoleCell,
@@ -64,12 +64,24 @@ export default function AssignmentsTable({
             <th className="px-3 py-2 text-right font-semibold text-muted-foreground w-48">
               <div className="flex flex-col gap-1">
                 <span className="text-xs">שם תלמיד</span>
-                <Input
-                  value={filterName}
-                  onChange={(e) => onFilterNameChange(e.target.value)}
-                  placeholder="חיפוש..."
-                  className="h-7 w-full text-xs"
-                />
+                <div className="relative">
+                  <Input
+                    value={filterName}
+                    onChange={(e) => onFilterNameChange(e.target.value)}
+                    placeholder="חיפוש..."
+                    className={`h-7 w-full text-xs ${filterName ? "pl-7" : ""}`}
+                  />
+                  {filterName ? (
+                    <button
+                      type="button"
+                      onClick={() => onFilterNameChange("")}
+                      className="absolute left-1.5 top-1/2 -translate-y-1/2 rounded p-0.5 text-muted-foreground hover:text-foreground"
+                      aria-label="נקה חיפוש"
+                    >
+                      <X size={12} />
+                    </button>
+                  ) : null}
+                </div>
               </div>
             </th>
             <th className="px-3 py-2 text-right font-semibold text-muted-foreground">
