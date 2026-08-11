@@ -174,7 +174,6 @@ export const base44 = {
     WorkplaceLogistics: createEntityClient("WorkplaceLogistics"),
     PublishedSchedule: createEntityClient("PublishedSchedule"),
     BackupSettings: createEntityClient("BackupSettings"),
-    FarmerRequest: createEntityClient("FarmerRequest"),
     TimeReport: createEntityClient("TimeReport"),
     AppSettings: createEntityClient("AppSettings"),
   },

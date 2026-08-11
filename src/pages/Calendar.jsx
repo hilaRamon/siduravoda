@@ -1,15 +1,15 @@
 import { useState, useMemo } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
+import { useAbsenceRequests } from '@/queries/absenceQueries';
 import {
-  useAbsenceRequests,
-  useCreateManualAbsence,
-} from '@/queries/absenceQueries';
+  useFarmerRequests,
+  useDeleteFarmerRequest,
+} from '@/queries/farmerRequestQueries';
+import { AddFarmerRequestForm, AddAbsenceForm } from '@/components/calendar/AddMultiDayForm';
 import { Button } from '@/components/ui/button';
-import { ChevronRight, ChevronLeft, Plus, Trash2, CalendarDays } from 'lucide-react';
+import { ChevronRight, ChevronLeft, Trash2, CalendarDays, Loader2 } from 'lucide-react';
 import { format, addWeeks, subWeeks, startOfWeek, addDays } from 'date-fns';
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
 function getWeekDays(baseDate) {
   const sunday = startOfWeek(baseDate, { weekStartsOn: 0 });
@@ -18,205 +18,9 @@ function getWeekDays(baseDate) {
 
 const DAY_NAMES = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי'];
 
-function AddFarmerRequestForm({ date, workplaces }) {
-  const [open, setOpen] = useState(false);
-  const [popoverOpen, setPopoverOpen] = useState(false);
-  const [search, setSearch] = useState('');
-  const [selectedWorkplace, setSelectedWorkplace] = useState(null);
-  const [volunteers, setVolunteers] = useState('');
-  const queryClient = useQueryClient();
-
-  const filtered = workplaces.filter(w =>
-    !search || w.name.includes(search)
-  );
-
-  const handleAdd = async () => {
-    if (!selectedWorkplace) return;
-    await base44.entities.FarmerRequest.create({
-      date,
-      workplace_id: selectedWorkplace.id,
-      workplace_name: selectedWorkplace.name,
-      requested_volunteers: volunteers !== '' ? parseInt(volunteers) : null,
-    });
-    queryClient.invalidateQueries({ queryKey: ['farmer-requests'] });
-    setSelectedWorkplace(null);
-    setVolunteers('');
-    setSearch('');
-    setOpen(false);
-  };
-
-  if (!open) {
-    return (
-      <button
-        onClick={() => setOpen(true)}
-        className="flex items-center gap-1 text-xs text-primary hover:opacity-70 mt-1"
-      >
-        <Plus size={13} /> הוסף דרישה
-      </button>
-    );
-  }
-
-  return (
-    <div className="mt-1 space-y-1.5 bg-secondary/30 rounded-lg p-2">
-      <Popover open={popoverOpen} onOpenChange={(v) => { setPopoverOpen(v); if (!v) setSearch(''); }}>
-        <PopoverTrigger asChild>
-          <button className="w-full h-7 border border-border rounded-md px-2 text-xs flex items-center justify-between bg-card hover:bg-secondary/40">
-            <span className={selectedWorkplace ? '' : 'text-muted-foreground'}>
-              {selectedWorkplace ? selectedWorkplace.name : 'בחר מקום עבודה...'}
-            </span>
-          </button>
-        </PopoverTrigger>
-        <PopoverContent className="w-56 p-0" align="start" dir="rtl">
-          <Command shouldFilter={false}>
-            <CommandInput
-              placeholder="חיפוש..."
-              className="h-7 text-xs"
-              value={search}
-              onValueChange={setSearch}
-            />
-            <CommandList>
-              <CommandEmpty>לא נמצא</CommandEmpty>
-              <CommandGroup>
-                {filtered.map(w => (
-                  <CommandItem
-                    key={w.id}
-                    value={w.name}
-                    onSelect={() => { setSelectedWorkplace(w); setPopoverOpen(false); setSearch(''); }}
-                    className="text-xs cursor-pointer"
-                  >
-                    {w.name}
-                  </CommandItem>
-                ))}
-              </CommandGroup>
-            </CommandList>
-          </Command>
-        </PopoverContent>
-      </Popover>
-
-      <input
-        type="number"
-        min="1"
-        value={volunteers}
-        onChange={e => setVolunteers(e.target.value)}
-        placeholder="כמות מבוקשת"
-        className="w-full h-7 border border-border rounded-md px-2 text-xs bg-card focus:outline-none focus:ring-1 focus:ring-primary/40"
-      />
-
-      <div className="flex gap-1">
-        <Button size="sm" className="h-6 text-xs flex-1" onClick={handleAdd} disabled={!selectedWorkplace}>
-          אישור
-        </Button>
-        <Button size="sm" variant="ghost" className="h-6 text-xs" onClick={() => { setOpen(false); setSelectedWorkplace(null); setVolunteers(''); }}>
-          ביטול
-        </Button>
-      </div>
-    </div>
-  );
-}
-
-function AddAbsenceForm({ date, students }) {
-  const [open, setOpen] = useState(false);
-  const [popoverOpen, setPopoverOpen] = useState(false);
-  const [search, setSearch] = useState('');
-  const [selectedStudent, setSelectedStudent] = useState(null);
-  const [reason, setReason] = useState('');
-  const [error, setError] = useState('');
-  const createMutation = useCreateManualAbsence();
-
-  const filtered = students.filter(s =>
-    !search || (s.full_name || '').includes(search)
-  );
-
-  const handleAdd = async () => {
-    if (!selectedStudent) return;
-    setError('');
-    try {
-      await createMutation.mutateAsync({
-        date,
-        student_id: selectedStudent.id,
-        reason: reason || '',
-      });
-      setSelectedStudent(null);
-      setReason('');
-      setSearch('');
-      setOpen(false);
-    } catch (err) {
-      setError(err.message || 'הוספה נכשלה');
-    }
-  };
-
-  if (!open) {
-    return (
-      <button
-        onClick={() => setOpen(true)}
-        className="flex items-center gap-1 text-xs text-primary hover:opacity-70 mt-1"
-      >
-        <Plus size={13} /> הוסף היעדרות
-      </button>
-    );
-  }
-
-  return (
-    <div className="mt-1 space-y-1.5 bg-secondary/30 rounded-lg p-2">
-      <Popover open={popoverOpen} onOpenChange={(v) => { setPopoverOpen(v); if (!v) setSearch(''); }}>
-        <PopoverTrigger asChild>
-          <button className="w-full h-7 border border-border rounded-md px-2 text-xs flex items-center justify-between bg-card hover:bg-secondary/40">
-            <span className={selectedStudent ? '' : 'text-muted-foreground'}>
-              {selectedStudent ? selectedStudent.full_name : 'בחר תלמיד...'}
-            </span>
-          </button>
-        </PopoverTrigger>
-        <PopoverContent className="w-56 p-0" align="start" dir="rtl">
-          <Command shouldFilter={false}>
-            <CommandInput
-              placeholder="חיפוש..."
-              className="h-7 text-xs"
-              value={search}
-              onValueChange={setSearch}
-            />
-            <CommandList>
-              <CommandEmpty>לא נמצא</CommandEmpty>
-              <CommandGroup>
-                {filtered.map(s => (
-                  <CommandItem
-                    key={s.id}
-                    value={s.full_name}
-                    onSelect={() => { setSelectedStudent(s); setPopoverOpen(false); setSearch(''); }}
-                    className="text-xs cursor-pointer"
-                  >
-                    {s.full_name}
-                  </CommandItem>
-                ))}
-              </CommandGroup>
-            </CommandList>
-          </Command>
-        </PopoverContent>
-      </Popover>
-
-      <input
-        type="text"
-        value={reason}
-        onChange={e => setReason(e.target.value)}
-        placeholder="סיבה (אופציונלי)"
-        className="w-full h-7 border border-border rounded-md px-2 text-xs bg-card focus:outline-none focus:ring-1 focus:ring-primary/40"
-      />
-
-      {error && <p className="text-xs text-destructive">{error}</p>}
-
-      <div className="flex gap-1">
-        <Button size="sm" className="h-6 text-xs flex-1" onClick={handleAdd} disabled={!selectedStudent || createMutation.isPending}>
-          אישור
-        </Button>
-        <Button size="sm" variant="ghost" className="h-6 text-xs" onClick={() => { setOpen(false); setSelectedStudent(null); setReason(''); setError(''); }}>
-          ביטול
-        </Button>
-      </div>
-    </div>
-  );
-}
-
 function DayColumn({ day, farmerRequests, absences, workplaces, students, studentsById }) {
-  const queryClient = useQueryClient();
+  const deleteMutation = useDeleteFarmerRequest();
+  const [deletingId, setDeletingId] = useState(null);
   const dateStr = format(day, 'yyyy-MM-dd');
   const isToday = dateStr === format(new Date(), 'yyyy-MM-dd');
 
@@ -226,8 +30,13 @@ function DayColumn({ day, farmerRequests, absences, workplaces, students, studen
   );
 
   const handleDeleteRequest = async (id) => {
-    await base44.entities.FarmerRequest.delete(id);
-    queryClient.invalidateQueries({ queryKey: ['farmer-requests'] });
+    if (deletingId) return;
+    setDeletingId(id);
+    try {
+      await deleteMutation.mutateAsync(id);
+    } finally {
+      setDeletingId(null);
+    }
   };
 
   return (
@@ -247,22 +56,34 @@ function DayColumn({ day, farmerRequests, absences, workplaces, students, studen
           <p className="text-sm text-muted-foreground">אין דרישות</p>
         ) : (
           <div className="space-y-1">
-            {dayFarmerRequests.map(req => (
-              <div key={req.id} className="flex items-center justify-between gap-1 bg-primary/5 border border-primary/15 rounded-md px-2 py-1">
-                <div className="min-w-0">
-                  <div className="text-sm font-medium truncate">{req.workplace_name}</div>
-                  {req.requested_volunteers && (
-                    <div className="text-sm text-muted-foreground">{req.requested_volunteers} מתנדבים</div>
-                  )}
-                </div>
-                <button
-                  onClick={() => handleDeleteRequest(req.id)}
-                  className="shrink-0 text-muted-foreground hover:text-destructive transition-colors"
+            {dayFarmerRequests.map(req => {
+              const isDeleting = deletingId === req.id;
+              return (
+                <div
+                  key={req.id}
+                  className={`flex items-center justify-between gap-1 bg-primary/5 border border-primary/15 rounded-md px-2 py-1 ${isDeleting ? 'opacity-60' : ''}`}
                 >
-                  <Trash2 size={11} />
-                </button>
-              </div>
-            ))}
+                  <div className="min-w-0">
+                    <div className="text-sm font-medium truncate">{req.workplace_name}</div>
+                    {req.requested_volunteers && (
+                      <div className="text-sm text-muted-foreground">{req.requested_volunteers} מתנדבים</div>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => handleDeleteRequest(req.id)}
+                    disabled={!!deletingId}
+                    className="shrink-0 text-muted-foreground hover:text-destructive transition-colors disabled:pointer-events-none"
+                    aria-label="מחק דרישה"
+                  >
+                    {isDeleting ? (
+                      <Loader2 size={11} className="animate-spin" />
+                    ) : (
+                      <Trash2 size={11} />
+                    )}
+                  </button>
+                </div>
+              );
+            })}
           </div>
         )}
         <AddFarmerRequestForm date={dateStr} workplaces={workplaces} />
@@ -299,9 +120,9 @@ export default function Calendar() {
   const startDate = format(days[0], 'yyyy-MM-dd');
   const endDate = format(days[4], 'yyyy-MM-dd');
 
-  const { data: farmerRequests = [] } = useQuery({
-    queryKey: ['farmer-requests'],
-    queryFn: () => base44.entities.FarmerRequest.list('-date', 500),
+  const { data: farmerRequests = [] } = useFarmerRequests({
+    startDate,
+    endDate,
   });
 
   const { data: absences = [] } = useAbsenceRequests({
