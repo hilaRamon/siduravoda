@@ -10,6 +10,14 @@ import {
 } from "../config/permissions.js";
 import { attachUser, requireAuth } from "../middleware/auth.js";
 import { hydrateUser } from "../services/permissionRuleService.js";
+import {
+  createRememberToken,
+  findValidRememberToken,
+  readRememberEntries,
+  revokeAllRememberTokensForUser,
+  setRememberCookie,
+  slideRememberToken,
+} from "../lib/rememberMe.js";
 
 const router = express.Router();
 
@@ -17,6 +25,11 @@ router.use(attachUser);
 
 async function toClientUser(doc) {
   return hydrateUser(sanitizeUser(doc));
+}
+
+async function issueRememberCookie(req, res, userId) {
+  const entries = await createRememberToken(userId, readRememberEntries(req));
+  setRememberCookie(res, entries);
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -58,12 +71,73 @@ function canManageTargetUser(req, target) {
   return false;
 }
 
+// ─── Login emails (public) ────────────────────────────────────────────────────
+
+router.get("/login-emails", async (_req, res, next) => {
+  try {
+    const User = getModel("User");
+    const docs = await User.find({ is_active: { $ne: false } })
+      .select("email")
+      .lean()
+      .exec();
+
+    const emails = new Set(
+      docs.map((d) => String(d.email || "").trim().toLowerCase()).filter(Boolean),
+    );
+
+    const envAdminEmail = getEnvAdmin().email;
+    if (envAdminEmail) emails.add(envAdminEmail);
+
+    res.json([...emails].sort());
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ─── Auto-login via remember-me cookie ────────────────────────────────────────
+
+router.post("/auto-login", async (req, res, next) => {
+  try {
+    const email = String(req.body.email || "").trim().toLowerCase();
+    if (!email) {
+      return res.status(400).json({ message: "Email is required", code: "not_remembered" });
+    }
+
+    const User = getModel("User");
+    const user = await User.findOne({ email });
+    if (!user || user.is_active === false) {
+      return res.status(401).json({ message: "Not remembered on this device", code: "not_remembered" });
+    }
+
+    const envAdmin = getEnvAdmin();
+    // Same admin gate as password login
+    if (user.role === "admin" && email !== envAdmin.email) {
+      return res.status(401).json({ message: "Not remembered on this device", code: "not_remembered" });
+    }
+
+    const entries = readRememberEntries(req);
+    const match = await findValidRememberToken(user.id, entries);
+    if (!match) {
+      return res.status(401).json({ message: "Not remembered on this device", code: "not_remembered" });
+    }
+
+    await slideRememberToken(match.doc, { force: true });
+    setRememberCookie(res, entries);
+
+    const token = signToken({ sub: user.id, role: user.role });
+    return res.json({ token, user: await toClientUser(user) });
+  } catch (error) {
+    return next(error);
+  }
+});
+
 // ─── Login ────────────────────────────────────────────────────────────────────
 
 router.post("/login", async (req, res, next) => {
   try {
     const email = String(req.body.email || "").trim().toLowerCase();
     const password = String(req.body.password || "");
+    const rememberMe = Boolean(req.body.rememberMe);
 
     if (!email || !password) {
       return res.status(400).json({ message: "Email and password are required" });
@@ -93,6 +167,10 @@ router.post("/login", async (req, res, next) => {
         await adminDoc.save();
       }
 
+      if (rememberMe) {
+        await issueRememberCookie(req, res, adminDoc.id);
+      }
+
       const token = signToken({ sub: adminDoc.id, role: ROLES.ADMIN });
       return res.json({ token, user: await toClientUser(adminDoc) });
     }
@@ -115,6 +193,10 @@ router.post("/login", async (req, res, next) => {
       return res.status(401).json({ message: "Invalid email or password" });
     }
 
+    if (rememberMe) {
+      await issueRememberCookie(req, res, user.id);
+    }
+
     const token = signToken({ sub: user.id, role: user.role });
     return res.json({ token, user: await toClientUser(user) });
   } catch (error) {
@@ -123,6 +205,7 @@ router.post("/login", async (req, res, next) => {
 });
 
 // ─── Logout ───────────────────────────────────────────────────────────────────
+// Ends the active session only. Does NOT revoke remember-me cookies.
 
 router.post("/logout", (_req, res) => {
   res.json({ ok: true });
@@ -255,6 +338,7 @@ router.delete("/users/:id", requireAuth, async (req, res, next) => {
     }
 
     await User.findByIdAndDelete(req.params.id);
+    await revokeAllRememberTokensForUser(req.params.id);
     return res.status(204).send();
   } catch (error) {
     return next(error);
@@ -282,6 +366,7 @@ router.patch("/users/:id/password", requireAuth, async (req, res, next) => {
 
     target.password_hash = await hashPassword(password);
     await target.save();
+    await revokeAllRememberTokensForUser(target.id);
 
     return res.json({ ok: true });
   } catch (error) {
@@ -371,6 +456,7 @@ router.patch("/me/password", requireAuth, async (req, res, next) => {
 
     user.password_hash = await hashPassword(newPassword);
     await user.save();
+    await revokeAllRememberTokensForUser(user.id);
 
     return res.json({ ok: true });
   } catch (error) {
