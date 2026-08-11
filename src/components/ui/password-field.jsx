@@ -16,6 +16,7 @@ export function PasswordField({
   disabled = false,
   minLength = 6,
   showLengthValidation = false,
+  autoFocus = false,
 }) {
   const inputRef = useRef(null);
   const [visible, setVisible] = useState(false);
@@ -57,6 +58,7 @@ export function PasswordField({
           autoComplete={autoComplete}
           required={required}
           disabled={disabled}
+          autoFocus={autoFocus}
           dir="ltr"
           lang="en"
           inputMode="text"

@@ -27,13 +27,16 @@ Login uses the local API (not Base44):
 
 On first start with an empty `User` collection, an admin is created from `ADMIN_EMAIL` / `ADMIN_PASSWORD` in `.env`.
 
-**Permission levels** (set in Admin Tools → הרשאות משתמשים):
+**Permission levels** (stored as `User.role`; capabilities live in `PermissionRule`):
 
 | Level | Access |
 |--------|--------|
-| מנהל (`admin`) | Full app + user management |
-| משתמש (`user`) | Assignments, students, reports, etc. |
-| דיווח זמנים (`reporter`) | `/time-reporting` only |
+| מנהל מערכת (`admin`) | Full app + all user management + approve time reports |
+| משתמש (`user`) | Full main app; invite reporters & workplace managers |
+| מנהל מקומות עבודה (`workplace_manager`) | `/workplaces` only |
+| מדווח זמנים (`reporter`) | `/time-reporting` only |
+
+Permission matrix API: `/api/permission-rules` (seeded on server start; hydration attaches flags to the user on login).
 
 The JWT is stored in `localStorage` as `auth_token` and sent on every API request.
 
@@ -43,6 +46,7 @@ The Express server lives in `server/` and exposes:
 
 - `GET /api/health`
 - Auth routes under `/api/auth`
+- Permission rules under `/api/permission-rules`
 - `GET/POST/PATCH/DELETE /api/entities/:entityName` (authenticated; see middleware)
 - `POST /api/entities/:entityName/filter`
 - `POST /api/entities/:entityName/bulk`

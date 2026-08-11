@@ -1,7 +1,7 @@
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/lib/AuthContext';
 import { ShieldOff } from 'lucide-react';
-import { isReporterOnly, isWorkplaceManagerOnly } from '@/lib/permissions';
+import { canAccessMainApp, isReporterOnly, isWorkplaceManagerOnly } from '@/lib/permissions';
 
 export default function RequirePermission({ check, children, fallback }) {
   const { user, isLoadingAuth } = useAuth();
@@ -46,6 +46,10 @@ export function RequireMainApp({ children }) {
 
   if (isReporterOnly(user)) {
     return <Navigate to="/time-reporting" replace />;
+  }
+
+  if (!canAccessMainApp(user) && !isWorkplaceManagerOnly(user)) {
+    return <Navigate to="/login" replace />;
   }
 
   return children;

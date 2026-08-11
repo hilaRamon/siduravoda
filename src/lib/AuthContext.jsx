@@ -60,8 +60,18 @@ export const AuthProvider = ({ children }) => {
     checkUserAuth();
   }, [checkUserAuth]);
 
-  const login = useCallback(async (email, password) => {
-    const loggedInUser = await base44.auth.login(email, password);
+  const login = useCallback(async (email, password, rememberMe = false) => {
+    const loggedInUser = await base44.auth.login(email, password, rememberMe);
+    setUser(loggedInUser);
+    setIsAuthenticated(true);
+    setAuthError(null);
+    setIsLoadingAuth(false);
+    setAuthChecked(true);
+    return loggedInUser;
+  }, []);
+
+  const autoLogin = useCallback(async (email) => {
+    const loggedInUser = await base44.auth.autoLogin(email);
     setUser(loggedInUser);
     setIsAuthenticated(true);
     setAuthError(null);
@@ -99,6 +109,7 @@ export const AuthProvider = ({ children }) => {
         appPublicSettings: { auth_required: true },
         logout,
         login,
+        autoLogin,
         navigateToLogin,
         checkUserAuth,
       }}

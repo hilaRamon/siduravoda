@@ -29,6 +29,7 @@ export async function apiRequest(path, options = {}) {
 
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...options,
+    credentials: "include",
     headers,
   });
 
@@ -130,6 +131,7 @@ async function htmlToPdf({ html }) {
 
   const response = await fetch(`${API_BASE_URL}/api/integrations/core/html-to-pdf`, {
     method: "POST",
+    credentials: "include",
     headers,
     body: JSON.stringify({ html }),
   });
@@ -210,13 +212,24 @@ export const base44 = {
     },
   },
   auth: {
-    async login(email, password) {
+    async login(email, password, rememberMe = false) {
       const result = await apiRequest("/api/auth/login", {
         method: "POST",
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email, password, rememberMe }),
       });
       setAuthToken(result.token);
       return result.user;
+    },
+    async autoLogin(email) {
+      const result = await apiRequest("/api/auth/auto-login", {
+        method: "POST",
+        body: JSON.stringify({ email }),
+      });
+      setAuthToken(result.token);
+      return result.user;
+    },
+    listLoginEmails() {
+      return apiRequest("/api/auth/login-emails");
     },
     async logout() {
       try {

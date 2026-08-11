@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
-import { isAdmin } from '@/lib/permissions';
+import { canApproveTimeReports } from '@/lib/permissions';
 import { Button } from '@/components/ui/button';
 import { CheckCircle2, XCircle, Clock, CalendarDays, Building2, User } from 'lucide-react';
 import { format } from 'date-fns';
@@ -87,8 +87,7 @@ export default function TimeReportsAdmin() {
   const queryClient = useQueryClient();
 
   const { user: currentUser, isLoadingAuth: loadingUser } = useAuth();
-  const userIsAdmin = isAdmin(currentUser);
-  const readOnly = !userIsAdmin;
+  const readOnly = !canApproveTimeReports(currentUser);
 
   const { data: reports = [], isLoading } = useQuery({
     queryKey: ['time-reports', selectedDate],

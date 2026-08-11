@@ -1,8 +1,11 @@
 import { getModel } from "../models/index.js";
 import { hashPassword } from "./password.js";
 import { ROLES } from "../config/permissions.js";
+import { ensurePermissionRulesSeeded } from "../services/permissionRuleService.js";
 
 export async function ensureAdminUser() {
+  await ensurePermissionRulesSeeded();
+
   const User = getModel("User");
   const count = await User.countDocuments();
   if (count > 0) return;
@@ -16,9 +19,6 @@ export async function ensureAdminUser() {
     password_hash: await hashPassword(password),
     full_name: fullName,
     role: ROLES.ADMIN,
-    can_report_time: false,
-    can_view_time_reports: true,
-    can_manage_workplaces: false,
     is_active: true,
   });
 

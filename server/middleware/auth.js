@@ -1,6 +1,13 @@
 import { verifyToken } from "../lib/jwt.js";
 import { getModel } from "../models/index.js";
 import { sanitizeUser } from "../config/permissions.js";
+import { hydrateUser } from "../services/permissionRuleService.js";
+import {
+  findValidRememberToken,
+  readRememberEntries,
+  setRememberCookie,
+  slideRememberToken,
+} from "../lib/rememberMe.js";
 
 const AUTH_HEADER = "authorization";
 const TOKEN_COOKIE = "auth_token";
@@ -16,7 +23,22 @@ export function extractToken(req) {
   return null;
 }
 
-export async function attachUser(req, _res, next) {
+async function maybeSlideRememberToken(req, res, userId) {
+  try {
+    const entries = readRememberEntries(req);
+    if (!entries.length) return;
+    const match = await findValidRememberToken(userId, entries);
+    if (!match) return;
+    const slid = await slideRememberToken(match.doc);
+    if (slid) {
+      setRememberCookie(res, entries);
+    }
+  } catch {
+    // Sliding is best-effort; never block the request
+  }
+}
+
+export async function attachUser(req, res, next) {
   req.user = null;
   const token = extractToken(req);
   if (!token) {
@@ -30,7 +52,10 @@ export async function attachUser(req, _res, next) {
     if (!doc || doc.is_active === false) {
       return next();
     }
-    req.user = sanitizeUser(doc);
+    req.user = await hydrateUser(sanitizeUser(doc));
+    // Fire-and-forget slide; don't delay the response path unnecessarily,
+    // but await so Set-Cookie is applied before the response is sent.
+    await maybeSlideRememberToken(req, res, doc.id);
     return next();
   } catch {
     return next();
