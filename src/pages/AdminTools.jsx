@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { base44 } from '@/api/base44Client';
+import { assignmentApi } from '@/api/assignmentApi';
 import { useAuth } from '@/lib/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Shuffle, Loader2, UserCheck, BookOpen, Settings2, HardDriveDownload, Shield } from 'lucide-react';
@@ -55,11 +56,11 @@ export default function AdminTools() {
     const allDates = eachDayOfInterval({ start: startDate, end: endDate }).map(d => format(d, 'yyyy-MM-dd'));
 
     setRandomStatus('מוחק שיבוצים קיימים...');
-    const existingAssignments = await base44.entities.Assignment.list();
+    const existingAssignments = await assignmentApi.list({ limit: 10000 });
     const toDelete = existingAssignments.filter(a => a.date >= '2026-04-01');
     for (let i = 0; i < toDelete.length; i++) {
       setRandomStatus(`מוחק שיבוצים... ${i + 1} / ${toDelete.length}`);
-      await base44.entities.Assignment.delete(toDelete[i].id);
+      await assignmentApi.remove(toDelete[i].id);
       await new Promise(r => setTimeout(r, 200));
     }
 
@@ -81,7 +82,7 @@ export default function AdminTools() {
 
     for (let i = 0; i < allNew.length; i += 100) {
       setRandomStatus(`יוצר שיבוצים... ${Math.min(i + 100, allNew.length)} / ${allNew.length}`);
-      await base44.entities.Assignment.bulkCreate(allNew.slice(i, i + 100));
+      await assignmentApi.bulkCreate(allNew.slice(i, i + 100));
     }
 
     setRandomizing(false);
@@ -95,7 +96,7 @@ export default function AdminTools() {
     setAssigningRoles(true);
     setRolesStatus('טוען שיבוצים...');
 
-    const allAssignments = await base44.entities.Assignment.list();
+    const allAssignments = await assignmentApi.list({ limit: 10000 });
     const relevant = allAssignments.filter(a => a.date >= '2026-04-01');
     const byDate = {};
     relevant.forEach(a => { if (!byDate[a.date]) byDate[a.date] = []; byDate[a.date].push(a); });
@@ -122,7 +123,7 @@ export default function AdminTools() {
 
     setRolesStatus(`מעדכן תפקידים... 0 / ${updates.length}`);
     for (let i = 0; i < updates.length; i++) {
-      await base44.entities.Assignment.update(updates[i].id, { role: updates[i].role });
+      await assignmentApi.update(updates[i].id, { role: updates[i].role });
       if (i % 5 === 0) { setRolesStatus(`מעדכן תפקידים... ${i + 1} / ${updates.length}`); await new Promise(r => setTimeout(r, 150)); }
     }
 

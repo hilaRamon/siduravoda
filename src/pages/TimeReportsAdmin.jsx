@@ -1,11 +1,13 @@
 import { useState, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
+import { assignmentApi } from '@/api/assignmentApi';
 import { useAuth } from '@/lib/AuthContext';
 import { canApproveTimeReports } from '@/lib/permissions';
 import { Button } from '@/components/ui/button';
 import { CheckCircle2, XCircle, Clock, CalendarDays, Building2, User } from 'lucide-react';
 import { format } from 'date-fns';
+import { assignmentKeys } from '@/queries/assignmentQueries';
 
 const STATUS_STYLES = {
   'ממתין': 'bg-yellow-100 text-yellow-700',
@@ -169,17 +171,17 @@ export default function TimeReportsAdmin() {
     if (status === 'אושר') {
       const duration = calcDuration(report.start_time, report.end_time);
       if (duration !== null) {
-        const assignments = await base44.entities.Assignment.filter({
+        const assignments = await assignmentApi.list({
           date: report.date,
           student_id: report.student_id,
         });
         if (assignments.length > 0) {
-          await base44.entities.Assignment.update(assignments[0].id, { hours: duration });
+          await assignmentApi.update(assignments[0].id, { hours: duration });
         }
       }
     }
     queryClient.invalidateQueries({ queryKey: ['time-reports', selectedDate] });
-    queryClient.invalidateQueries({ queryKey: ['assignments', selectedDate] });
+    queryClient.invalidateQueries({ queryKey: assignmentKeys.byDate(selectedDate) });
   };
 
   // Approve/reject all students in a workplace group

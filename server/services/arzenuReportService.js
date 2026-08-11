@@ -1,4 +1,5 @@
 import { getModel } from "../models/index.js";
+import Assignment from "../models/Assignment.js";
 import { SKIP_FARMS, SKIP_WORKPLACES } from "../lib/reportConstants.js";
 
 async function getWorkplaceMaps() {
@@ -59,7 +60,6 @@ function resolveStudentName(studentId, assignmentName, byId) {
  * @param {{ startDate: string, endDate: string }} params
  */
 export async function getArzenuReport({ startDate, endDate }) {
-  const Assignment = getModel("Assignment");
   const [{ byId: workplaceById, skipIds }, studentById] = await Promise.all([
     getWorkplaceMaps(),
     getStudentMap(),

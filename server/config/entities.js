@@ -34,22 +34,6 @@ export const entityDefinitions = {
       notes: { type: String },
     },
   },
-  Assignment: {
-    required: ["date", "student_id", "workplace_id"],
-    schema: {
-      date: { type: String, required: true },
-      student_id: { type: String, required: true },
-      student_name: { type: String },
-      workplace_id: { type: String, required: true },
-      workplace_name: { type: String },
-      role: { type: String },
-      rate: { type: Number, default: 40 },
-      hours: { type: Number, default: 4.5 },
-      bonus: { type: Number },
-      notes: { type: String },
-    },
-    indexes: [{ fields: { date: 1, student_id: 1 } }],
-  },
   Vehicle: {
     required: ["name"],
     schema: {

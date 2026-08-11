@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { absenceApi } from "@/api/absenceApi";
+import { assignmentApi } from "@/api/assignmentApi";
 import { base44 } from "@/api/base44Client";
 import {
   NOT_WORKING_WORKPLACE_NAME,
@@ -23,7 +24,8 @@ export function useAssignments(date, options = {}) {
   return useQuery({
     queryKey: assignmentKeys.byDate(date),
     queryFn: () =>
-      base44.entities.Assignment.filter({ date }, "-created_date", 2000),
+      assignmentApi.list({ date, sort: "-created_date", limit: 2000 }),
+    enabled: !!date,
     ...options,
   });
 }
@@ -34,7 +36,7 @@ export function useAssignments(date, options = {}) {
 export function useCreateAssignment() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (data) => base44.entities.Assignment.create(data),
+    mutationFn: async (data) => assignmentApi.create(data),
     onSuccess: (_result, variables) => {
       invalidateAssignmentQueries(queryClient, variables?.date);
     },
@@ -55,7 +57,7 @@ export function useUpdateAssignment() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (/** @type {AssignmentUpdateInput} */ vars) =>
-      base44.entities.Assignment.update(vars.id, vars.data),
+      assignmentApi.update(vars.id, vars.data),
     onSuccess: (_result, variables) => {
       invalidateAssignmentQueries(queryClient, variables?.date);
     },
@@ -75,7 +77,7 @@ export function useDeleteAssignment() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (/** @type {AssignmentDeleteInput} */ vars) =>
-      base44.entities.Assignment.delete(vars.id),
+      assignmentApi.remove(vars.id),
     onSuccess: (_result, variables) => {
       invalidateAssignmentQueries(queryClient, variables?.date);
     },
@@ -107,10 +109,8 @@ export function useAssignStudent() {
 
       if (allForStudent.length > 1) {
         const [keep, ...extras] = allForStudent;
-        await Promise.all(
-          extras.map((a) => base44.entities.Assignment.delete(a.id)),
-        );
-        await base44.entities.Assignment.update(keep.id, {
+        await Promise.all(extras.map((a) => assignmentApi.remove(a.id)));
+        await assignmentApi.update(keep.id, {
           workplace_id: workplace.id,
           workplace_name: workplace.name,
         });
@@ -118,14 +118,14 @@ export function useAssignStudent() {
       }
 
       if (allForStudent.length === 1) {
-        await base44.entities.Assignment.update(allForStudent[0].id, {
+        await assignmentApi.update(allForStudent[0].id, {
           workplace_id: workplace.id,
           workplace_name: workplace.name,
         });
         return;
       }
 
-      await base44.entities.Assignment.create({
+      await assignmentApi.create({
         date,
         student_id: student.id,
         student_name: student.full_name,
@@ -144,11 +144,11 @@ export function useAssignStudent() {
 async function bulkUpdateAssignments({ toCreate = [], toUpdate = [] }) {
   await Promise.all(
     toUpdate.map(({ id, fullRecord }) =>
-      base44.entities.Assignment.update(id, fullRecord),
+      assignmentApi.update(id, fullRecord),
     ),
   );
   if (toCreate.length > 0) {
-    await base44.entities.Assignment.bulkCreate(toCreate);
+    await assignmentApi.bulkCreate(toCreate);
   }
 }
 
@@ -172,7 +172,7 @@ export function useBulkUpsertAssignments() {
         await Promise.all(
           toCreate
             .slice(i, i + CHUNK_SIZE)
-            .map((record) => base44.entities.Assignment.create(record)),
+            .map((record) => assignmentApi.create(record)),
         );
         doneOps++;
         onProgress?.(Math.round((doneOps / Math.max(totalOps, 1)) * 100));
@@ -182,9 +182,7 @@ export function useBulkUpsertAssignments() {
         await Promise.all(
           toUpdate
             .slice(i, i + CHUNK_SIZE)
-            .map(({ id, fullRecord }) =>
-              base44.entities.Assignment.update(id, fullRecord),
-            ),
+            .map(({ id, fullRecord }) => assignmentApi.update(id, fullRecord)),
         );
         doneOps++;
         onProgress?.(Math.round((doneOps / Math.max(totalOps, 1)) * 100));
@@ -252,11 +250,11 @@ export function useCloneDayAssignments() {
       );
 
       report(40, "טוען שיבוצים קיימים...");
-      const targetAssignments = await base44.entities.Assignment.filter(
-        { date: targetDate },
-        "-created_date",
-        2000,
-      );
+      const targetAssignments = await assignmentApi.list({
+        date: targetDate,
+        sort: "-created_date",
+        limit: 2000,
+      });
 
       const targetByStudent = {};
       targetAssignments.forEach((a) => {
@@ -288,7 +286,7 @@ export function useCloneDayAssignments() {
           }
         });
       for (const id of duplicatesToDelete) {
-        await base44.entities.Assignment.delete(id);
+        await assignmentApi.remove(id);
       }
 
       const DAY_NUM_TO_HEB = { 0: "א", 1: "ב", 2: "ג", 3: "ד", 4: "ה" };

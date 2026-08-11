@@ -3,6 +3,7 @@ import path from "node:path";
 import * as XLSX from "xlsx";
 import JSZip from "jszip";
 import { getModel } from "../models/index.js";
+import Assignment from "../models/Assignment.js";
 import { sendVerificationToRecipients, sendWeeklyBackupToRecipients } from "../lib/email.js";
 import {
   mapAssignmentExportRow,
@@ -28,7 +29,6 @@ async function loadBackupData() {
   const Student = getModel("Student");
   const Workplace = getModel("Workplace");
   const Vehicle = getModel("Vehicle");
-  const Assignment = getModel("Assignment");
   const AppSettings = getModel("AppSettings");
 
   const [students, workplaces, vehicles, assignments, settingsDoc] = await Promise.all([

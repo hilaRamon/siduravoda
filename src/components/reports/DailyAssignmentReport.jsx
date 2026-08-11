@@ -12,16 +12,14 @@ import {
   toGregDate,
   toHebrewDate,
 } from "@/components/reports/dailyReportPdf";
+import { useAssignments } from "@/queries/assignmentQueries";
 
 export default function DailyAssignmentReport() {
   const [date, setDate] = useState(format(new Date(), "yyyy-MM-dd"));
   const [exporting, setExporting] = useState(false);
   const hiddenRef = useRef(null);
 
-  const { data: assignments = [], isLoading } = useQuery({
-    queryKey: ["assignments", date],
-    queryFn: () => base44.entities.Assignment.filter({ date }),
-  });
+  const { data: assignments = [], isLoading } = useAssignments(date);
 
   const { data: logisticsList = [] } = useQuery({
     queryKey: ["workplace-logistics", date],

@@ -167,7 +167,6 @@ export const base44 = {
   entities: {
     User: createEntityClient("User"),
     Student: createEntityClient("Student"),
-    Assignment: createEntityClient("Assignment"),
     Vehicle: createEntityClient("Vehicle"),
     Role: createEntityClient("Role"),
     Workplace: createEntityClient("Workplace"),
