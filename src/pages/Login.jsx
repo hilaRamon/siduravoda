@@ -5,11 +5,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Loader2, LogIn } from 'lucide-react';
 import { PasswordField } from '@/components/ui/password-field';
-import { canReportTime, isWorkplaceManagerOnly } from '@/lib/permissions';
+import { isReporterOnly, isWorkplaceManagerOnly } from '@/lib/permissions';
 
 function getPostLoginTarget(user, from) {
   if (isWorkplaceManagerOnly(user)) return '/workplaces';
-  if (canReportTime(user) && user.role !== 'admin') return '/time-reporting';
+  if (isReporterOnly(user)) return '/time-reporting';
   return from;
 }
 
@@ -51,11 +51,7 @@ export default function Login() {
     setLoading(true);
     try {
       const loggedIn = await login(email.trim(), password);
-      const target =
-        canReportTime(loggedIn) && loggedIn.role !== 'admin'
-          ? '/time-reporting'
-          : from;
-      navigate(target, { replace: true });
+      navigate(getPostLoginTarget(loggedIn, from), { replace: true });
     } catch (err) {
       setError(err?.message || 'התחברות נכשלה');
     } finally {

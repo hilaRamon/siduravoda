@@ -2,12 +2,22 @@ import express from "express";
 import { getModel } from "../models/index.js";
 import { hashPassword, verifyPassword, generateTemporaryPassword } from "../lib/password.js";
 import { signToken } from "../lib/jwt.js";
-import { levelToFields, sanitizeUser, isRegularUser } from "../config/permissions.js";
+import {
+  sanitizeUser,
+  isRegularUser,
+  getAllowedInviteRoles,
+  ROLES,
+} from "../config/permissions.js";
 import { attachUser, requireAuth } from "../middleware/auth.js";
+import { hydrateUser } from "../services/permissionRuleService.js";
 
 const router = express.Router();
 
 router.use(attachUser);
+
+async function toClientUser(doc) {
+  return hydrateUser(sanitizeUser(doc));
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -30,18 +40,8 @@ function callerIsEnvAdmin(req) {
   return email && req.user.email === email;
 }
 
-function getAllowedInviteLevels(req) {
-  if (callerIsEnvAdmin(req)) return new Set(["user", "reporter", "workplace_manager"]);
-  if (isRegularUser(req.user)) return new Set(["reporter", "workplace_manager"]);
-  return new Set();
-}
-
-function isReporterAccount(userDoc) {
-  return userDoc?.role === "user" && userDoc?.can_report_time === true;
-}
-
-function isWorkplaceManagerAccount(userDoc) {
-  return userDoc?.role === "user" && userDoc?.can_manage_workplaces === true;
+function resolveRequestedRole(body) {
+  return body?.role || body?.level || ROLES.REPORTER;
 }
 
 function canManageTargetUser(req, target) {
@@ -51,7 +51,9 @@ function canManageTargetUser(req, target) {
   }
   if (callerIsEnvAdmin(req)) return true;
   if (isRegularUser(req.user)) {
-    return isReporterAccount(target) || isWorkplaceManagerAccount(target);
+    return (
+      target.role === ROLES.REPORTER || target.role === ROLES.WORKPLACE_MANAGER
+    );
   }
   return false;
 }
@@ -83,16 +85,16 @@ router.post("/login", async (req, res, next) => {
           email,
           password_hash: await hashPassword(password),
           full_name: envAdmin.fullName,
-          role: "admin",
-          can_report_time: false,
-          can_manage_workplaces: false,
-          can_view_time_reports: true,
+          role: ROLES.ADMIN,
           is_active: true,
         });
+      } else if (adminDoc.role !== ROLES.ADMIN) {
+        adminDoc.role = ROLES.ADMIN;
+        await adminDoc.save();
       }
 
-      const token = signToken({ sub: adminDoc.id, role: "admin" });
-      return res.json({ token, user: sanitizeUser(adminDoc) });
+      const token = signToken({ sub: adminDoc.id, role: ROLES.ADMIN });
+      return res.json({ token, user: await toClientUser(adminDoc) });
     }
 
     // Regular user auth: check DB
@@ -114,7 +116,7 @@ router.post("/login", async (req, res, next) => {
     }
 
     const token = signToken({ sub: user.id, role: user.role });
-    return res.json({ token, user: sanitizeUser(user) });
+    return res.json({ token, user: await toClientUser(user) });
   } catch (error) {
     return next(error);
   }
@@ -136,9 +138,11 @@ router.get("/users", requireAuth, async (req, res, next) => {
   try {
     const User = getModel("User");
     const docs = await User.find().sort({ created_date: -1 }).exec();
-    const manageable = docs
-      .filter((u) => canManageTargetUser(req, u))
-      .map((u) => sanitizeUser(u));
+    const manageable = [];
+    for (const u of docs) {
+      if (!canManageTargetUser(req, u)) continue;
+      manageable.push(await toClientUser(u));
+    }
     res.json(manageable);
   } catch (error) {
     next(error);
@@ -147,26 +151,25 @@ router.get("/users", requireAuth, async (req, res, next) => {
 
 // ─── Invite ───────────────────────────────────────────────────────────────────
 //
-// Admin can invite: user | reporter | workplace_manager
-// Regular user (role=user) can invite: reporter | workplace_manager only
-// Nobody else can invite.
+// can_manage_users=all: user | reporter | workplace_manager
+// can_manage_users=limited: reporter | workplace_manager only
 
 router.post("/invite", requireAuth, async (req, res, next) => {
   try {
-    const allowedLevels = getAllowedInviteLevels(req);
-    if (allowedLevels.size === 0) {
+    const allowedRoles = getAllowedInviteRoles(req.user);
+    if (allowedRoles.size === 0) {
       return res.status(403).json({ message: "You don't have permission to invite users" });
     }
 
     const email = String(req.body.email || "").trim().toLowerCase();
     const fullName = String(req.body.full_name || "").trim();
-    const requestedLevel = req.body.level || "reporter";
+    const requestedRole = resolveRequestedRole(req.body);
 
     if (!email) {
       return res.status(400).json({ message: "Email is required" });
     }
 
-    if (!allowedLevels.has(requestedLevel)) {
+    if (!allowedRoles.has(requestedRole)) {
       return res.status(403).json({ message: "You cannot create this user level" });
     }
 
@@ -183,18 +186,17 @@ router.post("/invite", requireAuth, async (req, res, next) => {
     }
 
     const temporaryPassword = generateTemporaryPassword();
-    const fields = levelToFields(requestedLevel);
 
     const user = await User.create({
       email,
       full_name: fullName,
       password_hash: await hashPassword(temporaryPassword),
-      ...fields,
+      role: requestedRole,
       is_active: true,
     });
 
     return res.status(201).json({
-      user: sanitizeUser(user),
+      user: await toClientUser(user),
       temporaryPassword,
     });
   } catch (error) {
@@ -214,9 +216,9 @@ router.patch("/users/:id", requireAuth, async (req, res, next) => {
       return res.status(403).json({ message: "You cannot edit this user" });
     }
 
-    // Level transitions are constrained by what caller can create
-    const allowedLevels = getAllowedInviteLevels(req);
-    if (req.body.level && !allowedLevels.has(req.body.level)) {
+    const allowedRoles = getAllowedInviteRoles(req.user);
+    const requestedRole = req.body.role || req.body.level;
+    if (requestedRole && !allowedRoles.has(requestedRole)) {
       return res.status(403).json({ message: "You cannot set this user level" });
     }
 
@@ -225,13 +227,8 @@ router.patch("/users/:id", requireAuth, async (req, res, next) => {
     for (const key of allowed) {
       if (req.body[key] !== undefined) payload[key] = req.body[key];
     }
-    if (req.body.level) {
-      Object.assign(payload, levelToFields(req.body.level));
-    }
-
-    if (!callerIsEnvAdmin(req)) {
-      // User-level managers cannot grant report-view privileges
-      payload.can_view_time_reports = false;
+    if (requestedRole) {
+      payload.role = requestedRole;
     }
 
     const doc = await User.findByIdAndUpdate(req.params.id, payload, {
@@ -239,7 +236,7 @@ router.patch("/users/:id", requireAuth, async (req, res, next) => {
       runValidators: true,
     });
 
-    return res.json(sanitizeUser(doc));
+    return res.json(await toClientUser(doc));
   } catch (error) {
     return next(error);
   }
@@ -337,7 +334,7 @@ router.patch("/me", requireAuth, async (req, res, next) => {
     }
 
     await user.save();
-    return res.json(sanitizeUser(user));
+    return res.json(await toClientUser(user));
   } catch (error) {
     return next(error);
   }

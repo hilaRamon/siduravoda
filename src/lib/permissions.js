@@ -5,48 +5,44 @@ export function isAdmin(user) {
 }
 
 export function isRegularUser(user) {
-  return (
-    user?.role === 'user' &&
-    user?.can_report_time !== true &&
-    user?.can_manage_workplaces !== true
-  );
+  return user?.role === 'user';
 }
 
 export function isReporterOnly(user) {
-  return (
-    user?.role === 'user' &&
-    user?.can_report_time === true &&
-    user?.can_view_time_reports !== true
-  );
+  return user?.role === 'reporter';
 }
 
 export function isWorkplaceManagerOnly(user) {
-  return (
-    user?.role === 'user' &&
-    user?.can_manage_workplaces === true &&
-    user?.can_report_time !== true
-  );
+  return user?.role === 'workplace_manager';
 }
 
 export function canReportTime(user) {
-  return isAdmin(user) || user?.can_report_time === true;
+  return user?.can_report_time === true;
 }
 
 export function canViewTimeReports(user) {
-  return isAdmin(user) || isRegularUser(user) || user?.can_view_time_reports === true;
+  return user?.can_view_time_reports === true;
+}
+
+export function canApproveTimeReports(user) {
+  return user?.can_approve_time_reports === true;
 }
 
 export function canAccessWorkplacesApp(user) {
-  return isAdmin(user) || isRegularUser(user) || isWorkplaceManagerOnly(user);
+  return user?.can_manage_workplaces === true;
 }
 
-/** Admin tools: admin gets full user management; regular user gets reporter-invite only */
+/** Admin tools: driven by hydrated PermissionRule flag */
 export function canAccessAdminTools(user) {
-  return isAdmin(user) || isRegularUser(user);
+  return user?.can_access_admin_tools === true;
 }
 
 export function canAccessMainApp(user) {
-  return user?.is_active !== false && (isAdmin(user) || isRegularUser(user));
+  return user?.is_active !== false && user?.can_access_main_app === true;
+}
+
+export function getManageUsersLevel(user) {
+  return user?.can_manage_users || 'none';
 }
 
 /** All main-app nav items (path → label) */
@@ -81,6 +77,6 @@ export function getDocumentTitle(pathname) {
 
 /** Nav items visible per user */
 export function getVisibleNavItems(user) {
-  if (isAdmin(user) || isRegularUser(user)) return NAV_ITEMS;
+  if (user?.can_access_main_app === true) return NAV_ITEMS;
   return [];
 }

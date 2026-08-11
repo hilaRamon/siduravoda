@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
@@ -10,14 +10,8 @@ import { PasswordField } from '@/components/ui/password-field';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useAuth } from '@/lib/AuthContext';
-import { isAdmin, isRegularUser } from '@/lib/permissions';
-
-function getUserLevel(u) {
-  if (u.role === 'admin') return 'admin';
-  if (u.can_report_time) return 'reporter';
-  if (u.can_manage_workplaces) return 'workplace_manager';
-  return 'user';
-}
+import { getManageUsersLevel } from '@/lib/permissions';
+import { usePermissionRules } from '@/queries/permissionRuleQueries';
 
 /** Same character set / length as server generateTemporaryPassword */
 function generatePassword() {
@@ -29,30 +23,34 @@ function generatePassword() {
   return out;
 }
 
-// Levels available to admin (cannot create another admin)
-const ADMIN_LEVELS = [
-  {
-    value: 'user',
-    label: 'משתמש',
+const ROLE_STYLES = {
+  user: {
     description: 'גישה בסיסית למערכת',
     color: 'bg-secondary text-secondary-foreground border-border',
     activeColor: 'bg-slate-600 text-white border-slate-600',
   },
-  {
-    value: 'reporter',
-    label: 'דיווח זמנים',
+  reporter: {
     description: 'גישה לקישור דיווח הזמנים בלבד',
     color: 'bg-blue-50 text-blue-700 border-blue-200',
     activeColor: 'bg-blue-600 text-white border-blue-600',
   },
-  {
-    value: 'workplace_manager',
-    label: 'מקומות עבודה',
+  workplace_manager: {
     description: 'גישה לעמוד מקומות עבודה בלבד',
     color: 'bg-emerald-50 text-emerald-700 border-emerald-200',
     activeColor: 'bg-emerald-600 text-white border-emerald-600',
   },
-];
+};
+
+function toLevelMeta(rule) {
+  const style = ROLE_STYLES[rule.role] || ROLE_STYLES.user;
+  return {
+    value: rule.role,
+    label: rule.label_he || rule.role,
+    description: style.description,
+    color: style.color,
+    activeColor: style.activeColor,
+  };
+}
 
 // ─── Set password dialog ──────────────────────────────────────────────────────
 
@@ -261,7 +259,7 @@ function InviteBox({ allowedLevel, label }) {
 
 // ─── Admin view ───────────────────────────────────────────────────────────────
 
-function UserManager({ canManageUsers, inviteOptions }) {
+function UserManager({ canManageUsers, inviteOptions, levelOptions }) {
   const queryClient = useQueryClient();
   const [updating, setUpdating] = useState(null);
   const [deleting, setDeleting] = useState(null);
@@ -274,16 +272,12 @@ function UserManager({ canManageUsers, inviteOptions }) {
   });
 
   const manageableUsers = users;
-
-  const levelButtons =
-    inviteOptions.includes('user')
-      ? ADMIN_LEVELS
-      : ADMIN_LEVELS.filter((l) => inviteOptions.includes(l.value));
+  const levelButtons = levelOptions.filter((l) => inviteOptions.includes(l.value));
 
   const handleSetLevel = async (user, level) => {
     setUpdating(user.id);
     try {
-      await base44.auth.updateUser(user.id, { level });
+      await base44.auth.updateUser(user.id, { role: level, level });
       queryClient.invalidateQueries({ queryKey: ['users-list'] });
     } finally {
       setUpdating(null);
@@ -301,17 +295,21 @@ function UserManager({ canManageUsers, inviteOptions }) {
     }
   };
 
+  const inviteLabels = {
+    user: 'הוספת משתמש רגיל',
+    reporter: 'הוספת מדווח זמנים',
+    workplace_manager: 'הוספת מנהל מקומות עבודה',
+  };
+
   return (
     <div className="space-y-5 max-w-3xl">
-      {inviteOptions.includes('user') && (
-        <InviteBox allowedLevel="user" label="הוספת משתמש רגיל" />
-      )}
-      {inviteOptions.includes('reporter') && (
-        <InviteBox allowedLevel="reporter" label="הוספת מדווח זמנים" />
-      )}
-      {inviteOptions.includes('workplace_manager') && (
-        <InviteBox allowedLevel="workplace_manager" label="הוספת מנהל מקומות עבודה" />
-      )}
+      {inviteOptions.map((role) => (
+        <InviteBox
+          key={role}
+          allowedLevel={role}
+          label={inviteLabels[role] || `הוספת ${role}`}
+        />
+      ))}
 
       <div className="bg-card border border-border rounded-2xl overflow-hidden">
         <div className="px-5 py-4 border-b border-border flex items-center gap-2">
@@ -342,10 +340,10 @@ function UserManager({ canManageUsers, inviteOptions }) {
             {manageableUsers.map(u => {
               const isUpdating = updating === u.id;
               const isDeleting = deleting === u.id;
-              const currentLevel = getUserLevel(u);
+              const currentLevel = u.role;
               const levelMeta =
                 levelButtons.find((l) => l.value === currentLevel) ||
-                ADMIN_LEVELS.find((l) => l.value === currentLevel);
+                levelOptions.find((l) => l.value === currentLevel);
 
               return (
                 <div key={u.id} className="flex items-center gap-4 px-5 py-4 flex-wrap hover:bg-secondary/10 transition-colors">
@@ -414,15 +412,34 @@ function UserManager({ canManageUsers, inviteOptions }) {
 
 export default function UserPermissions() {
   const { user } = useAuth();
-  const admin = isAdmin(user);
-  const canManageUsers = admin || isRegularUser(user);
-  const inviteOptions = admin
-    ? ['user', 'reporter', 'workplace_manager']
-    : ['reporter', 'workplace_manager'];
+  const manageLevel = getManageUsersLevel(user);
+  const canManageUsers = manageLevel === 'all' || manageLevel === 'limited';
+  const inviteOptions =
+    manageLevel === 'all'
+      ? ['user', 'reporter', 'workplace_manager']
+      : manageLevel === 'limited'
+        ? ['reporter', 'workplace_manager']
+        : [];
+
+  const { data: rules = [] } = usePermissionRules({
+    enabled: canManageUsers,
+  });
+
+  const levelOptions = useMemo(
+    () =>
+      rules
+        .filter((r) => r.role !== 'admin')
+        .map(toLevelMeta),
+    [rules],
+  );
 
   if (!canManageUsers) return null;
 
   return (
-    <UserManager canManageUsers={canManageUsers} inviteOptions={inviteOptions} />
+    <UserManager
+      canManageUsers={canManageUsers}
+      inviteOptions={inviteOptions}
+      levelOptions={levelOptions}
+    />
   );
 }

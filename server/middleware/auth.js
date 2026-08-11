@@ -1,6 +1,7 @@
 import { verifyToken } from "../lib/jwt.js";
 import { getModel } from "../models/index.js";
 import { sanitizeUser } from "../config/permissions.js";
+import { hydrateUser } from "../services/permissionRuleService.js";
 
 const AUTH_HEADER = "authorization";
 const TOKEN_COOKIE = "auth_token";
@@ -30,7 +31,7 @@ export async function attachUser(req, _res, next) {
     if (!doc || doc.is_active === false) {
       return next();
     }
-    req.user = sanitizeUser(doc);
+    req.user = await hydrateUser(sanitizeUser(doc));
     return next();
   } catch {
     return next();

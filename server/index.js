@@ -14,7 +14,10 @@ import authRouter from "./routes/auth.js";
 import publicRouter from "./routes/public.js";
 import backupRouter from "./routes/backup.js";
 import absenceRequestsRouter from "./routes/absenceRequests.js";
+import permissionRulesRouter from "./routes/permissionRules.js";
 import { ensureAdminUser } from "./lib/bootstrap.js";
+import { migrateLegacyUserRoles } from "./lib/migrateUserRoles.js";
+import { ensurePermissionRulesSeeded } from "./services/permissionRuleService.js";
 
 dotenv.config();
 
@@ -50,6 +53,7 @@ app.use("/api/integrations", uploadsRouter);
 app.use("/api/integrations", reportsRouter);
 app.use("/api/admin/backup", backupRouter);
 app.use("/api/absence-requests", absenceRequestsRouter);
+app.use("/api/permission-rules", permissionRulesRouter);
 
 const distDir = path.resolve(process.cwd(), "dist");
 const hasFrontendBuild = fs.existsSync(path.join(distDir, "index.html"));
@@ -79,6 +83,8 @@ app.use((error, _req, res, _next) => {
 
 async function start() {
   await mongoose.connect(mongoUri);
+  await ensurePermissionRulesSeeded();
+  await migrateLegacyUserRoles();
   await ensureAdminUser();
   app.listen(port, () => {
     console.log(`Server listening on http://localhost:${port}`);

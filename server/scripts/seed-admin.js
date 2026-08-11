@@ -6,6 +6,7 @@ import mongoose from "mongoose";
 import { getModel } from "../models/index.js";
 import { hashPassword } from "../lib/password.js";
 import { ROLES } from "../config/permissions.js";
+import { ensurePermissionRulesSeeded } from "../services/permissionRuleService.js";
 
 dotenv.config();
 
@@ -21,6 +22,7 @@ async function main() {
   }
 
   await mongoose.connect(mongoUri);
+  await ensurePermissionRulesSeeded();
   const User = getModel("User");
 
   const password_hash = await hashPassword(password);
@@ -30,11 +32,21 @@ async function main() {
     existing.password_hash = password_hash;
     existing.full_name = fullName;
     existing.role = ROLES.ADMIN;
-    existing.can_report_time = false;
-    existing.can_view_time_reports = true;
-    existing.can_manage_workplaces = false;
     existing.is_active = true;
+    existing.set("can_report_time", undefined);
+    existing.set("can_view_time_reports", undefined);
+    existing.set("can_manage_workplaces", undefined);
     await existing.save();
+    await User.updateOne(
+      { _id: existing._id },
+      {
+        $unset: {
+          can_report_time: "",
+          can_view_time_reports: "",
+          can_manage_workplaces: "",
+        },
+      },
+    );
     console.log("Updated existing admin user.");
   } else {
     await User.create({
@@ -42,9 +54,6 @@ async function main() {
       password_hash,
       full_name: fullName,
       role: ROLES.ADMIN,
-      can_report_time: false,
-      can_view_time_reports: true,
-      can_manage_workplaces: false,
       is_active: true,
     });
     console.log("Created new admin user.");
