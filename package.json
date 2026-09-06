@@ -16,7 +16,7 @@
     "typecheck": "tsc -p ./jsconfig.json",
     "dev:full": "node --watch server/index.js & vite",
     "preview": "vite preview",
-    "test": "node --test server/lib/pricing.test.js"
+    "test": "node --test server/lib/pricing.test.js server/lib/scheduleVisibility.test.js"
   },
   "dependencies": {
     "@base44/sdk": "^0.8.29",
