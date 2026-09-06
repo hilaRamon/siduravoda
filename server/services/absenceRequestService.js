@@ -253,9 +253,13 @@ export async function rejectAbsenceRequest(id) {
 }
 
 export async function deleteAbsenceRequest(id) {
+  const existing = await getAbsenceRequest(id);
   const deleted = await absenceRequestRepository.deleteById(id);
   if (!deleted) {
     throw new AbsenceRequestError("Absence request not found", 404);
+  }
+  if (existing.status === "אושר" && existing.student_id && existing.date) {
+    await clearAssignmentForDate(existing.student_id, existing.date);
   }
   return deleted;
 }

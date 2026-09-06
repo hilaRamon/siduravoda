@@ -1,14 +1,15 @@
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
-import { useAbsenceRequests } from '@/queries/absenceQueries';
+import { useAbsenceRequests, useDeleteAbsence } from '@/queries/absenceQueries';
 import {
   useFarmerRequests,
   useDeleteFarmerRequest,
 } from '@/queries/farmerRequestQueries';
 import { AddFarmerRequestForm, AddAbsenceForm } from '@/components/calendar/AddMultiDayForm';
+import { DeleteIconButton } from '@/components/calendar/DeleteIconButton';
 import { Button } from '@/components/ui/button';
-import { ChevronRight, ChevronLeft, Trash2, CalendarDays, Loader2 } from 'lucide-react';
+import { ChevronRight, ChevronLeft, CalendarDays } from 'lucide-react';
 import { format, addWeeks, subWeeks, startOfWeek, addDays } from 'date-fns';
 
 function getWeekDays(baseDate) {
@@ -19,7 +20,8 @@ function getWeekDays(baseDate) {
 const DAY_NAMES = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי'];
 
 function DayColumn({ day, farmerRequests, absences, workplaces, students, studentsById }) {
-  const deleteMutation = useDeleteFarmerRequest();
+  const deleteRequestMutation = useDeleteFarmerRequest();
+  const deleteAbsenceMutation = useDeleteAbsence();
   const [deletingId, setDeletingId] = useState(null);
   const dateStr = format(day, 'yyyy-MM-dd');
   const isToday = dateStr === format(new Date(), 'yyyy-MM-dd');
@@ -29,11 +31,11 @@ function DayColumn({ day, farmerRequests, absences, workplaces, students, studen
     a => a.date === dateStr && a.status === 'אושר' && a.student_id,
   );
 
-  const handleDeleteRequest = async (id) => {
+  const handleDelete = async (id, mutateAsync) => {
     if (deletingId) return;
     setDeletingId(id);
     try {
-      await deleteMutation.mutateAsync(id);
+      await mutateAsync(id);
     } finally {
       setDeletingId(null);
     }
@@ -69,18 +71,12 @@ function DayColumn({ day, farmerRequests, absences, workplaces, students, studen
                       <div className="text-sm text-muted-foreground">{req.requested_volunteers} מתנדבים</div>
                     )}
                   </div>
-                  <button
-                    onClick={() => handleDeleteRequest(req.id)}
+                  <DeleteIconButton
+                    onClick={() => handleDelete(req.id, deleteRequestMutation.mutateAsync)}
                     disabled={!!deletingId}
-                    className="shrink-0 text-muted-foreground hover:text-destructive transition-colors disabled:pointer-events-none"
-                    aria-label="מחק דרישה"
-                  >
-                    {isDeleting ? (
-                      <Loader2 size={11} className="animate-spin" />
-                    ) : (
-                      <Trash2 size={11} />
-                    )}
-                  </button>
+                    isDeleting={isDeleting}
+                    ariaLabel="מחק דרישה"
+                  />
                 </div>
               );
             })}
@@ -95,16 +91,30 @@ function DayColumn({ day, farmerRequests, absences, workplaces, students, studen
           <p className="text-sm text-muted-foreground">אין היעדרויות</p>
         ) : (
           <div className="space-y-1">
-            {dayAbsences.map(abs => (
-              <div key={abs.id} className="bg-destructive/5 border border-destructive/15 rounded-md px-2 py-1">
-                <div className="text-sm font-medium">
-                  {studentsById[abs.student_id]?.full_name || '—'}
+            {dayAbsences.map(abs => {
+              const isDeleting = deletingId === abs.id;
+              return (
+                <div
+                  key={abs.id}
+                  className={`flex items-center justify-between gap-1 bg-destructive/5 border border-destructive/15 rounded-md px-2 py-1 ${isDeleting ? 'opacity-60' : ''}`}
+                >
+                  <div className="min-w-0">
+                    <div className="text-sm font-medium">
+                      {studentsById[abs.student_id]?.full_name || '—'}
+                    </div>
+                    {abs.reason && (
+                      <div className="text-sm text-muted-foreground truncate">{abs.reason}</div>
+                    )}
+                  </div>
+                  <DeleteIconButton
+                    onClick={() => handleDelete(abs.id, deleteAbsenceMutation.mutateAsync)}
+                    disabled={!!deletingId}
+                    isDeleting={isDeleting}
+                    ariaLabel="מחק היעדרות"
+                  />
                 </div>
-                {abs.reason && (
-                  <div className="text-sm text-muted-foreground truncate">{abs.reason}</div>
-                )}
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
         <AddAbsenceForm date={dateStr} students={students} />
