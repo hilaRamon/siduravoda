@@ -1,17 +1,14 @@
 import express from "express";
-import { getModel } from "../models/index.js";
-import { buildSort } from "../lib/query.js";
+import { getPublicSchedule } from "../services/publishedScheduleService.js";
 
 const router = express.Router();
 
-/** Latest published schedule PDF — no authentication */
+/** Latest visible published schedule — no authentication */
 router.get("/schedule", async (req, res, next) => {
   try {
-    const Model = getModel("PublishedSchedule");
-    const sort = buildSort("-date");
-    const doc = await Model.findOne().sort(sort).exec();
+    const doc = await getPublicSchedule();
     res.set("Cache-Control", "no-store");
-    res.json(doc ? doc.toJSON() : null);
+    res.json(doc);
   } catch (error) {
     next(error);
   }

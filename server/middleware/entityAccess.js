@@ -5,12 +5,6 @@ import {
   isWorkplaceManagerOnly,
 } from "../config/permissions.js";
 
-/** Public entity reads (no login) */
-function isPublicRead(entityName, req) {
-  if (entityName !== "PublishedSchedule") return false;
-  return req.method === "GET";
-}
-
 function isReadMethod(method) {
   return method === "GET" || method === "POST"; // POST used for /filter
 }
@@ -24,10 +18,6 @@ const REPORTER_READ_ENTITIES = new Set([
 export function checkEntityAccess(req, res, next) {
   const entityName = req.entityName || req.params.entityName;
   const method = req.method;
-
-  if (isPublicRead(entityName, req)) {
-    return next();
-  }
 
   if (!req.user) {
     return res.status(401).json({ message: "Authentication required" });

@@ -259,14 +259,15 @@
 
 ### 2.10 ישות: PublishedSchedule (סידור מפורסם)
 
-**קובץ:** `entities/PublishedSchedule.json`
+**קבצים:** `entities/PublishedSchedule.json` · `server/models/PublishedSchedule.js` · `server/repositories/publishedScheduleRepository.js` · `server/services/publishedScheduleService.js` · `server/controllers/publishedScheduleController.js` · `server/routes/publishedSchedules.js` · `src/api/publishedScheduleApi.js` · `src/queries/publishedScheduleQueries.js`
 
 | שם שדה | סוג | חובה | תיאור |
 |--------|-----|------|--------|
 | `date` | string (date) | ✅ | תאריך הסידור |
-| `file_url` | string | ✅ | URL ל-PDF המפורסם בענן |
+| `file_url` | string | ✅ | URL ל-PDF המפורסם |
+| `snapshot` | object | ❌ | `{ reportGroups, gregDate, hebrewDate }` לתצוגת טלוויזיה |
 
-**כלל:** המערכת מחזיקה **רשומה אחת בלבד** בכל עת. בפרסום חדש — כל הרשומות הקיימות נמחקות ונוצרת רשומה חדשה.
+**כלל:** רשומה אחת לכל תאריך (upsert לפי `date`). פרסום שומר מיד, אך דף `/schedule` מציג רק סידורים שכבר הגיע מועד השחרור שלהם: **16:00 שעון ישראל ביום שלפני** תאריך הסידור. אם המועד כבר עבר — הסידור מוצג מיד. עד אז נשאר הסידור הציבורי הקודם.
 
 ---
 
@@ -329,6 +330,7 @@
 - **מה מאופס:** `role = null`, `bonus = null`
 - **מה נשמר:** `rate`, `hours`
 - **תלמידים יומיים (guest_*):** **לא** מועתקים
+- **תלמיד לא פעיל (`is_active = false`):** **לא** מועתק
 - **תלמיד עם היעדרות מאושרת לתאריך היעד:** מקבל `workplace_id = ''`, `workplace_name = ''` (ללא שיבוץ)
 
 #### 3.1.2א כלל צוות ביום רגיל
@@ -807,8 +809,10 @@ margin = 8mm
 
 #### 5.1.4 פרסום
 
-- יצירת Blob → UploadFile API → שמירת URL ב-PublishedSchedule
-- מחיקת כל הרשומות הישנות לפני שמירת החדשה
+- יצירת Blob → UploadFile API → שמירת URL ב-PublishedSchedule (`PUT /api/published-schedules`, upsert לפי תאריך)
+- אין מחיקה של סידורים מתאריכים אחרים — הסידור הציבורי הקודם נשאר עד מועד השחרור
+- שחרור לציבור: 16:00 שעון ישראל ביום שלפני תאריך הסידור, או מיד אם המועד כבר עבר
+- `GET /api/public/schedule` מחזיר את הסידור העדכני ביותר שכבר מותר להציג
 
 ---
 
@@ -943,7 +947,7 @@ margin = 8mm
 | שעת יציאה לפני כניסה | `שעת יציאה חייבת להיות מאוחרת משעת כניסה` | Toast אדום (3 שניות) |
 | שכפול שלם | `✅ הושלם! שוכפלו {N} שיבוצים לתאריך {date} ({מצב})` | alert() |
 | שגיאה בשכפול | `❌ שגיאה בשכפול: {error.message}` | alert() |
-| פרסום סידור | badge ירוק: `✓ הסידור פורסם בהצלחה!` | inline |
+| פרסום סידור | badge ירוק: `✓ הסידור פורסם בהצלחה!` או `✓ הסידור נשמר. יוצג לציבור ב-16:00 ב-DD/MM` | inline |
 
 ### 6.2 ולידציות שדה
 

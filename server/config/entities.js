@@ -83,14 +83,6 @@ export const entityDefinitions = {
     },
     indexes: [{ fields: { date: 1, workplace_id: 1 } }],
   },
-  PublishedSchedule: {
-    required: ["date", "file_url"],
-    schema: {
-      date: { type: String, required: true },
-      file_url: { type: String, required: true },
-      snapshot: { type: Object },
-    },
-  },
   BackupSettings: {
     required: [],
     schema: {

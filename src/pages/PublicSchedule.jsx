@@ -1,30 +1,26 @@
 import { useEffect } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { base44 } from '@/api/base44Client';
+import { useQueryClient } from '@tanstack/react-query';
 import { resolveUploadUrl } from '@/lib/uploads';
 import { Loader2 } from 'lucide-react';
 import { useIsTvSchedule } from '@/hooks/use-tv-schedule';
 import ScheduleScreenView from '@/components/reports/ScheduleScreenView';
+import {
+  publishedScheduleKeys,
+  usePublicPublishedSchedule,
+} from '@/queries/publishedScheduleQueries';
 
 const SCHEDULE_CHANNEL = 'published-schedule';
-const REFETCH_MS = 30_000;
 
 export default function PublicSchedule() {
   const queryClient = useQueryClient();
   const isTvSchedule = useIsTvSchedule();
 
-  const { data: latest, isLoading, isError } = useQuery({
-    queryKey: ['published-schedule-public'],
-    queryFn: () => base44.public.getPublishedSchedule(),
-    refetchInterval: REFETCH_MS,
-    refetchIntervalInBackground: true,
-    refetchOnWindowFocus: true,
-  });
+  const { data: latest, isLoading, isError } = usePublicPublishedSchedule();
 
   useEffect(() => {
     const channel = new BroadcastChannel(SCHEDULE_CHANNEL);
     channel.onmessage = () => {
-      queryClient.invalidateQueries({ queryKey: ['published-schedule-public'] });
+      queryClient.invalidateQueries({ queryKey: publishedScheduleKeys.public });
     };
     return () => channel.close();
   }, [queryClient]);

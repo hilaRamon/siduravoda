@@ -52,7 +52,7 @@ The Express server lives in `server/` and exposes:
 - `POST /api/entities/:entityName/bulk`
 - `POST /api/integrations/core/upload-file` (authenticated)
 
-`GET /api/public/schedule` is public (for `/schedule`; no sign-in). `GET /api/entities/PublishedSchedule` is also readable without auth.
+`GET /api/public/schedule` is public (for `/schedule`; no sign-in) and returns only a schedule that is already allowed to go live (16:00 Israel time the day before its date). Authenticated publish uses `/api/published-schedules`.
 
 Uploaded PDFs are stored in the local `uploads/` directory and served back as static files.
 
