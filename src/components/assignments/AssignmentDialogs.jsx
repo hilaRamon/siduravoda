@@ -142,7 +142,7 @@ export function AddGuestDialog({
 export function CloneDialog({
   open,
   onOpenChange,
-  assignmentByStudent,
+  cloneableCount,
   date,
   cloneTargetDate,
   onCloneTargetDateChange,
@@ -164,13 +164,8 @@ export function CloneDialog({
         </DialogHeader>
         <div className="space-y-4 mt-2">
           <p className="text-sm text-muted-foreground">
-            שכפל את{" "}
-            {
-              Object.values(assignmentByStudent).filter(
-                (a) => !a.student_id?.startsWith("guest_"),
-              ).length
-            }{" "}
-            השיבוצים מתאריך <strong>{date}</strong> לתאריך:
+            שכפל את {cloneableCount} השיבוצים מתאריך <strong>{date}</strong>{" "}
+            לתאריך:
           </p>
           <input
             type="date"

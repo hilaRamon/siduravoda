@@ -182,6 +182,14 @@ export default function Assignments() {
     [assignments],
   );
 
+  const cloneableAssignments = useMemo(() => {
+    const studentById = Object.fromEntries(students.map((s) => [s.id, s]));
+    return Object.values(assignmentByStudent).filter((a) => {
+      if (a.student_id?.startsWith("guest_")) return false;
+      return studentById[a.student_id]?.is_active !== false;
+    });
+  }, [assignmentByStudent, students]);
+
   const filteredStudents = useMemo(
     () =>
       students
@@ -450,11 +458,8 @@ export default function Assignments() {
     setCloneProgress(0);
     setCloneStep("טוען נתונים...");
     try {
-      const sourceAssignments = Object.values(assignmentByStudent).filter(
-        (a) => !a.student_id?.startsWith("guest_"),
-      );
       await cloneDayMutation.mutateAsync({
-        sourceAssignments,
+        sourceAssignments: cloneableAssignments,
         targetDate: cloneTargetDate,
         workplaces,
         defaults: assignmentDefaults,
@@ -526,7 +531,7 @@ export default function Assignments() {
             setShowCloneDialog(v);
             if (!v) setCloning(false);
           }}
-          assignmentByStudent={assignmentByStudent}
+          cloneableCount={cloneableAssignments.length}
           date={date}
           cloneTargetDate={cloneTargetDate}
           onCloneTargetDateChange={setCloneTargetDate}

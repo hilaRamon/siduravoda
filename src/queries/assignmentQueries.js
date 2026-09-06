@@ -302,6 +302,7 @@ export function useCloneDayAssignments() {
 
       for (const src of sourceAssignments) {
         const student = studentById[src.student_id];
+        if (student?.is_active === false) continue;
         const isCrew = student?.cohort?.includes("צוות");
 
         let targetWp;
