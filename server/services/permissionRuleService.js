@@ -45,7 +45,7 @@ export const DEFAULT_PERMISSION_RULES = [
     can_manage_workplaces: true,
     can_report_time: false,
     can_view_time_reports: true,
-    can_approve_time_reports: false,
+    can_approve_time_reports: true,
     can_access_admin_tools: true,
     can_manage_users: "limited",
   },
@@ -91,6 +91,15 @@ export async function ensurePermissionRulesSeeded() {
       await permissionRuleRepository.upsertByRole(rule.role, rule);
     }
   }
+
+  // Regular users share admin approve/reject on the time-reports page.
+  const userRule = await permissionRuleRepository.findByRole("user");
+  if (userRule && userRule.can_approve_time_reports !== true) {
+    await permissionRuleRepository.updateById(userRule.id, {
+      can_approve_time_reports: true,
+    });
+  }
+
   clearPermissionRuleCache();
 }
 
