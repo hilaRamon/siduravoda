@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
-import { assignmentApi } from '@/api/assignmentApi';
+import { timeReportApi } from '@/api/timeReportApi';
 import { useAuth } from '@/lib/AuthContext';
 import { canApproveTimeReports } from '@/lib/permissions';
 import { Button } from '@/components/ui/button';
@@ -17,6 +17,10 @@ const STATUS_STYLES = {
 
 const DEFAULT_START = '07:00';
 const DEFAULT_END = '11:45';
+
+function isCustomHours(report) {
+  return report.start_time !== DEFAULT_START || report.end_time !== DEFAULT_END;
+}
 
 function calcDuration(start, end) {
   if (!start || !end) return null;
@@ -86,6 +90,7 @@ function ReportRow({ report, onStatus, isIndividual, readOnly }) {
 export default function TimeReportsAdmin() {
   const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [activeTab, setActiveTab] = useState('ממתין');
+  const [approvingDate, setApprovingDate] = useState(false);
   const queryClient = useQueryClient();
 
   const { user: currentUser, isLoadingAuth: loadingUser } = useAuth();
@@ -109,8 +114,11 @@ export default function TimeReportsAdmin() {
   }, [allPending]);
 
   const changedReports = reports
-    .filter(r => r.start_time !== DEFAULT_START || r.end_time !== DEFAULT_END)
+    .filter(isCustomHours)
     .sort((a, b) => (a.workplace_name || '').localeCompare(b.workplace_name || '', 'he'));
+
+  const hasPendingForDate = reports.some(r => r.status === 'ממתין')
+    || allPending.some(r => r.date === selectedDate);
 
   const pending = changedReports.filter(r => r.status === 'ממתין');
   const approved = changedReports.filter(r => r.status === 'אושר');
@@ -166,29 +174,44 @@ export default function TimeReportsAdmin() {
     return { workplaceGroups, individualRows };
   }, [tabReports]);
 
-  const handleStatus = async (report, status) => {
-    await base44.entities.TimeReport.update(report.id, { status });
-    if (status === 'אושר') {
-      const duration = calcDuration(report.start_time, report.end_time);
-      if (duration !== null) {
-        const assignments = await assignmentApi.list({
-          date: report.date,
-          student_id: report.student_id,
-        });
-        if (assignments.length > 0) {
-          await assignmentApi.update(assignments[0].id, { hours: duration });
-        }
-      }
-    }
+  const invalidateAfterStatusChange = () => {
     queryClient.invalidateQueries({ queryKey: ['time-reports', selectedDate] });
+    queryClient.invalidateQueries({ queryKey: ['time-reports-all-pending'] });
+    queryClient.invalidateQueries({ queryKey: ['time-reports-pending'] });
     queryClient.invalidateQueries({ queryKey: assignmentKeys.byDate(selectedDate) });
+  };
+
+  const handleStatus = async (report, status) => {
+    await timeReportApi.bulkStatus({ ids: [report.id], status });
+    invalidateAfterStatusChange();
   };
 
   // Approve/reject all students in a workplace group
   const handleWorkplaceStatus = async (wpId, status) => {
-    const group = tabReports.filter(r => r.workplace_id === wpId);
-    for (const r of group) {
-      await handleStatus(r, status);
+    const ids = tabReports.filter(r => r.workplace_id === wpId).map(r => r.id);
+    if (ids.length === 0) return;
+    await timeReportApi.bulkStatus({ ids, status });
+    invalidateAfterStatusChange();
+  };
+
+  const handleApproveDate = async () => {
+    const pendingCustomIds = new Set([
+      ...reports.filter(r => r.status === 'ממתין' && isCustomHours(r)).map(r => r.id),
+      ...allPending.filter(r => r.date === selectedDate && isCustomHours(r)).map(r => r.id),
+    ]);
+    if (pendingCustomIds.size > 0) {
+      const confirmed = confirm(
+        `יש ${pendingCustomIds.size} דיווחים עם שעות חריגות שעדיין לא אושרו. אישור התאריך יאשר גם אותם. להמשיך?`,
+      );
+      if (!confirmed) return;
+    }
+
+    setApprovingDate(true);
+    try {
+      await timeReportApi.approveDate(selectedDate);
+      invalidateAfterStatusChange();
+    } finally {
+      setApprovingDate(false);
     }
   };
 
@@ -234,6 +257,17 @@ export default function TimeReportsAdmin() {
               onChange={e => setSelectedDate(e.target.value)}
               className="border border-border rounded-lg px-3 py-2 text-sm bg-card focus:outline-none focus:ring-2 focus:ring-primary/30"
             />
+            {!readOnly && hasPendingForDate && (
+              <Button
+                size="sm"
+                className="h-9 gap-1.5 bg-green-600 hover:bg-green-700 text-white"
+                onClick={handleApproveDate}
+                disabled={approvingDate}
+              >
+                <CheckCircle2 size={15} />
+                {approvingDate ? 'מאשר...' : 'אשר את כל התאריך'}
+              </Button>
+            )}
           </div>
           {pendingDates.length > 0 && (
             <div className="flex items-center gap-2 flex-wrap justify-end">
