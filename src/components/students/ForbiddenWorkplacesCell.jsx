@@ -1,10 +1,9 @@
 import { useState } from 'react';
-import { studentApi } from '@/api/studentApi';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { X } from 'lucide-react';
 
-export default function ForbiddenWorkplacesCell({ student, workplaces, onSave }) {
+export default function ForbiddenWorkplacesCell({ student, workplaces, onUpdate }) {
   const [open, setOpen] = useState(false);
   const forbiddenIds = student.forbidden_workplaces || [];
   const forbiddenNames = forbiddenIds
@@ -13,15 +12,13 @@ export default function ForbiddenWorkplacesCell({ student, workplaces, onSave })
 
   const handleAdd = async (workplaceId) => {
     const updated = [...forbiddenIds, workplaceId];
-    await studentApi.update(student.id, { forbidden_workplaces: updated });
-    onSave();
+    await onUpdate({ forbidden_workplaces: updated });
     setOpen(false);
   };
 
   const handleRemove = async (workplaceId) => {
     const updated = forbiddenIds.filter(id => id !== workplaceId);
-    await studentApi.update(student.id, { forbidden_workplaces: updated });
-    onSave();
+    await onUpdate({ forbidden_workplaces: updated });
   };
 
   const availableWorkplaces = workplaces.filter(w => !forbiddenIds.includes(w.id));

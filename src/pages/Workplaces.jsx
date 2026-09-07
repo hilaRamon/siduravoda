@@ -10,7 +10,8 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ChevronsUpDown, Plus, Search, Pencil, Trash2, Building2, Upload } from 'lucide-react';
 import ImportWorkplacesModal from '@/components/workplaces/ImportWorkplacesModal';
-import { showAlert } from '@/components/AppAlert';
+import { confirmAlert } from '@/components/AppAlert';
+import { useOptimisticListItemUpdate } from '@/hooks/useOptimisticListItemUpdate';
 
 function WorkplaceFormModal({ open, onClose, onSave, workplace, existingFarms }) {
   const [form, setForm] = useState(workplace || {
@@ -129,6 +130,12 @@ export default function Workplaces() {
     queryFn: () => base44.entities.Workplace.list('-created_date'),
   });
 
+  const updateWorkplaceItem = useOptimisticListItemUpdate({
+    queryKey: ['workplaces'],
+    updateFn: (id, patch) => base44.entities.Workplace.update(id, patch),
+    fallbackMessage: 'שגיאה בעדכון הסכם. נסה שוב.',
+  });
+
   const existingFarms = useMemo(() => {
     const names = new Set(workplaces.map(w => w.farm_name).filter(Boolean));
     return [...names].sort((a, b) => a.localeCompare(b, 'he'));
@@ -150,29 +157,13 @@ export default function Workplaces() {
   };
 
   const handleDelete = async (id) => {
-    if (!confirm('האם למחוק מקום עבודה זה?')) return;
+    if (!(await confirmAlert('האם למחוק מקום עבודה זה?'))) return;
     await base44.entities.Workplace.delete(id);
     queryClient.invalidateQueries({ queryKey: ['workplaces'] });
   };
 
-  const handleToggleAgreement = async (workplace) => {
-    const nextValue = !workplace.has_agreement;
-    const previous = queryClient.getQueryData(['workplaces']);
-
-    queryClient.setQueryData(['workplaces'], (current) =>
-      (current || []).map((w) =>
-        w.id === workplace.id ? { ...w, has_agreement: nextValue } : w
-      )
-    );
-
-    try {
-      await base44.entities.Workplace.update(workplace.id, {
-        has_agreement: nextValue,
-      });
-    } catch (error) {
-      queryClient.setQueryData(['workplaces'], previous);
-      await showAlert(error?.message || 'שגיאה בעדכון הסכם. נסה שוב.');
-    }
+  const handleToggleAgreement = (workplace) => {
+    updateWorkplaceItem(workplace.id, { has_agreement: !workplace.has_agreement });
   };
 
   return (

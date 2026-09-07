@@ -41,6 +41,8 @@ import StudentFormModal from "@/components/students/StudentFormModal";
 import ImportModal from "@/components/students/ImportModal";
 import ImportPhonesModal from "@/components/students/ImportPhonesModal";
 import ForbiddenWorkplacesCell from "@/components/students/ForbiddenWorkplacesCell";
+import { confirmAlert } from "@/components/AppAlert";
+import { useOptimisticListItemUpdate } from "@/hooks/useOptimisticListItemUpdate";
 
 const FREE_DAY_COLORS = {
   א: "bg-blue-100 text-blue-700",
@@ -65,6 +67,10 @@ export default function Students() {
   const updateStudent = useUpdateStudent();
   const deleteStudent = useDeleteStudent();
   const renameCohort = useRenameCohort();
+  const updateStudentItem = useOptimisticListItemUpdate({
+    queryKey: studentKeys.all,
+    updateFn: (id, patch) => studentApi.update(id, patch),
+  });
 
   const { data: workplaces = [] } = useQuery({
     queryKey: ["workplaces"],
@@ -141,15 +147,12 @@ export default function Students() {
   };
 
   const handleDelete = async (id) => {
-    if (!confirm("האם למחוק תלמיד זה?")) return;
+    if (!(await confirmAlert("האם למחוק תלמיד זה?"))) return;
     await deleteStudent.mutateAsync(id);
   };
 
-  const handleToggleActive = async (student) => {
-    await updateStudent.mutateAsync({
-      id: student.id,
-      data: { is_active: !student.is_active },
-    });
+  const handleToggleActive = (student) => {
+    updateStudentItem(student.id, { is_active: !student.is_active });
   };
 
   const handleDeactivateCohort = async (cohort) => {
@@ -304,10 +307,9 @@ export default function Students() {
                   <td className="px-5 py-3">
                     <Select
                       value={s.distance_status || null}
-                      onValueChange={async (val) => {
-                        await updateStudent.mutateAsync({
-                          id: s.id,
-                          data: { distance_status: val || null },
+                      onValueChange={(val) => {
+                        updateStudentItem(s.id, {
+                          distance_status: val || null,
                         });
                       }}
                     >
@@ -329,11 +331,7 @@ export default function Students() {
                   <ForbiddenWorkplacesCell
                     student={s}
                     workplaces={workplaces}
-                    onSave={() =>
-                      queryClient.invalidateQueries({
-                        queryKey: studentKeys.all,
-                      })
-                    }
+                    onUpdate={(patch) => updateStudentItem(s.id, patch)}
                   />
                   <td className="px-5 py-3 text-center">
                     <Checkbox

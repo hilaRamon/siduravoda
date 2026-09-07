@@ -16,15 +16,17 @@ import {
   useAbsenceRequests,
   useRejectAbsence,
 } from "@/queries/absenceQueries";
+import { assignmentApi } from "@/api/assignmentApi";
 import {
+  assignmentKeys,
   useAssignments,
   useAssignStudent,
   useBulkUpsertAssignments,
   useCloneDayAssignments,
   useCreateAssignment,
   useDeleteAssignment,
-  useUpdateAssignment,
 } from "@/queries/assignmentQueries";
+import { useOptimisticListItemUpdate } from "@/hooks/useOptimisticListItemUpdate";
 import { useStudents } from "@/queries/studentQueries";
 import { useWorkplaces } from "@/queries/workplaceQueries";
 import { useRoles } from "@/queries/roleQueries";
@@ -99,7 +101,10 @@ export default function Assignments() {
   });
 
   const createMutation = useCreateAssignment();
-  const updateMutation = useUpdateAssignment();
+  const updateAssignmentItem = useOptimisticListItemUpdate({
+    queryKey: assignmentKeys.byDate(date),
+    updateFn: (id, patch) => assignmentApi.update(id, patch),
+  });
   const deleteMutation = useDeleteAssignment();
   const assignMutation = useAssignStudent();
   const rejectAbsence = useRejectAbsence();
@@ -332,20 +337,14 @@ export default function Assignments() {
     await deleteMutation.mutateAsync({ id, date });
   };
 
-  const handleUpdateRole = async (assignment, roleName) => {
-    await updateMutation.mutateAsync({
-      id: assignment.id,
-      data: { role: roleName === "none" ? "" : roleName },
-      date,
+  const handleUpdateRole = (assignment, roleName) => {
+    updateAssignmentItem(assignment.id, {
+      role: roleName === "none" ? "" : roleName,
     });
   };
 
-  const handleUpdateField = async (assignment, field, value) => {
-    await updateMutation.mutateAsync({
-      id: assignment.id,
-      data: { [field]: value },
-      date,
-    });
+  const handleUpdateField = (assignment, field, value) => {
+    updateAssignmentItem(assignment.id, { [field]: value });
   };
 
   const handleBulkSave = async () => {
