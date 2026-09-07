@@ -20,6 +20,7 @@ import {
   getScheduleVisibleDate,
   isScheduleVisible,
 } from "@/lib/scheduleVisibility";
+import { useStudents } from "@/queries/studentQueries";
 
 const PUBLISH_TOAST_MS = 5000;
 
@@ -37,10 +38,7 @@ export default function DailyReportPDFButton({ date, assignments }) {
     queryFn: () => base44.entities.WorkplaceLogistics.filter({ date }),
   });
 
-  const { data: students = [] } = useQuery({
-    queryKey: ["students"],
-    queryFn: () => base44.entities.Student.list("-created_date"),
-  });
+  const { students } = useStudents();
 
   const { data: published = [] } = usePublishedSchedules();
 

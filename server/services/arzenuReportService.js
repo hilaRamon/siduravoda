@@ -1,6 +1,7 @@
 import { getModel } from "../models/index.js";
 import Assignment from "../models/Assignment.js";
 import { SKIP_FARMS, SKIP_WORKPLACES } from "../lib/reportConstants.js";
+import * as studentRepository from "../repositories/studentRepository.js";
 
 async function getWorkplaceMaps() {
   const Workplace = getModel("Workplace");
@@ -22,12 +23,11 @@ async function getWorkplaceMaps() {
 }
 
 async function getStudentMap() {
-  const Student = getModel("Student");
-  const students = await Student.find().select("full_name").lean();
+  const students = await studentRepository.find({});
   const byId = {};
 
   for (const student of students) {
-    byId[student._id.toString()] = student.full_name || "";
+    byId[student.id] = student.full_name || "";
   }
 
   return byId;

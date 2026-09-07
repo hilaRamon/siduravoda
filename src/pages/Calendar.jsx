@@ -11,6 +11,7 @@ import { DeleteIconButton } from '@/components/calendar/DeleteIconButton';
 import { Button } from '@/components/ui/button';
 import { ChevronRight, ChevronLeft, CalendarDays } from 'lucide-react';
 import { format, addWeeks, subWeeks, startOfWeek, addDays } from 'date-fns';
+import { useStudents } from '@/queries/studentQueries';
 
 function getWeekDays(baseDate) {
   const sunday = startOfWeek(baseDate, { weekStartsOn: 0 });
@@ -141,10 +142,7 @@ export default function Calendar() {
     status: 'אושר',
   });
 
-  const { data: students = [] } = useQuery({
-    queryKey: ['students'],
-    queryFn: () => base44.entities.Student.list('full_name', 1000),
-  });
+  const { students } = useStudents();
 
   const studentsById = useMemo(() => {
     const map = {};

@@ -9,6 +9,7 @@ import {
   mapAssignmentExportRow,
   normalizeAppSettings,
 } from "../lib/pricing.js";
+import * as studentRepository from "../repositories/studentRepository.js";
 
 const BACKUP_DIR = path.resolve(process.cwd(), "uploads", "backups");
 const ISRAEL_TZ = "Asia/Jerusalem";
@@ -26,13 +27,12 @@ function workbookToBuffer(wb) {
 }
 
 async function loadBackupData() {
-  const Student = getModel("Student");
   const Workplace = getModel("Workplace");
   const Vehicle = getModel("Vehicle");
   const AppSettings = getModel("AppSettings");
 
   const [students, workplaces, vehicles, assignments, settingsDoc] = await Promise.all([
-    Student.find().sort({ full_name: 1 }).limit(1000).lean(),
+    studentRepository.find({}, { sort: { full_name: 1 }, limit: 1000 }),
     Workplace.find().sort({ name: 1 }).limit(1000).lean(),
     Vehicle.find().sort({ name: 1 }).limit(1000).lean(),
     Assignment.find().sort({ date: 1 }).lean(),

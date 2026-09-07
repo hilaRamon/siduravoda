@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { absenceApi } from "@/api/absenceApi";
 import { assignmentApi } from "@/api/assignmentApi";
-import { base44 } from "@/api/base44Client";
+import { studentApi } from "@/api/studentApi";
 import {
   NOT_WORKING_WORKPLACE_NAME,
   PRE_ASSIGNMENT_WORKPLACE_NAME,
@@ -230,10 +230,10 @@ export function useCloneDayAssignments() {
       });
 
       report(10, "טוען תלמידים...");
-      const freshStudents = await base44.entities.Student.list(
-        "-created_date",
-        2000,
-      );
+      const freshStudents = await studentApi.list({
+        sort: "-created_date",
+        limit: 2000,
+      });
       const studentById = {};
       freshStudents.forEach((s) => {
         studentById[s.id] = s;
