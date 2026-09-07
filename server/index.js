@@ -19,6 +19,7 @@ import permissionRulesRouter from "./routes/permissionRules.js";
 import assignmentsRouter from "./routes/assignments.js";
 import publishedSchedulesRouter from "./routes/publishedSchedules.js";
 import timeReportsRouter from "./routes/timeReports.js";
+import studentsRouter from "./routes/students.js";
 import { ensureAdminUser } from "./lib/bootstrap.js";
 import { migrateLegacyUserRoles } from "./lib/migrateUserRoles.js";
 import { ensurePermissionRulesSeeded } from "./services/permissionRuleService.js";
@@ -62,6 +63,7 @@ app.use("/api/permission-rules", permissionRulesRouter);
 app.use("/api/assignments", assignmentsRouter);
 app.use("/api/published-schedules", publishedSchedulesRouter);
 app.use("/api/time-reports", timeReportsRouter);
+app.use("/api/students", studentsRouter);
 
 const distDir = path.resolve(process.cwd(), "dist");
 const hasFrontendBuild = fs.existsSync(path.join(distDir, "index.html"));

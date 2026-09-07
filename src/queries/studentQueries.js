@@ -1,15 +1,19 @@
 import { useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { base44 } from "@/api/base44Client";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { studentApi } from "@/api/studentApi";
 
 export const studentKeys = {
   all: ["students"],
 };
 
+function invalidateStudentQueries(queryClient) {
+  queryClient.invalidateQueries({ queryKey: studentKeys.all });
+}
+
 export function useStudents(options = {}) {
   const query = useQuery({
     queryKey: studentKeys.all,
-    queryFn: () => base44.entities.Student.list("-created_date"),
+    queryFn: () => studentApi.list({ sort: "-created_date" }),
     ...options,
   });
 
@@ -41,4 +45,64 @@ export function useStudents(options = {}) {
     studentOptions,
     studentNameById,
   };
+}
+
+export function useCreateStudent() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data) => studentApi.create(data),
+    onSuccess: () => invalidateStudentQueries(queryClient),
+  });
+}
+
+/**
+ * @typedef {object} StudentUpdateInput
+ * @property {string} id
+ * @property {Record<string, unknown>} data
+ */
+
+/**
+ * @returns {import('@tanstack/react-query').UseMutationResult<any, Error, StudentUpdateInput>}
+ */
+export function useUpdateStudent() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (/** @type {StudentUpdateInput} */ vars) =>
+      studentApi.update(vars.id, vars.data),
+    onSuccess: () => invalidateStudentQueries(queryClient),
+  });
+}
+
+export function useDeleteStudent() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id) => studentApi.remove(id),
+    onSuccess: () => invalidateStudentQueries(queryClient),
+  });
+}
+
+export function useBulkCreateStudents() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (items) => studentApi.bulkCreate(items),
+    onSuccess: () => invalidateStudentQueries(queryClient),
+  });
+}
+
+/**
+ * @typedef {object} RenameCohortInput
+ * @property {string} from
+ * @property {string} to
+ */
+
+/**
+ * @returns {import('@tanstack/react-query').UseMutationResult<any, Error, RenameCohortInput>}
+ */
+export function useRenameCohort() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (/** @type {RenameCohortInput} */ vars) =>
+      studentApi.renameCohort(vars),
+    onSuccess: () => invalidateStudentQueries(queryClient),
+  });
 }

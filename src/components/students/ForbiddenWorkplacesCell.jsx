@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { base44 } from '@/api/base44Client';
+import { studentApi } from '@/api/studentApi';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { X } from 'lucide-react';
@@ -13,14 +13,14 @@ export default function ForbiddenWorkplacesCell({ student, workplaces, onSave })
 
   const handleAdd = async (workplaceId) => {
     const updated = [...forbiddenIds, workplaceId];
-    await base44.entities.Student.update(student.id, { forbidden_workplaces: updated });
+    await studentApi.update(student.id, { forbidden_workplaces: updated });
     onSave();
     setOpen(false);
   };
 
   const handleRemove = async (workplaceId) => {
     const updated = forbiddenIds.filter(id => id !== workplaceId);
-    await base44.entities.Student.update(student.id, { forbidden_workplaces: updated });
+    await studentApi.update(student.id, { forbidden_workplaces: updated });
     onSave();
   };
 

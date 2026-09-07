@@ -3,7 +3,7 @@ import * as XLSX from 'xlsx';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Upload, Phone, X } from 'lucide-react';
-import { base44 } from '@/api/base44Client';
+import { studentApi } from '@/api/studentApi';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
@@ -169,7 +169,7 @@ export default function ImportPhonesModal({ open, onClose, students, onImported 
     let notFound = 0;
     for (const row of rows) {
       if (row.status === 'matched') {
-        await base44.entities.Student.update(row.matchedStudent.id, { phone: row.phone });
+        await studentApi.update(row.matchedStudent.id, { phone: row.phone });
         updated++;
       } else if (row.status === 'has_phone') {
         skipped++;
