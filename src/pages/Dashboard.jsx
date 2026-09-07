@@ -3,14 +3,12 @@ import { base44 } from '@/api/base44Client';
 import { Users, Building2, CalendarDays, TrendingUp } from 'lucide-react';
 import { format } from 'date-fns';
 import { useAssignments } from '@/queries/assignmentQueries';
+import { useStudents } from '@/queries/studentQueries';
 
 export default function Dashboard() {
   const today = format(new Date(), 'yyyy-MM-dd');
 
-  const { data: students = [] } = useQuery({
-    queryKey: ['students'],
-    queryFn: () => base44.entities.Student.list(),
-  });
+  const { students } = useStudents();
 
   const { data: workplaces = [] } = useQuery({
     queryKey: ['workplaces'],

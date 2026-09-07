@@ -12,7 +12,6 @@ function isReadMethod(method) {
 const REPORTER_READ_ENTITIES = new Set([
   "WorkplaceLogistics",
   "Workplace",
-  "Student",
 ]);
 
 export function checkEntityAccess(req, res, next) {

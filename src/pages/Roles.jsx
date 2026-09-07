@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Plus, Pencil, Trash2, ShieldCheck } from 'lucide-react';
+import { confirmAlert } from '@/components/AppAlert';
 
 const COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#f97316'];
 
@@ -95,7 +96,7 @@ export default function Roles() {
   };
 
   const handleDelete = async (id) => {
-    if (!confirm('למחוק תפקיד זה?')) return;
+    if (!(await confirmAlert('למחוק תפקיד זה?'))) return;
     await base44.entities.Role.delete(id);
     queryClient.invalidateQueries({ queryKey: ['roles'] });
   };

@@ -26,6 +26,19 @@ export async function showAlert(message, options = {}) {
   return openAlert(message, options);
 }
 
+/** Returns true only if the user clicks אישור. X / overlay / ביטול return false. */
+export async function confirmAlert(message, options = {}) {
+  let confirmed = false;
+  await showAlert(message, {
+    ...options,
+    onConfirm: () => {
+      confirmed = true;
+      options.onConfirm?.();
+    },
+  });
+  return confirmed;
+}
+
 export function AppAlertHost() {
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("שים לב");

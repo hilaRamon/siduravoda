@@ -5,6 +5,7 @@ import {
   normalizeAppSettings,
 } from "../lib/pricing.js";
 import * as absenceRequestRepository from "../repositories/absenceRequestRepository.js";
+import * as studentRepository from "../repositories/studentRepository.js";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const NOT_WORKING_WORKPLACE_NAME = "תתת - לא עובד";
@@ -36,16 +37,15 @@ async function findStudentIdByPhone(phone) {
   const normalized = normalizePhone(phone);
   if (!normalized) return null;
 
-  const Student = getModel("Student");
-  const students = await Student.find({ phone: { $exists: true, $ne: "" } })
-    .select("_id phone")
-    .lean();
+  const students = await studentRepository.find({
+    phone: { $exists: true, $ne: "" },
+  });
 
   const matches = students.filter(
     (s) => normalizePhone(s.phone) === normalized,
   );
   if (matches.length !== 1) return null;
-  return matches[0]._id.toString();
+  return matches[0].id;
 }
 
 async function getNotWorkingWorkplace() {
@@ -73,9 +73,8 @@ async function getAssignmentDefaultsFromSettings() {
 }
 
 async function assignNotWorking(studentId, date) {
-  const Student = getModel("Student");
   const workplace = await getNotWorkingWorkplace();
-  const student = await Student.findById(studentId).select("full_name").lean();
+  const student = await studentRepository.findById(studentId);
   const studentName = student?.full_name || "";
 
   const existing = await Assignment.find({

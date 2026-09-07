@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { assignmentApi } from '@/api/assignmentApi';
+import { studentApi } from '@/api/studentApi';
 import { useAuth } from '@/lib/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Shuffle, Loader2, UserCheck, BookOpen, Settings2, HardDriveDownload, Shield } from 'lucide-react';
@@ -35,7 +36,7 @@ export default function AdminTools() {
       normalizeAppSettings(settingsList[0]),
     );
 
-    const allStudents = await base44.entities.Student.list();
+    const allStudents = await studentApi.list();
     const activeStudents = allStudents.filter(s => s.is_active !== false);
     if (!activeStudents.length) { await showAlert('אין תלמידים פעילים'); setRandomizing(false); return; }
 

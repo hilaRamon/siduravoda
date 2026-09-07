@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react';
 import { base44 } from '@/api/base44Client';
 import { assignmentApi } from '@/api/assignmentApi';
+import { studentApi } from '@/api/studentApi';
 import { Button } from '@/components/ui/button';
 import { Upload, Loader2, FileSpreadsheet, CheckCircle2, AlertCircle } from 'lucide-react';
 import * as XLSX from 'xlsx';
@@ -85,7 +86,7 @@ export default function ImportAssignments() {
 
     // Load students and workplaces to resolve IDs
     const [students, workplaces] = await Promise.all([
-      base44.entities.Student.list('full_name', 1000),
+      studentApi.list({ sort: 'full_name', limit: 1000 }),
       base44.entities.Workplace.list('name', 1000),
     ]);
 

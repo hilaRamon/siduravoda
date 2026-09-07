@@ -1,6 +1,15 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
+import { studentApi } from "@/api/studentApi";
+import {
+  studentKeys,
+  useStudents,
+  useCreateStudent,
+  useUpdateStudent,
+  useDeleteStudent,
+  useRenameCohort,
+} from "@/queries/studentQueries";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -20,10 +29,20 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import StudentFormModal from "@/components/students/StudentFormModal";
 import ImportModal from "@/components/students/ImportModal";
 import ImportPhonesModal from "@/components/students/ImportPhonesModal";
 import ForbiddenWorkplacesCell from "@/components/students/ForbiddenWorkplacesCell";
+import { confirmAlert } from "@/components/AppAlert";
+import { useOptimisticListItemUpdate } from "@/hooks/useOptimisticListItemUpdate";
 
 const FREE_DAY_COLORS = {
   א: "bg-blue-100 text-blue-700",
@@ -39,11 +58,18 @@ export default function Students() {
   const [showImport, setShowImport] = useState(false);
   const [showImportPhones, setShowImportPhones] = useState(false);
   const [editStudent, setEditStudent] = useState(null);
+  const [cohortPrompt, setCohortPrompt] = useState(null);
+  const savingCohortRef = useRef(false);
   const queryClient = useQueryClient();
 
-  const { data: students = [], isLoading } = useQuery({
-    queryKey: ["students"],
-    queryFn: () => base44.entities.Student.list("-created_date"),
+  const { students, isLoading } = useStudents();
+  const createStudent = useCreateStudent();
+  const updateStudent = useUpdateStudent();
+  const deleteStudent = useDeleteStudent();
+  const renameCohort = useRenameCohort();
+  const updateStudentItem = useOptimisticListItemUpdate({
+    queryKey: studentKeys.all,
+    updateFn: (id, patch) => studentApi.update(id, patch),
   });
 
   const { data: workplaces = [] } = useQuery({
@@ -64,28 +90,69 @@ export default function Students() {
     (s) => s.full_name?.includes(search) || s.cohort?.includes(search),
   );
 
-  const handleSave = async (form) => {
-    if (editStudent) {
-      await base44.entities.Student.update(editStudent.id, form);
-    } else {
-      await base44.entities.Student.create(form);
-    }
-    queryClient.invalidateQueries({ queryKey: ["students"] });
+  const closeForm = () => {
     setShowForm(false);
     setEditStudent(null);
   };
 
-  const handleDelete = async (id) => {
-    if (!confirm("האם למחוק תלמיד זה?")) return;
-    await base44.entities.Student.delete(id);
-    queryClient.invalidateQueries({ queryKey: ["students"] });
+  const handleSave = async (form) => {
+    if (editStudent) {
+      const oldCohort = (editStudent.cohort || "").trim();
+      const newCohort = (form.cohort || "").trim();
+      if (oldCohort && newCohort !== oldCohort) {
+        const othersCount = students.filter(
+          (s) => s.cohort === oldCohort && s.id !== editStudent.id,
+        ).length;
+        if (othersCount > 0) {
+          setCohortPrompt({
+            studentId: editStudent.id,
+            form,
+            oldCohort,
+            newCohort,
+            othersCount,
+          });
+          setShowForm(false);
+          return;
+        }
+      }
+      await updateStudent.mutateAsync({ id: editStudent.id, data: form });
+    } else {
+      await createStudent.mutateAsync(form);
+    }
+    closeForm();
   };
 
-  const handleToggleActive = async (student) => {
-    await base44.entities.Student.update(student.id, {
-      is_active: !student.is_active,
-    });
-    queryClient.invalidateQueries({ queryKey: ["students"] });
+  const finishCohortSave = async (pending, renameAll) => {
+    if (!pending) return;
+    savingCohortRef.current = true;
+    setCohortPrompt(null);
+    try {
+      if (renameAll) {
+        await renameCohort.mutateAsync({
+          from: pending.oldCohort,
+          to: pending.newCohort,
+        });
+      }
+      await updateStudent.mutateAsync({
+        id: pending.studentId,
+        data: pending.form,
+      });
+      closeForm();
+    } catch (error) {
+      setShowForm(true);
+      throw error;
+    } finally {
+      savingCohortRef.current = false;
+    }
+  };
+
+  const handleDelete = async (id) => {
+    if (!(await confirmAlert("האם למחוק תלמיד זה?"))) return;
+    await deleteStudent.mutateAsync(id);
+  };
+
+  const handleToggleActive = (student) => {
+    updateStudentItem(student.id, { is_active: !student.is_active });
   };
 
   const handleDeactivateCohort = async (cohort) => {
@@ -93,10 +160,10 @@ export default function Students() {
     const cohortStudents = students.filter((s) => s.cohort === cohort);
     await Promise.all(
       cohortStudents.map((s) =>
-        base44.entities.Student.update(s.id, { is_active: false }),
+        studentApi.update(s.id, { is_active: false }),
       ),
     );
-    queryClient.invalidateQueries({ queryKey: ["students"] });
+    queryClient.invalidateQueries({ queryKey: studentKeys.all });
   };
 
   return (
@@ -240,12 +307,9 @@ export default function Students() {
                   <td className="px-5 py-3">
                     <Select
                       value={s.distance_status || null}
-                      onValueChange={async (val) => {
-                        await base44.entities.Student.update(s.id, {
+                      onValueChange={(val) => {
+                        updateStudentItem(s.id, {
                           distance_status: val || null,
-                        });
-                        queryClient.invalidateQueries({
-                          queryKey: ["students"],
                         });
                       }}
                     >
@@ -267,9 +331,7 @@ export default function Students() {
                   <ForbiddenWorkplacesCell
                     student={s}
                     workplaces={workplaces}
-                    onSave={() =>
-                      queryClient.invalidateQueries({ queryKey: ["students"] })
-                    }
+                    onUpdate={(patch) => updateStudentItem(s.id, patch)}
                   />
                   <td className="px-5 py-3 text-center">
                     <Checkbox
@@ -309,18 +371,56 @@ export default function Students() {
 
       <StudentFormModal
         open={showForm}
-        onClose={() => {
-          setShowForm(false);
-          setEditStudent(null);
-        }}
+        onClose={closeForm}
         onSave={handleSave}
         student={editStudent}
       />
+      <Dialog
+        open={!!cohortPrompt}
+        onOpenChange={(open) => {
+          if (!open) {
+            setCohortPrompt(null);
+            if (!savingCohortRef.current && editStudent) {
+              setShowForm(true);
+            }
+          }
+        }}
+      >
+        <DialogContent dir="rtl" className="[&>button]:left-4 [&>button]:right-auto">
+          <DialogHeader className="text-right sm:text-right">
+            <DialogTitle>שינוי מחזור</DialogTitle>
+            <DialogDescription>
+              {cohortPrompt
+                ? `שינית את המחזור מ-"${cohortPrompt.oldCohort}" ל-"${cohortPrompt.newCohort}". לשנות רק לתלמיד זה, או לכל ${cohortPrompt.othersCount + 1} התלמידים במחזור?`
+                : ""}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:flex-row-reverse sm:justify-start sm:space-x-0">
+            <Button
+              onClick={() => {
+                savingCohortRef.current = true;
+                void finishCohortSave(cohortPrompt, true);
+              }}
+            >
+              כל המחזור
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                savingCohortRef.current = true;
+                void finishCohortSave(cohortPrompt, false);
+              }}
+            >
+              רק תלמיד זה
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <ImportModal
         open={showImport}
         onClose={() => setShowImport(false)}
         onImported={() =>
-          queryClient.invalidateQueries({ queryKey: ["students"] })
+          queryClient.invalidateQueries({ queryKey: studentKeys.all })
         }
       />
       <ImportPhonesModal
@@ -328,7 +428,7 @@ export default function Students() {
         onClose={() => setShowImportPhones(false)}
         students={students}
         onImported={() =>
-          queryClient.invalidateQueries({ queryKey: ["students"] })
+          queryClient.invalidateQueries({ queryKey: studentKeys.all })
         }
       />
     </div>

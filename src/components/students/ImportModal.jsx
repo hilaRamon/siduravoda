@@ -14,7 +14,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Upload, AlertCircle, CheckCircle2 } from "lucide-react";
-import { base44 } from "@/api/base44Client";
+import { studentApi } from "@/api/studentApi";
 import { showAlert } from "@/components/AppAlert";
 import * as XLSX from "xlsx";
 
@@ -267,7 +267,7 @@ export default function ImportModal({ open, onClose, onImported }) {
       const errs = validateRows();
       const errorRowNums = new Set(errs.map((e) => e.row));
 
-      const existing = await base44.entities.Student.list("full_name", 1000);
+      const existing = await studentApi.list({ sort: "full_name", limit: 1000 });
       /** @type {Record<string, any>} */
       const existingByName = {};
       existing.forEach((s) => {
@@ -317,10 +317,10 @@ export default function ImportModal({ open, onClose, onImported }) {
 
       const CHUNK = 50;
       for (let i = 0; i < toCreate.length; i += CHUNK) {
-        await base44.entities.Student.bulkCreate(toCreate.slice(i, i + CHUNK));
+        await studentApi.bulkCreate(toCreate.slice(i, i + CHUNK));
       }
       for (const u of toUpdate) {
-        await base44.entities.Student.update(u.id, u.data);
+        await studentApi.update(u.id, u.data);
       }
 
       setImportCount(toCreate.length + toUpdate.length);

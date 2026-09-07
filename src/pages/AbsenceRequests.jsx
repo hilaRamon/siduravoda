@@ -1,6 +1,5 @@
 import { useState, useMemo } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { base44 } from '@/api/base44Client';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   absenceKeys,
   useAbsenceRequests,
@@ -16,6 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { MessageSquare, Check, X, Clock, RefreshCw } from 'lucide-react';
+import { useStudents } from '@/queries/studentQueries';
 
 const STATUS_COLORS = {
   'ממתין': 'bg-warning/15 text-warning border-warning/30',
@@ -227,10 +227,7 @@ export default function AbsenceRequests() {
 
   const { data: requests = [], isLoading } = useAbsenceRequests();
 
-  const { data: students = [] } = useQuery({
-    queryKey: ['students'],
-    queryFn: () => base44.entities.Student.list('full_name', 1000),
-  });
+  const { students } = useStudents();
 
   const studentsById = useMemo(() => {
     const map = {};

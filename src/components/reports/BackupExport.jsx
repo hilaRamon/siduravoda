@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { assignmentApi } from '@/api/assignmentApi';
+import { studentApi } from '@/api/studentApi';
 import { Button } from '@/components/ui/button';
 import { Loader2, Database, Archive } from 'lucide-react';
 import * as XLSX from 'xlsx';
@@ -18,7 +19,7 @@ function workbookToBuffer(wb) {
 
 async function buildAllWorkbooks() {
   const [students, workplaces, vehicles, assignments, settingsList] = await Promise.all([
-    base44.entities.Student.list('full_name', 1000),
+    studentApi.list({ sort: 'full_name', limit: 1000 }),
     base44.entities.Workplace.list('name', 1000),
     base44.entities.Vehicle.list('name', 1000),
     assignmentApi.list({ sort: 'date', limit: 10000 }),
@@ -70,7 +71,7 @@ async function buildAllWorkbooks() {
 }
 
 async function exportStudents() {
-  const students = await base44.entities.Student.list('full_name', 1000);
+  const students = await studentApi.list({ sort: 'full_name', limit: 1000 });
   const rows = students.map(s => ({
     'שם מלא': s.full_name || '',
     'מחזור': s.cohort || '',

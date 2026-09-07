@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Plus, Pencil, Trash2, Upload } from 'lucide-react';
 import ImportVehiclesModal from '@/components/vehicles/ImportVehiclesModal';
+import { confirmAlert } from '@/components/AppAlert';
 
 function VehicleFormModal({ vehicle, onSave, onClose }) {
   const [form, setForm] = useState({
@@ -76,7 +77,7 @@ export default function Vehicles() {
   };
 
   const handleDelete = async (id) => {
-    if (!confirm('למחוק רכב זה?')) return;
+    if (!(await confirmAlert('למחוק רכב זה?'))) return;
     await base44.entities.Vehicle.delete(id);
     queryClient.invalidateQueries({ queryKey: ['vehicles'] });
   };

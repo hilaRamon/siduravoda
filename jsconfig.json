@@ -21,6 +21,7 @@
     "src/pages/**/*.jsx",
     "src/api/**/*.js",
     "src/queries/**/*.js",
+    "src/hooks/**/*.js",
     "src/Layout.jsx"
   ],
   "exclude": ["node_modules", "dist", "src/vite-plugins", "src/lib"]

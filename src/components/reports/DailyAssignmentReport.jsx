@@ -13,6 +13,7 @@ import {
   toHebrewDate,
 } from "@/components/reports/dailyReportPdf";
 import { useAssignments } from "@/queries/assignmentQueries";
+import { useStudents } from "@/queries/studentQueries";
 
 export default function DailyAssignmentReport() {
   const [date, setDate] = useState(format(new Date(), "yyyy-MM-dd"));
@@ -26,10 +27,7 @@ export default function DailyAssignmentReport() {
     queryFn: () => base44.entities.WorkplaceLogistics.filter({ date }),
   });
 
-  const { data: students = [] } = useQuery({
-    queryKey: ["students"],
-    queryFn: () => base44.entities.Student.list("-created_date"),
-  });
+  const { students } = useStudents();
 
   const { logisticsMap, logisticsMapByName, studentsMap } = useMemo(
     () => buildLookupMaps(logisticsList, students),
