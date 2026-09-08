@@ -18,6 +18,7 @@ import FarmerRequest from "../models/FarmerRequest.js";
 import { hashPassword } from "../lib/password.js";
 import { ROLES } from "../config/permissions.js";
 import { ensurePermissionRulesSeeded } from "../services/permissionRuleService.js";
+import { migrateAssignmentWorkNumber } from "../lib/migrateAssignmentWorkNumber.js";
 import { PRICING_DEFAULTS, dailyToHourlyRate } from "../lib/pricing.js";
 
 const DEFAULT_ASSIGNMENT_RATE = dailyToHourlyRate(
@@ -432,6 +433,7 @@ async function main() {
     process.exit(1);
   }
 
+  await migrateAssignmentWorkNumber();
   await ensurePermissionRulesSeeded();
 
   const existingStudents = await Student.countDocuments();
@@ -518,6 +520,7 @@ async function main() {
         student_name: student.full_name,
         workplace_id: idOf(workplace),
         workplace_name: workplace.name,
+        work_number: 1,
         rate,
         hours,
         role: "",

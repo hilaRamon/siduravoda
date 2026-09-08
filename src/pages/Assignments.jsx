@@ -42,9 +42,10 @@ import {
   NOT_WORKING_WORKPLACE_NAME,
   PRE_ASSIGNMENT_WORKPLACE_NAME,
   REQUEST_FULFILLED_SNACKBAR_MS,
+  assignmentWorkNumber,
+  assignmentsByStudentId,
   buildBulkAssignmentOps,
   countStudentsAtWorkplace,
-  dedupeLatestAssignments,
   getRequestedVolunteers,
   warnIfNoAgreement,
 } from "@/lib/assignmentHelpers";
@@ -162,20 +163,18 @@ export default function Assignments() {
     return true;
   };
 
-  const assignmentByStudent = useMemo(() => {
+  const assignmentsByStudent = useMemo(
+    () => assignmentsByStudentId(assignments),
+    [assignments],
+  );
+
+  const primaryByStudent = useMemo(() => {
     const map = {};
-    assignments.forEach((a) => {
-      const existing = map[a.student_id];
-      if (
-        !existing ||
-        (a.updated_date || a.created_date) >
-          (existing.updated_date || existing.created_date)
-      ) {
-        map[a.student_id] = a;
-      }
+    Object.entries(assignmentsByStudent).forEach(([id, list]) => {
+      map[id] = list.find((a) => assignmentWorkNumber(a) === 1) || list[0];
     });
     return map;
-  }, [assignments]);
+  }, [assignmentsByStudent]);
 
   const cohorts = useMemo(
     () => [...new Set(students.map((s) => s.cohort).filter(Boolean))],
@@ -189,19 +188,20 @@ export default function Assignments() {
 
   const cloneableAssignments = useMemo(() => {
     const studentById = Object.fromEntries(students.map((s) => [s.id, s]));
-    return Object.values(assignmentByStudent).filter((a) => {
+    return Object.values(primaryByStudent).filter((a) => {
       if (a.student_id?.startsWith("guest_")) return false;
       return studentById[a.student_id]?.is_active !== false;
     });
-  }, [assignmentByStudent, students]);
+  }, [primaryByStudent, students]);
 
   const filteredStudents = useMemo(
     () =>
       students
         .filter((s) => {
-          const a = assignmentByStudent[s.id];
-          if (s.is_active === false && !a) return false;
-          if (!a && s.created_date && s.created_date.slice(0, 10) > date)
+          const list = assignmentsByStudent[s.id] || [];
+          const hasAssignment = list.length > 0;
+          if (s.is_active === false && !hasAssignment) return false;
+          if (!hasAssignment && s.created_date && s.created_date.slice(0, 10) > date)
             return false;
           if (filterName && !s.full_name?.includes(filterName)) return false;
           if (
@@ -211,18 +211,20 @@ export default function Assignments() {
           )
             return false;
           if (filterWorkplace && filterWorkplace !== "all") {
-            if (!a || a.workplace_id !== filterWorkplace) return false;
+            if (!list.some((row) => row.workplace_id === filterWorkplace)) {
+              return false;
+            }
           }
           if (filterRole && filterRole !== "all") {
-            if (!a || a.role !== filterRole) return false;
+            if (!list.some((row) => row.role === filterRole)) return false;
           }
-          if (filterAssigned === "assigned" && !a) return false;
-          if (filterAssigned === "unassigned" && a) return false;
+          if (filterAssigned === "assigned" && !hasAssignment) return false;
+          if (filterAssigned === "unassigned" && hasAssignment) return false;
           return true;
         })
         .sort((a, b) => {
-          const aAssign = assignmentByStudent[a.id];
-          const bAssign = assignmentByStudent[b.id];
+          const aAssign = primaryByStudent[a.id];
+          const bAssign = primaryByStudent[b.id];
           const aWp = aAssign?.workplace_name || "";
           const bWp = bAssign?.workplace_name || "";
           if (aWp !== bWp) return aWp.localeCompare(bWp, "he");
@@ -233,7 +235,8 @@ export default function Assignments() {
         }),
     [
       students,
-      assignmentByStudent,
+      assignmentsByStudent,
+      primaryByStudent,
       date,
       filterName,
       filterCohort,
@@ -243,44 +246,78 @@ export default function Assignments() {
     ],
   );
 
+  const tableRows = useMemo(() => {
+    const rows = [];
+    filteredStudents.forEach((student) => {
+      const list = assignmentsByStudent[student.id] || [];
+      if (list.length === 0) {
+        rows.push({
+          key: student.id,
+          student,
+          assignment: null,
+          selectKey: student.id,
+        });
+        return;
+      }
+      list
+        .filter((a) => {
+          if (
+            filterWorkplace &&
+            filterWorkplace !== "all" &&
+            a.workplace_id !== filterWorkplace
+          ) {
+            return false;
+          }
+          if (filterRole && filterRole !== "all" && a.role !== filterRole) {
+            return false;
+          }
+          return true;
+        })
+        .forEach((assignment) => {
+          rows.push({
+            key: assignment.id,
+            student,
+            assignment,
+            selectKey: assignment.id,
+          });
+        });
+    });
+    return rows;
+  }, [filteredStudents, assignmentsByStudent, filterWorkplace, filterRole]);
+
   const allVisibleSelected =
-    filteredStudents.length > 0 &&
-    filteredStudents.every((s) =>
-      selectedIds.has(assignmentByStudent[s.id]?.id || s.id),
-    );
+    tableRows.length > 0 &&
+    tableRows.every((row) => selectedIds.has(row.selectKey));
 
   const toggleSelectAll = () => {
     if (allVisibleSelected) {
       setSelectedIds(new Set());
     } else {
-      setSelectedIds(
-        new Set(
-          filteredStudents.map((s) => assignmentByStudent[s.id]?.id || s.id),
-        ),
-      );
+      setSelectedIds(new Set(tableRows.map((row) => row.selectKey)));
     }
   };
 
-  const toggleSelect = (studentId, rowIdx, shiftKey) => {
+  const toggleSelect = (selectKey, rowIdx, shiftKey) => {
     setSelectedIds((prev) => {
       const next = new Set(prev);
       if (shiftKey && lastSelectedIdx !== null) {
         const from = Math.min(lastSelectedIdx, rowIdx);
         const to = Math.max(lastSelectedIdx, rowIdx);
         for (let i = from; i <= to; i++) {
-          const s = filteredStudents[i];
-          if (s) next.add(assignmentByStudent[s.id]?.id || s.id);
+          const row = tableRows[i];
+          if (row) next.add(row.selectKey);
         }
+      } else if (next.has(selectKey)) {
+        next.delete(selectKey);
       } else {
-        if (next.has(studentId)) next.delete(studentId);
-        else next.add(studentId);
+        next.add(selectKey);
       }
       return next;
     });
     setLastSelectedIdx(rowIdx);
   };
 
-  const handleAssign = async (student, workplace) => {
+  const handleAssign = async (student, workplace, assignment) => {
     const absence = absentByStudentId[student.id];
     if (absence && workplace.name !== NOT_WORKING_WORKPLACE_NAME) {
       await offerRejectAbsence(student, absence);
@@ -301,18 +338,31 @@ export default function Assignments() {
       date,
       student,
       workplace,
+      assignment,
       assignments,
       defaults: assignmentDefaults,
     });
 
     const prevCount = countStudentsAtWorkplace(assignments, workplace.id);
-    const currentForStudent = dedupeLatestAssignments(assignments).find(
-      (a) => a.student_id === student.id,
-    );
-    const nextCount =
-      currentForStudent?.workplace_id === workplace.id
-        ? prevCount
-        : prevCount + 1;
+    const nextAssignments = assignment
+      ? assignments.map((a) =>
+          a.id === assignment.id
+            ? {
+                ...a,
+                workplace_id: workplace.id,
+                workplace_name: workplace.name,
+              }
+            : a,
+        )
+      : [
+          ...assignments,
+          {
+            student_id: student.id,
+            workplace_id: workplace.id,
+            work_number: 1,
+          },
+        ];
+    const nextCount = countStudentsAtWorkplace(nextAssignments, workplace.id);
     notifyIfRequestFulfilled(
       workplace.id,
       workplace.name,
@@ -393,26 +443,17 @@ export default function Assignments() {
       });
 
       if (wp) {
-        const byStudent = {};
-        dedupeLatestAssignments(assignments).forEach((a) => {
-          byStudent[a.student_id] = a;
-        });
-        const prevCount = Object.values(byStudent).filter(
-          (a) => a.workplace_id === wp.id,
-        ).length;
-        toUpdate.forEach(({ fullRecord }) => {
-          if (!fullRecord.student_id) return;
-          byStudent[fullRecord.student_id] = {
-            ...byStudent[fullRecord.student_id],
-            ...fullRecord,
-          };
-        });
-        toCreate.forEach((record) => {
-          byStudent[record.student_id] = record;
-        });
-        const nextCount = Object.values(byStudent).filter(
-          (a) => a.workplace_id === wp.id,
-        ).length;
+        const prevCount = countStudentsAtWorkplace(assignments, wp.id);
+        const updatedById = Object.fromEntries(
+          toUpdate.map(({ id, fullRecord }) => [id, fullRecord]),
+        );
+        const nextList = [
+          ...assignments.map((a) =>
+            updatedById[a.id] ? { ...a, ...updatedById[a.id] } : a,
+          ),
+          ...toCreate,
+        ];
+        const nextCount = countStudentsAtWorkplace(nextList, wp.id);
         notifyIfRequestFulfilled(wp.id, wp.name, prevCount, nextCount);
       }
 
@@ -444,6 +485,7 @@ export default function Assignments() {
       student_name: guestName.trim(),
       workplace_id: defaultGuestWp?.id ?? "",
       workplace_name: defaultGuestWp?.name ?? PRE_ASSIGNMENT_WORKPLACE_NAME,
+      work_number: 1,
       rate: assignmentDefaults.rate,
       hours: assignmentDefaults.hours,
     });
@@ -511,7 +553,7 @@ export default function Assignments() {
           selected={cohortDialogSelected}
           onSelectedChange={setCohortDialogSelected}
           filteredStudents={filteredStudents}
-          assignmentByStudent={assignmentByStudent}
+          assignmentsByStudent={assignmentsByStudent}
           onConfirm={setSelectedIds}
         />
 
@@ -560,14 +602,13 @@ export default function Assignments() {
         />
 
         <AssignmentsTable
-          filteredStudents={filteredStudents}
+          tableRows={tableRows}
           guestAssignments={guestAssignments}
           students={students}
           cohorts={cohorts}
           workplaces={workplaces}
           roles={roles}
           assignments={assignments}
-          assignmentByStudent={assignmentByStudent}
           assignmentDefaults={assignmentDefaults}
           selectedIds={selectedIds}
           allVisibleSelected={allVisibleSelected}

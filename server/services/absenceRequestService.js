@@ -85,16 +85,19 @@ async function assignNotWorking(studentId, date) {
     .exec();
 
   if (existing.length > 0) {
-    const [keep, ...extras] = existing;
+    const primary =
+      existing.find((doc) => (doc.work_number ?? 1) === 1) || existing[0];
+    const extras = existing.filter((doc) => doc._id.toString() !== primary._id.toString());
     if (extras.length > 0) {
       await Assignment.deleteMany({
         _id: { $in: extras.map((doc) => doc._id) },
       });
     }
-    keep.workplace_id = workplace.id;
-    keep.workplace_name = workplace.name;
-    if (studentName) keep.student_name = studentName;
-    await keep.save();
+    primary.workplace_id = workplace.id;
+    primary.workplace_name = workplace.name;
+    primary.work_number = 1;
+    if (studentName) primary.student_name = studentName;
+    await primary.save();
     return;
   }
 
@@ -105,6 +108,7 @@ async function assignNotWorking(studentId, date) {
     student_name: studentName,
     workplace_id: workplace.id,
     workplace_name: workplace.name,
+    work_number: 1,
     rate: defaults.rate,
     hours: defaults.hours,
   });

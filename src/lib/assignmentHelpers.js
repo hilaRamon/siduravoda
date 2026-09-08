@@ -4,25 +4,60 @@ export const NOT_WORKING_WORKPLACE_NAME = "תתת - לא עובד";
 export const PRE_ASSIGNMENT_WORKPLACE_NAME = "אאא- לפני שיבוץ";
 export const REQUEST_FULFILLED_SNACKBAR_MS = 4000;
 
+export function assignmentWorkNumber(assignment) {
+  const n = Number(assignment?.work_number);
+  return Number.isInteger(n) && n >= 1 ? n : 1;
+}
+
+function isNewerAssignment(candidate, existing) {
+  return (
+    (candidate.updated_date || candidate.created_date) >
+    (existing.updated_date || existing.created_date)
+  );
+}
+
+/** Keep the latest row per (student_id, work_number). */
+export function collapseAssignmentDupes(assignmentList = []) {
+  const bySlot = {};
+  assignmentList.forEach((a) => {
+    if (!a?.student_id) return;
+    const key = `${a.student_id}::${assignmentWorkNumber(a)}`;
+    const existing = bySlot[key];
+    if (!existing || isNewerAssignment(a, existing)) {
+      bySlot[key] = a;
+    }
+  });
+  return Object.values(bySlot);
+}
+
+export function assignmentsByStudentId(assignmentList = []) {
+  const map = {};
+  collapseAssignmentDupes(assignmentList).forEach((a) => {
+    if (!map[a.student_id]) map[a.student_id] = [];
+    map[a.student_id].push(a);
+  });
+  Object.values(map).forEach((list) => {
+    list.sort((a, b) => assignmentWorkNumber(a) - assignmentWorkNumber(b));
+  });
+  return map;
+}
+
+/** One assignment per student: work_number 1 only (latest if duplicates). */
 export function dedupeLatestAssignments(assignmentList) {
   const byStudent = {};
-  assignmentList.forEach((a) => {
-    const existing = byStudent[a.student_id];
-    if (
-      !existing ||
-      (a.updated_date || a.created_date) >
-        (existing.updated_date || existing.created_date)
-    ) {
-      byStudent[a.student_id] = a;
-    }
+  collapseAssignmentDupes(assignmentList).forEach((a) => {
+    if (assignmentWorkNumber(a) !== 1) return;
+    byStudent[a.student_id] = a;
   });
   return Object.values(byStudent);
 }
 
 export function countStudentsAtWorkplace(assignmentList, workplaceId) {
-  return dedupeLatestAssignments(assignmentList).filter(
-    (a) => a.workplace_id === workplaceId,
-  ).length;
+  const ids = new Set();
+  collapseAssignmentDupes(assignmentList).forEach((a) => {
+    if (a.workplace_id === workplaceId) ids.add(a.student_id);
+  });
+  return ids.size;
 }
 
 export function getRequestedVolunteers(farmerRequests, workplaceId) {
@@ -96,7 +131,10 @@ export function buildBulkAssignmentOps({
   const assignmentByStudentId = {};
   assignments.forEach((a) => {
     assignmentById[a.id] = a;
-    assignmentByStudentId[a.student_id] = a;
+    const existing = assignmentByStudentId[a.student_id];
+    if (!existing || assignmentWorkNumber(a) < assignmentWorkNumber(existing)) {
+      assignmentByStudentId[a.student_id] = a;
+    }
   });
   const studentById = {};
   students.forEach((s) => {
@@ -142,6 +180,7 @@ export function buildBulkAssignmentOps({
           student_name: student.full_name,
           workplace_id: wp.id,
           workplace_name: wp.name,
+          work_number: 1,
           rate:
             bulkRate !== ""
               ? dailyMode

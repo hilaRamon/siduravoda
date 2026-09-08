@@ -29,7 +29,8 @@ export function CohortSelectDialog({
   selected,
   onSelectedChange,
   filteredStudents,
-  assignmentByStudent,
+  assignmentByStudent = {},
+  assignmentsByStudent = {},
   onConfirm,
 }) {
   return (
@@ -70,7 +71,12 @@ export function CohortSelectDialog({
                 const ids = new Set();
                 filteredStudents.forEach((s) => {
                   if (selected.includes(s.cohort)) {
-                    ids.add(assignmentByStudent[s.id]?.id || s.id);
+                    const list = assignmentsByStudent?.[s.id];
+                    if (list?.length) {
+                      list.forEach((a) => ids.add(a.id));
+                    } else {
+                      ids.add(assignmentByStudent?.[s.id]?.id || s.id);
+                    }
                   }
                 });
                 onConfirm(ids);

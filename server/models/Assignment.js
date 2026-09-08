@@ -10,14 +10,18 @@ const assignmentSchema = new mongoose.Schema(
     workplace_name: { type: String },
     role: { type: String },
     rate: { type: Number, default: 40 },
-    hours: { type: Number, default: 4.5 },
+    hours: { type: Number, default: 4.75 },
     bonus: { type: Number },
     notes: { type: String },
+    work_number: { type: Number, default: 1, min: 1 },
   },
-  baseSchemaOptions,
+  { ...baseSchemaOptions, autoIndex: false },
 );
 
-assignmentSchema.index({ date: 1, student_id: 1 });
+assignmentSchema.index(
+  { date: 1, student_id: 1, work_number: 1 },
+  { unique: true },
+);
 
 const Assignment =
   mongoose.models.Assignment || mongoose.model("Assignment", assignmentSchema);

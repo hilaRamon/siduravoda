@@ -1,6 +1,7 @@
 import { getModel } from "../models/index.js";
 import Assignment from "../models/Assignment.js";
 import { SKIP_WORKPLACES } from "../lib/reportConstants.js";
+import { primaryWorkNumberMatch } from "../lib/assignmentWorkNumber.js";
 import * as studentRepository from "../repositories/studentRepository.js";
 
 async function getWorkplaceMaps() {
@@ -61,6 +62,7 @@ export async function getStudentWorkReport({
     date: { $gte: startDate, $lte: endDate },
     workplace_name: { $nin: SKIP_WORKPLACES, $exists: true, $ne: "" },
     student_id: { $exists: true, $ne: "" },
+    ...primaryWorkNumberMatch(),
   };
 
   if (skipIds.length > 0) {
@@ -72,6 +74,7 @@ export async function getStudentWorkReport({
 
   const aggregated = await Assignment.aggregate([
     { $match: match },
+    { $sort: { updated_date: -1, created_date: -1 } },
     {
       $group: {
         _id: { student_id: "$student_id", date: "$date" },

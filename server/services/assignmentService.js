@@ -1,3 +1,4 @@
+import Assignment from "../models/Assignment.js";
 import { buildSort } from "../lib/query.js";
 import * as assignmentRepository from "../repositories/assignmentRepository.js";
 
@@ -40,6 +41,16 @@ function normalizeAssignmentInput(body = {}, { partial = false } = {}) {
     data.workplace_id = String(body.workplace_id);
   } else if (!partial) {
     throw new AssignmentError("workplace_id is required");
+  }
+
+  if (body.work_number !== undefined) {
+    const n = Number(body.work_number);
+    if (!Number.isInteger(n) || n < 1) {
+      throw new AssignmentError("work_number must be an integer >= 1");
+    }
+    data.work_number = n;
+  } else if (!partial) {
+    data.work_number = 1;
   }
 
   for (const key of [
@@ -131,10 +142,26 @@ export async function updateAssignment(id, body) {
   return doc;
 }
 
+async function compactWorkNumbers(date, studentId) {
+  if (!date || !studentId) return;
+  const remaining = await Assignment.find({ date, student_id: studentId })
+    .sort({ work_number: 1, created_date: 1 })
+    .exec();
+  let next = 1;
+  for (const row of remaining) {
+    if (row.work_number !== next) {
+      row.work_number = next;
+      await row.save();
+    }
+    next += 1;
+  }
+}
+
 export async function deleteAssignment(id) {
   const doc = await assignmentRepository.deleteById(id);
   if (!doc) {
     throw new AssignmentError("Assignment not found", 404);
   }
+  await compactWorkNumbers(doc.date, doc.student_id);
   return doc;
 }

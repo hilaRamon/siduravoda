@@ -179,17 +179,8 @@ export default function LogisticsSidebar({ date, assignments }) {
   }, [farmerRequests]);
 
   const activeWorkplaces = useMemo(() => {
-    const assignmentByStudent = {};
-    assignments.forEach(a => {
-      const existing = assignmentByStudent[a.student_id];
-      if (!existing || (a.updated_date || a.created_date) > (existing.updated_date || existing.created_date)) {
-        assignmentByStudent[a.student_id] = a;
-      }
-    });
-    const deduped = Object.values(assignmentByStudent);
-
     const map = {};
-    deduped
+    assignments
       .filter(a => a.workplace_id && a.workplace_name)
       .forEach(a => {
         if (!map[a.workplace_id]) map[a.workplace_id] = { name: a.workplace_name, students: new Set() };

@@ -25,7 +25,7 @@ export default function StudentWorkReport() {
     endDate: toDate,
     students: selectedStudents.length > 0 ? selectedStudents : undefined,
   });
-  // Report API deduplicates by (student_id, date) — a student can only work one day per date
+  // Report API uses work_number 1 only — extra same-day workplaces are omitted here
 
   const reportData = data?.students ?? [];
 

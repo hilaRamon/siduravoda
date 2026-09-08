@@ -18,8 +18,8 @@ function timeReportModel() {
   return getModel("TimeReport");
 }
 
-function hoursKey(date, studentId) {
-  return `${date}|${studentId}`;
+function hoursKey(date, studentId, workplaceId) {
+  return `${date}|${studentId}|${workplaceId}`;
 }
 
 async function applyCustomHours(reports) {
@@ -28,11 +28,16 @@ async function applyCustomHours(reports) {
     if (!isCustomHours(report)) continue;
     const duration = calcDuration(report.start_time, report.end_time);
     if (duration === null) continue;
-    hoursByKey.set(hoursKey(report.date, report.student_id), duration);
+    hoursByKey.set(
+      hoursKey(report.date, report.student_id, report.workplace_id),
+      duration,
+    );
   }
   if (hoursByKey.size === 0) return;
 
-  const dates = [...new Set([...hoursByKey.keys()].map((key) => key.split("|")[0]))];
+  const dates = [
+    ...new Set([...hoursByKey.keys()].map((key) => key.split("|")[0])),
+  ];
   const studentIds = [
     ...new Set([...hoursByKey.keys()].map((key) => key.split("|")[1])),
   ];
@@ -47,7 +52,11 @@ async function applyCustomHours(reports) {
   const seen = new Set();
   const ops = [];
   for (const assignment of assignments) {
-    const key = hoursKey(assignment.date, assignment.student_id);
+    const key = hoursKey(
+      assignment.date,
+      assignment.student_id,
+      assignment.workplace_id,
+    );
     if (seen.has(key) || !hoursByKey.has(key)) continue;
     seen.add(key);
     ops.push({

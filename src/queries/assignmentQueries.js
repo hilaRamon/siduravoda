@@ -5,6 +5,7 @@ import { studentApi } from "@/api/studentApi";
 import {
   NOT_WORKING_WORKPLACE_NAME,
   PRE_ASSIGNMENT_WORKPLACE_NAME,
+  assignmentWorkNumber,
 } from "@/lib/assignmentHelpers";
 
 export const assignmentKeys = {
@@ -89,36 +90,37 @@ export function useDeleteAssignment() {
  * @property {string} date
  * @property {{ id: string, full_name: string }} student
  * @property {{ id: string, name: string }} workplace
- * @property {Array<{ id: string, student_id: string }>} assignments
+ * @property {Array<{ id: string, student_id: string, work_number?: number }>} assignments
+ * @property {{ id: string, student_id: string } | null} [assignment]
  * @property {{ rate: number, hours: number }} defaults
  */
 
 /**
- * Create or update a student's workplace assignment for a date,
- * deleting duplicate rows when present.
+ * Create or update a student's workplace assignment for a date.
+ * Updates the given row (or work_number 1) and leaves extra works in place.
  * @returns {import('@tanstack/react-query').UseMutationResult<void, Error, AssignStudentInput>}
  */
 export function useAssignStudent() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (/** @type {AssignStudentInput} */ input) => {
-      const { date, student, workplace, assignments, defaults } = input;
-      const allForStudent = assignments.filter(
-        (a) => a.student_id === student.id,
-      );
+      const { date, student, workplace, assignments, assignment, defaults } =
+        input;
 
-      if (allForStudent.length > 1) {
-        const [keep, ...extras] = allForStudent;
-        await Promise.all(extras.map((a) => assignmentApi.remove(a.id)));
-        await assignmentApi.update(keep.id, {
+      if (assignment?.id) {
+        await assignmentApi.update(assignment.id, {
           workplace_id: workplace.id,
           workplace_name: workplace.name,
         });
         return;
       }
 
-      if (allForStudent.length === 1) {
-        await assignmentApi.update(allForStudent[0].id, {
+      const primary = assignments.find(
+        (a) =>
+          a.student_id === student.id && assignmentWorkNumber(a) === 1,
+      );
+      if (primary) {
+        await assignmentApi.update(primary.id, {
           workplace_id: workplace.id,
           workplace_name: workplace.name,
         });
@@ -131,6 +133,7 @@ export function useAssignStudent() {
         student_name: student.full_name,
         workplace_id: workplace.id,
         workplace_name: workplace.name,
+        work_number: 1,
         rate: defaults.rate,
         hours: defaults.hours,
       });
@@ -256,21 +259,9 @@ export function useCloneDayAssignments() {
         limit: 2000,
       });
 
-      const targetByStudent = {};
-      targetAssignments.forEach((a) => {
-        const existing = targetByStudent[a.student_id];
-        if (
-          !existing ||
-          (a.updated_date || a.created_date) >
-            (existing.updated_date || existing.created_date)
-        ) {
-          targetByStudent[a.student_id] = a;
-        }
-      });
-
-      report(50, "מנקה כפילויות...");
+      const targetPrimaryByStudent = {};
       const duplicatesToDelete = [];
-      const seenOnTarget = new Set();
+      const seenPrimary = new Set();
       [...targetAssignments]
         .sort((a, b) =>
           (b.updated_date || b.created_date) >
@@ -279,12 +270,16 @@ export function useCloneDayAssignments() {
             : -1,
         )
         .forEach((a) => {
-          if (seenOnTarget.has(a.student_id)) {
+          if (assignmentWorkNumber(a) !== 1) return;
+          if (seenPrimary.has(a.student_id)) {
             duplicatesToDelete.push(a.id);
           } else {
-            seenOnTarget.add(a.student_id);
+            seenPrimary.add(a.student_id);
+            targetPrimaryByStudent[a.student_id] = a;
           }
         });
+
+      report(50, "מנקה כפילויות...");
       for (const id of duplicatesToDelete) {
         await assignmentApi.remove(id);
       }
@@ -301,6 +296,7 @@ export function useCloneDayAssignments() {
       report(60, "מכין שיבוצים...");
 
       for (const src of sourceAssignments) {
+        if (assignmentWorkNumber(src) !== 1) continue;
         const student = studentById[src.student_id];
         if (student?.is_active === false) continue;
         const isCrew = student?.cohort?.includes("צוות");
@@ -334,7 +330,7 @@ export function useCloneDayAssignments() {
           targetWp = { id: src.workplace_id, name: src.workplace_name };
         }
 
-        const existing = targetByStudent[src.student_id];
+        const existing = targetPrimaryByStudent[src.student_id];
         if (existing) {
           toUpdate.push({
             id: existing.id,
@@ -352,6 +348,7 @@ export function useCloneDayAssignments() {
             student_name: src.student_name,
             workplace_id: targetWp.id,
             workplace_name: targetWp.name,
+            work_number: 1,
             rate: defaults.rate,
             hours: defaults.hours,
             role: null,

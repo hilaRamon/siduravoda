@@ -15,14 +15,13 @@ import {
 } from "@/components/assignments/AssignmentCells";
 
 export default function AssignmentsTable({
-  filteredStudents,
+  tableRows,
   guestAssignments,
   students,
   cohorts,
   workplaces,
   roles,
   assignments,
-  assignmentByStudent,
   assignmentDefaults,
   selectedIds,
   allVisibleSelected,
@@ -175,7 +174,7 @@ export default function AssignmentsTable({
           </tr>
         </thead>
         <tbody>
-          {filteredStudents.length === 0 ? (
+          {tableRows.length === 0 ? (
             <tr>
               <td
                 colSpan={10}
@@ -187,13 +186,12 @@ export default function AssignmentsTable({
               </td>
             </tr>
           ) : (
-            filteredStudents.map((student, idx) => {
-              const assignment = assignmentByStudent[student.id];
-              const selectKey = assignment?.id || student.id;
+            tableRows.map((row, idx) => {
+              const { student, assignment, selectKey } = row;
               const isSelected = selectedIds.has(selectKey);
               return (
                 <tr
-                  key={student.id}
+                  key={row.key}
                   className={`transition-colors ${isSelected ? "bg-primary/10" : assignment ? "bg-primary/5" : "hover:bg-secondary/20"}`}
                 >
                   <td className="px-3 py-2 border-b border-border">
@@ -277,14 +275,14 @@ export default function AssignmentsTable({
                       e.preventDefault();
                       onToggleSelect(
                         selectKey,
-                        filteredStudents.length + idx,
+                        tableRows.length + idx,
                         e.shiftKey,
                       );
                     }}
                   />
                 </td>
                 <td className="px-3 py-2 border-b border-border text-muted-foreground text-xs">
-                  {filteredStudents.length + idx + 1}
+                  {tableRows.length + idx + 1}
                 </td>
                 <td className="px-3 py-2 border-b border-border font-medium align-middle">
                   <span className="flex items-center gap-1">
