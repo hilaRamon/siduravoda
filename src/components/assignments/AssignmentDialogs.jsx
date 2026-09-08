@@ -153,8 +153,6 @@ export function CloneDialog({
   cloneTargetDate,
   onCloneTargetDateChange,
   cloning,
-  cloneStep,
-  cloneProgress,
   onClone,
 }) {
   return (
@@ -193,22 +191,6 @@ export function CloneDialog({
                 יוגדרו "תתת - לא עובד". אחרת → יישארו ללא שיבוץ.
               </div>
             )}
-          {cloning && (
-            <div className="space-y-2 pt-1">
-              <div className="flex justify-between items-center text-xs">
-                <span className="text-muted-foreground">{cloneStep}</span>
-                <span className="font-semibold text-primary">
-                  {cloneProgress}%
-                </span>
-              </div>
-              <div className="w-full h-3 bg-secondary rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-primary rounded-full transition-all duration-500 ease-out"
-                  style={{ width: `${cloneProgress}%` }}
-                />
-              </div>
-            </div>
-          )}
           <div className="flex gap-2 justify-end pt-1">
             <Button
               variant="outline"

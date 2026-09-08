@@ -54,8 +54,6 @@ import { showAlert } from "@/components/AppAlert";
 export default function Assignments() {
   const [date, setDate] = useState(format(new Date(), "yyyy-MM-dd"));
   const [cloning, setCloning] = useState(false);
-  const [cloneProgress, setCloneProgress] = useState(0);
-  const [cloneStep, setCloneStep] = useState("");
   const [showCloneDialog, setShowCloneDialog] = useState(false);
   const [cloneTargetDate, setCloneTargetDate] = useState("");
   const [filterName, setFilterName] = useState("");
@@ -496,25 +494,15 @@ export default function Assignments() {
   const handleCloneDay = async () => {
     if (!cloneTargetDate) return;
     setCloning(true);
-    setCloneProgress(0);
-    setCloneStep("טוען נתונים...");
     try {
       await cloneDayMutation.mutateAsync({
-        sourceAssignments: cloneableAssignments,
+        sourceDate: date,
         targetDate: cloneTargetDate,
-        workplaces,
-        defaults: assignmentDefaults,
-        onProgress: ({ progress, step }) => {
-          setCloneProgress(progress);
-          if (step !== undefined) setCloneStep(step);
-        },
       });
     } catch (error) {
       await showAlert(`שגיאה בשכפול: ${error.message || "נסה שוב"}`);
     } finally {
       setCloning(false);
-      setCloneProgress(0);
-      setCloneStep("");
       setShowCloneDialog(false);
       setCloneTargetDate("");
     }
@@ -577,8 +565,6 @@ export default function Assignments() {
           cloneTargetDate={cloneTargetDate}
           onCloneTargetDateChange={setCloneTargetDate}
           cloning={cloning}
-          cloneStep={cloneStep}
-          cloneProgress={cloneProgress}
           onClone={handleCloneDay}
         />
 

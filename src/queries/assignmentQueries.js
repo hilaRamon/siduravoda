@@ -1,12 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { absenceApi } from "@/api/absenceApi";
 import { assignmentApi } from "@/api/assignmentApi";
-import { studentApi } from "@/api/studentApi";
-import {
-  NOT_WORKING_WORKPLACE_NAME,
-  PRE_ASSIGNMENT_WORKPLACE_NAME,
-  assignmentWorkNumber,
-} from "@/lib/assignmentHelpers";
+import { assignmentWorkNumber } from "@/lib/assignmentHelpers";
 
 export const assignmentKeys = {
   all: ["assignments"],
@@ -144,17 +138,6 @@ export function useAssignStudent() {
   });
 }
 
-async function bulkUpdateAssignments({ toCreate = [], toUpdate = [] }) {
-  await Promise.all(
-    toUpdate.map(({ id, fullRecord }) =>
-      assignmentApi.update(id, fullRecord),
-    ),
-  );
-  if (toCreate.length > 0) {
-    await assignmentApi.bulkCreate(toCreate);
-  }
-}
-
 const delay = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /**
@@ -207,170 +190,8 @@ export function useBulkUpsertAssignments() {
 export function useCloneDayAssignments() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({
-      sourceAssignments,
-      targetDate,
-      workplaces,
-      defaults,
-      onProgress,
-    }) => {
-      const report = (progress, step) => onProgress?.({ progress, step });
-
-      const targetDayOfWeek = new Date(targetDate + "T12:00:00").getDay();
-      const isSunday = targetDayOfWeek === 0;
-
-      const DISTANCE_WORKPLACE_MAP = {};
-      [
-        "קרוב",
-        "רחוק",
-        NOT_WORKING_WORKPLACE_NAME,
-        PRE_ASSIGNMENT_WORKPLACE_NAME,
-      ].forEach((distStatus) => {
-        const wp = workplaces.find((w) => w.name === distStatus);
-        if (wp) {
-          DISTANCE_WORKPLACE_MAP[distStatus] = { id: wp.id, name: wp.name };
-        }
-      });
-
-      report(10, "טוען תלמידים...");
-      const freshStudents = await studentApi.list({
-        sort: "-created_date",
-        limit: 2000,
-      });
-      const studentById = {};
-      freshStudents.forEach((s) => {
-        studentById[s.id] = s;
-      });
-
-      report(25, "בודק היעדרויות...");
-      const approvedAbsences = await absenceApi.list({
-        startDate: targetDate,
-        endDate: targetDate,
-        status: "אושר",
-      });
-      const absentStudentIds = new Set(
-        approvedAbsences.map((a) => a.student_id).filter(Boolean),
-      );
-
-      report(40, "טוען שיבוצים קיימים...");
-      const targetAssignments = await assignmentApi.list({
-        date: targetDate,
-        sort: "-created_date",
-        limit: 2000,
-      });
-
-      const targetPrimaryByStudent = {};
-      const duplicatesToDelete = [];
-      const seenPrimary = new Set();
-      [...targetAssignments]
-        .sort((a, b) =>
-          (b.updated_date || b.created_date) >
-          (a.updated_date || a.created_date)
-            ? 1
-            : -1,
-        )
-        .forEach((a) => {
-          if (assignmentWorkNumber(a) !== 1) return;
-          if (seenPrimary.has(a.student_id)) {
-            duplicatesToDelete.push(a.id);
-          } else {
-            seenPrimary.add(a.student_id);
-            targetPrimaryByStudent[a.student_id] = a;
-          }
-        });
-
-      report(50, "מנקה כפילויות...");
-      for (const id of duplicatesToDelete) {
-        await assignmentApi.remove(id);
-      }
-
-      const DAY_NUM_TO_HEB = { 0: "א", 1: "ב", 2: "ג", 3: "ד", 4: "ה" };
-      const targetDayHeb = DAY_NUM_TO_HEB[targetDayOfWeek];
-      const notWorkingWp = workplaces.find(
-        (w) => w.name === NOT_WORKING_WORKPLACE_NAME,
-      );
-
-      const toUpdate = [];
-      const toCreate = [];
-
-      report(60, "מכין שיבוצים...");
-
-      for (const src of sourceAssignments) {
-        if (assignmentWorkNumber(src) !== 1) continue;
-        const student = studentById[src.student_id];
-        if (student?.is_active === false) continue;
-        const isCrew = student?.cohort?.includes("צוות");
-
-        let targetWp;
-        if (absentStudentIds.has(src.student_id)) {
-          targetWp = notWorkingWp
-            ? { id: notWorkingWp.id, name: notWorkingWp.name }
-            : { id: "", name: NOT_WORKING_WORKPLACE_NAME };
-        } else if (isSunday) {
-          const distanceStatus = student?.distance_status;
-          if (distanceStatus && DISTANCE_WORKPLACE_MAP[distanceStatus]) {
-            targetWp = DISTANCE_WORKPLACE_MAP[distanceStatus];
-          } else {
-            targetWp = { id: src.workplace_id, name: src.workplace_name };
-          }
-        } else if (isCrew && targetDayHeb) {
-          const freeDays = Array.isArray(student?.free_day)
-            ? student.free_day
-            : student?.free_day
-              ? [student.free_day]
-              : [];
-          if (freeDays.includes(targetDayHeb)) {
-            targetWp = notWorkingWp
-              ? { id: notWorkingWp.id, name: notWorkingWp.name }
-              : { id: src.workplace_id, name: NOT_WORKING_WORKPLACE_NAME };
-          } else {
-            targetWp = { id: "", name: "" };
-          }
-        } else {
-          targetWp = { id: src.workplace_id, name: src.workplace_name };
-        }
-
-        const existing = targetPrimaryByStudent[src.student_id];
-        if (existing) {
-          toUpdate.push({
-            id: existing.id,
-            fullRecord: {
-              workplace_id: targetWp.id,
-              workplace_name: targetWp.name,
-              role: null,
-              bonus: null,
-            },
-          });
-        } else {
-          toCreate.push({
-            date: targetDate,
-            student_id: src.student_id,
-            student_name: src.student_name,
-            workplace_id: targetWp.id,
-            workplace_name: targetWp.name,
-            work_number: 1,
-            rate: defaults.rate,
-            hours: defaults.hours,
-            role: null,
-            bonus: null,
-          });
-        }
-      }
-
-      const CHUNK = 40;
-      for (let i = 0; i < toUpdate.length; i += CHUNK) {
-        await bulkUpdateAssignments({
-          toCreate: [],
-          toUpdate: toUpdate.slice(i, i + CHUNK),
-        });
-      }
-      if (toCreate.length > 0) {
-        await bulkUpdateAssignments({ toCreate, toUpdate: [] });
-      }
-
-      report(100, "");
-      return { created: toCreate.length, updated: toUpdate.length };
-    },
+    mutationFn: ({ sourceDate, targetDate }) =>
+      assignmentApi.clone({ sourceDate, targetDate }),
     onSuccess: () => {
       invalidateAssignmentQueries(queryClient);
     },
