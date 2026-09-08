@@ -36,6 +36,13 @@ export const assignmentApi = {
     });
   },
 
+  clone({ sourceDate, targetDate }) {
+    return apiRequest(`${BASE}/clone`, {
+      method: "POST",
+      body: JSON.stringify({ sourceDate, targetDate }),
+    });
+  },
+
   update(id, data) {
     return apiRequest(`${BASE}/${id}`, {
       method: "PATCH",

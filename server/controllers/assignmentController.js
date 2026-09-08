@@ -6,6 +6,7 @@ import {
   bulkCreateAssignments,
   updateAssignment,
   deleteAssignment,
+  cloneDayAssignments,
 } from "../services/assignmentService.js";
 
 function handleError(res, next, error) {
@@ -64,6 +65,15 @@ export async function remove(req, res, next) {
   try {
     await deleteAssignment(req.params.id);
     return res.status(204).send();
+  } catch (error) {
+    return handleError(res, next, error);
+  }
+}
+
+export async function cloneDay(req, res, next) {
+  try {
+    const result = await cloneDayAssignments(req.body || {});
+    return res.json(result);
   } catch (error) {
     return handleError(res, next, error);
   }
