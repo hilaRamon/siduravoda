@@ -1,5 +1,20 @@
+import { getModel } from "../models/index.js";
+import {
+  getAssignmentDefaults,
+  normalizeAppSettings,
+} from "../lib/pricing.js";
 import { buildSort } from "../lib/query.js";
+import {
+  CloneWorkplaceError,
+  DAY_NUM_TO_HEB,
+  DISTANCE_WORKPLACE_NAMES,
+  NOT_WORKING_WORKPLACE_NAME,
+  PRE_ASSIGNMENT_WORKPLACE_NAME,
+  decideCloneWorkplace,
+} from "../lib/cloneWorkplaceDecision.js";
+import * as absenceRequestRepository from "../repositories/absenceRequestRepository.js";
 import * as assignmentRepository from "../repositories/assignmentRepository.js";
+import * as studentRepository from "../repositories/studentRepository.js";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -137,4 +152,169 @@ export async function deleteAssignment(id) {
     throw new AssignmentError("Assignment not found", 404);
   }
   return doc;
+}
+
+function latestAssignmentByStudent(assignments) {
+  const byStudent = {};
+  for (const assignment of assignments) {
+    const existing = byStudent[assignment.student_id];
+    if (
+      !existing ||
+      (assignment.updated_date || assignment.created_date) >
+        (existing.updated_date || existing.created_date)
+    ) {
+      byStudent[assignment.student_id] = assignment;
+    }
+  }
+  return byStudent;
+}
+
+async function loadWorkplacesByName() {
+  const Workplace = getModel("Workplace");
+  const docs = await Workplace.find({
+    name: { $in: DISTANCE_WORKPLACE_NAMES },
+  }).lean();
+  const byName = {};
+  for (const doc of docs) {
+    byName[doc.name] = { id: doc._id.toString(), name: doc.name };
+  }
+  return byName;
+}
+
+async function getAssignmentDefaultsFromSettings() {
+  const AppSettings = getModel("AppSettings");
+  const settings = await AppSettings.findOne()
+    .sort({ updated_date: -1, created_date: -1 })
+    .lean();
+  return getAssignmentDefaults(normalizeAppSettings(settings));
+}
+
+export async function cloneDayAssignments({ sourceDate, targetDate }) {
+  assertDate(sourceDate);
+  assertDate(targetDate);
+
+  const [
+    sourceAssignments,
+    students,
+    approvedAbsences,
+    targetAssignments,
+    workplacesByName,
+    defaults,
+  ] = await Promise.all([
+    assignmentRepository.find(
+      { date: sourceDate },
+      { sort: { created_date: -1 }, limit: 2000 },
+    ),
+    studentRepository.find({}, { sort: { created_date: -1 }, limit: 2000 }),
+    absenceRequestRepository.find(
+      { date: targetDate, status: "אושר" },
+      { limit: 2000 },
+    ),
+    assignmentRepository.find(
+      { date: targetDate },
+      { sort: { created_date: -1 }, limit: 2000 },
+    ),
+    loadWorkplacesByName(),
+    getAssignmentDefaultsFromSettings(),
+  ]);
+
+  const studentById = Object.fromEntries(students.map((s) => [s.id, s]));
+  const absentStudentIds = new Set(
+    approvedAbsences.map((a) => a.student_id).filter(Boolean),
+  );
+  const sourceByStudent = latestAssignmentByStudent(
+    sourceAssignments.filter((a) => !a.student_id?.startsWith("guest_")),
+  );
+  const targetByStudent = latestAssignmentByStudent(targetAssignments);
+
+  const seenOnTarget = new Set();
+  const duplicatesToDelete = [];
+  [...targetAssignments]
+    .sort((a, b) =>
+      (b.updated_date || b.created_date) > (a.updated_date || a.created_date)
+        ? 1
+        : -1,
+    )
+    .forEach((a) => {
+      if (seenOnTarget.has(a.student_id)) {
+        duplicatesToDelete.push(a.id);
+      } else {
+        seenOnTarget.add(a.student_id);
+      }
+    });
+  await Promise.all(
+    duplicatesToDelete.map((id) => assignmentRepository.deleteById(id)),
+  );
+
+  const targetDayOfWeek = new Date(targetDate + "T12:00:00").getDay();
+  const isSunday = targetDayOfWeek === 0;
+  const targetDayHeb = DAY_NUM_TO_HEB[targetDayOfWeek];
+  const notWorkingWp = workplacesByName[NOT_WORKING_WORKPLACE_NAME];
+  const preAssignmentWp = workplacesByName[PRE_ASSIGNMENT_WORKPLACE_NAME];
+  const distanceWorkplaceMap = {};
+  for (const name of DISTANCE_WORKPLACE_NAMES) {
+    if (workplacesByName[name]) {
+      distanceWorkplaceMap[name] = workplacesByName[name];
+    }
+  }
+
+  const toUpdate = [];
+  const toCreate = [];
+
+  for (const src of Object.values(sourceByStudent)) {
+    const student = studentById[src.student_id];
+    let targetWp;
+    try {
+      targetWp = decideCloneWorkplace({
+        src,
+        student,
+        isSunday,
+        targetDayHeb,
+        isAbsent: absentStudentIds.has(src.student_id),
+        distanceWorkplaceMap,
+        notWorkingWp,
+        preAssignmentWp,
+      });
+    } catch (error) {
+      if (error instanceof CloneWorkplaceError) {
+        throw new AssignmentError(error.message);
+      }
+      throw error;
+    }
+    if (!targetWp?.id) continue;
+
+    const existing = targetByStudent[src.student_id];
+    if (existing) {
+      toUpdate.push({
+        id: existing.id,
+        data: {
+          workplace_id: targetWp.id,
+          workplace_name: targetWp.name,
+          role: null,
+          bonus: null,
+        },
+      });
+    } else {
+      toCreate.push({
+        date: targetDate,
+        student_id: src.student_id,
+        student_name: src.student_name,
+        workplace_id: targetWp.id,
+        workplace_name: targetWp.name,
+        rate: defaults.rate,
+        hours: defaults.hours,
+        role: null,
+        bonus: null,
+      });
+    }
+  }
+
+  await Promise.all(
+    toUpdate.map(({ id, data }) => assignmentRepository.updateById(id, data)),
+  );
+  if (toCreate.length > 0) {
+    await assignmentRepository.bulkCreate(toCreate);
+  }
+
+  return { created: toCreate.length, updated: toUpdate.length };
 }
