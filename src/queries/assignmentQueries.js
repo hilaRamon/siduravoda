@@ -224,7 +224,7 @@ export function useCloneDayAssignments() {
         PRE_ASSIGNMENT_WORKPLACE_NAME,
       ].forEach((distStatus) => {
         const wp = workplaces.find((w) => w.name === distStatus);
-        if (wp) {
+        if (wp?.id) {
           DISTANCE_WORKPLACE_MAP[distStatus] = { id: wp.id, name: wp.name };
         }
       });
@@ -294,6 +294,21 @@ export function useCloneDayAssignments() {
       const notWorkingWp = workplaces.find(
         (w) => w.name === NOT_WORKING_WORKPLACE_NAME,
       );
+      const preAssignmentWp = workplaces.find(
+        (w) => w.name === PRE_ASSIGNMENT_WORKPLACE_NAME,
+      );
+
+      const workplaceFromSource = (src) => {
+        if (src.workplace_name === NOT_WORKING_WORKPLACE_NAME) {
+          if (!preAssignmentWp?.id) {
+            throw new Error(
+              `מקום העבודה "${PRE_ASSIGNMENT_WORKPLACE_NAME}" לא נמצא`,
+            );
+          }
+          return { id: preAssignmentWp.id, name: preAssignmentWp.name };
+        }
+        return { id: src.workplace_id, name: src.workplace_name };
+      };
 
       const toUpdate = [];
       const toCreate = [];
@@ -307,15 +322,18 @@ export function useCloneDayAssignments() {
 
         let targetWp;
         if (absentStudentIds.has(src.student_id)) {
-          targetWp = notWorkingWp
-            ? { id: notWorkingWp.id, name: notWorkingWp.name }
-            : { id: "", name: NOT_WORKING_WORKPLACE_NAME };
+          if (!notWorkingWp?.id) {
+            throw new Error(
+              `מקום העבודה "${NOT_WORKING_WORKPLACE_NAME}" לא נמצא`,
+            );
+          }
+          targetWp = { id: notWorkingWp.id, name: notWorkingWp.name };
         } else if (isSunday) {
           const distanceStatus = student?.distance_status;
           if (distanceStatus && DISTANCE_WORKPLACE_MAP[distanceStatus]) {
             targetWp = DISTANCE_WORKPLACE_MAP[distanceStatus];
           } else {
-            targetWp = { id: src.workplace_id, name: src.workplace_name };
+            targetWp = workplaceFromSource(src);
           }
         } else if (isCrew && targetDayHeb) {
           const freeDays = Array.isArray(student?.free_day)
@@ -324,15 +342,20 @@ export function useCloneDayAssignments() {
               ? [student.free_day]
               : [];
           if (freeDays.includes(targetDayHeb)) {
-            targetWp = notWorkingWp
-              ? { id: notWorkingWp.id, name: notWorkingWp.name }
-              : { id: src.workplace_id, name: NOT_WORKING_WORKPLACE_NAME };
+            if (!notWorkingWp?.id) {
+              throw new Error(
+                `מקום העבודה "${NOT_WORKING_WORKPLACE_NAME}" לא נמצא`,
+              );
+            }
+            targetWp = { id: notWorkingWp.id, name: notWorkingWp.name };
           } else {
-            targetWp = { id: "", name: "" };
+            continue;
           }
         } else {
-          targetWp = { id: src.workplace_id, name: src.workplace_name };
+          targetWp = workplaceFromSource(src);
         }
+
+        if (!targetWp?.id) continue;
 
         const existing = targetByStudent[src.student_id];
         if (existing) {
