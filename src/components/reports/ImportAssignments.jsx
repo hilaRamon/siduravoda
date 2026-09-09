@@ -98,6 +98,7 @@ export default function ImportAssignments() {
 
     const toCreate = [];
     const skipped = [];
+    const seenStudentDate = new Set();
 
     rows.forEach(r => {
       const student = studentMap[r.studentName];
@@ -106,12 +107,20 @@ export default function ImportAssignments() {
       if (!student) { skipped.push(`תלמיד לא נמצא: "${r.studentName}"`); return; }
       if (!workplace) { skipped.push(`מקום עבודה לא נמצא: "${r.workplaceName}"`); return; }
 
+      const slotKey = `${student.id}|${r.date}`;
+      if (seenStudentDate.has(slotKey)) {
+        skipped.push(`דילוג על שיבוץ נוסף באותו יום: "${r.studentName}" ${r.date}`);
+        return;
+      }
+      seenStudentDate.add(slotKey);
+
       const record = {
         date: r.date,
         student_id: student.id,
         student_name: student.full_name,
         workplace_id: workplace.id,
         workplace_name: workplace.name,
+        work_number: 1,
       };
       if (r.role) record.role = r.role;
       if (r.rate !== null && !isNaN(r.rate)) record.rate = r.rate;

@@ -90,9 +90,13 @@ export function buildReportGroups(
     (a) => a.workplace_id && a.workplace_name,
   );
 
-  // Deduplicate: keep one assignment per student (most recently updated)
+  // First workplace only (work_number 1); missing work_number counts as 1
   const bestByStudent = {};
   filtered.forEach((a) => {
+    const workNumber = Number.isInteger(Number(a.work_number))
+      ? Number(a.work_number)
+      : 1;
+    if (workNumber > 1) return;
     const existing = bestByStudent[a.student_id];
     if (
       !existing ||

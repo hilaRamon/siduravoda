@@ -1,6 +1,7 @@
 import { getModel } from "../models/index.js";
 import Assignment from "../models/Assignment.js";
 import { SKIP_FARMS, SKIP_WORKPLACES } from "../lib/reportConstants.js";
+import { primaryWorkNumberMatch } from "../lib/assignmentWorkNumber.js";
 import * as studentRepository from "../repositories/studentRepository.js";
 
 async function getWorkplaceMaps() {
@@ -68,6 +69,7 @@ export async function getArzenuReport({ startDate, endDate }) {
   const match = {
     date: { $gte: startDate, $lte: endDate },
     workplace_name: { $nin: SKIP_WORKPLACES, $exists: true, $ne: "" },
+    ...primaryWorkNumberMatch(),
   };
 
   if (skipIds.length > 0) {

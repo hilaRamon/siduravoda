@@ -36,6 +36,13 @@ export const assignmentApi = {
     });
   },
 
+  bulkUpdate(items) {
+    return apiRequest(`${BASE}/bulk`, {
+      method: "PUT",
+      body: JSON.stringify(items),
+    });
+  },
+
   clone({ sourceDate, targetDate }) {
     return apiRequest(`${BASE}/clone`, {
       method: "POST",

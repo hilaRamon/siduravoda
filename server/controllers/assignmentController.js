@@ -4,6 +4,7 @@ import {
   getAssignment,
   createAssignment,
   bulkCreateAssignments,
+  bulkUpdateAssignments,
   updateAssignment,
   deleteAssignment,
   cloneDayAssignments,
@@ -47,6 +48,15 @@ export async function bulkCreate(req, res, next) {
   try {
     const items = await bulkCreateAssignments(req.body || []);
     return res.status(201).json(items);
+  } catch (error) {
+    return handleError(res, next, error);
+  }
+}
+
+export async function bulkUpdate(req, res, next) {
+  try {
+    const items = await bulkUpdateAssignments(req.body || []);
+    return res.json(items);
   } catch (error) {
     return handleError(res, next, error);
   }

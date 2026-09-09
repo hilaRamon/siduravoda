@@ -21,6 +21,7 @@ import publishedSchedulesRouter from "./routes/publishedSchedules.js";
 import timeReportsRouter from "./routes/timeReports.js";
 import studentsRouter from "./routes/students.js";
 import { ensureAdminUser } from "./lib/bootstrap.js";
+import { migrateAssignmentWorkNumber } from "./lib/migrateAssignmentWorkNumber.js";
 import { migrateLegacyUserRoles } from "./lib/migrateUserRoles.js";
 import { ensurePermissionRulesSeeded } from "./services/permissionRuleService.js";
 
@@ -93,6 +94,7 @@ app.use((error, _req, res, _next) => {
 
 async function start() {
   await mongoose.connect(mongoUri);
+  await migrateAssignmentWorkNumber();
   await ensurePermissionRulesSeeded();
   await migrateLegacyUserRoles();
   await ensureAdminUser();

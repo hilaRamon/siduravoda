@@ -1,4 +1,7 @@
-import { getModel } from "../models/index.js";
+import mongoose from "mongoose";
+import Assignment from "../models/Assignment.js";
+import AppSettings from "../models/AppSettings.js";
+import Workplace from "../models/Workplace.js";
 import {
   getAssignmentDefaults,
   normalizeAppSettings,
@@ -12,6 +15,7 @@ import {
   PRE_ASSIGNMENT_WORKPLACE_NAME,
   decideCloneWorkplace,
 } from "../lib/cloneWorkplaceDecision.js";
+import { isPrimaryWorkNumber } from "../lib/assignmentWorkNumber.js";
 import * as absenceRequestRepository from "../repositories/absenceRequestRepository.js";
 import * as assignmentRepository from "../repositories/assignmentRepository.js";
 import * as studentRepository from "../repositories/studentRepository.js";
@@ -55,6 +59,16 @@ function normalizeAssignmentInput(body = {}, { partial = false } = {}) {
     data.workplace_id = String(body.workplace_id);
   } else if (!partial) {
     throw new AssignmentError("workplace_id is required");
+  }
+
+  if (body.work_number !== undefined) {
+    const n = Number(body.work_number);
+    if (!Number.isInteger(n) || n < 1) {
+      throw new AssignmentError("work_number must be an integer >= 1");
+    }
+    data.work_number = n;
+  } else if (!partial) {
+    data.work_number = 1;
   }
 
   for (const key of [
@@ -146,11 +160,58 @@ export async function updateAssignment(id, body) {
   return doc;
 }
 
+export async function bulkUpdateAssignments(items) {
+  if (!Array.isArray(items)) {
+    throw new AssignmentError("Request body must be an array");
+  }
+  if (items.length === 0) return [];
+
+  const patches = items.map((item, index) => {
+    if (!item || typeof item !== "object" || Array.isArray(item)) {
+      throw new AssignmentError(`Item ${index} must be an object`);
+    }
+    const { id, ...rest } = item;
+    if (!id) {
+      throw new AssignmentError("Each item must include id");
+    }
+    if (!mongoose.isValidObjectId(id)) {
+      throw new AssignmentError("Assignment not found", 404);
+    }
+    const data = normalizeAssignmentInput(rest, { partial: true });
+    if (Object.keys(data).length === 0) {
+      throw new AssignmentError("No fields to update");
+    }
+    return { id: String(id), data };
+  });
+
+  const result = await assignmentRepository.bulkUpdate(patches);
+  if (result?.missing?.length) {
+    throw new AssignmentError("Assignment not found", 404);
+  }
+  return result;
+}
+
+async function compactWorkNumbers(date, studentId) {
+  if (!date || !studentId) return;
+  const remaining = await Assignment.find({ date, student_id: studentId })
+    .sort({ work_number: 1, created_date: 1 })
+    .exec();
+  let next = 1;
+  for (const row of remaining) {
+    if (row.work_number !== next) {
+      row.work_number = next;
+      await row.save();
+    }
+    next += 1;
+  }
+}
+
 export async function deleteAssignment(id) {
   const doc = await assignmentRepository.deleteById(id);
   if (!doc) {
     throw new AssignmentError("Assignment not found", 404);
   }
+  await compactWorkNumbers(doc.date, doc.student_id);
   return doc;
 }
 
@@ -170,7 +231,6 @@ function latestAssignmentByStudent(assignments) {
 }
 
 async function loadWorkplacesByName() {
-  const Workplace = getModel("Workplace");
   const docs = await Workplace.find({
     name: { $in: DISTANCE_WORKPLACE_NAMES },
   }).lean();
@@ -182,7 +242,6 @@ async function loadWorkplacesByName() {
 }
 
 async function getAssignmentDefaultsFromSettings() {
-  const AppSettings = getModel("AppSettings");
   const settings = await AppSettings.findOne()
     .sort({ updated_date: -1, created_date: -1 })
     .lean();
@@ -223,13 +282,20 @@ export async function cloneDayAssignments({ sourceDate, targetDate }) {
     approvedAbsences.map((a) => a.student_id).filter(Boolean),
   );
   const sourceByStudent = latestAssignmentByStudent(
-    sourceAssignments.filter((a) => !a.student_id?.startsWith("guest_")),
+    sourceAssignments.filter(
+      (a) =>
+        !a.student_id?.startsWith("guest_") &&
+        isPrimaryWorkNumber(a.work_number),
+    ),
   );
-  const targetByStudent = latestAssignmentByStudent(targetAssignments);
+  const targetByStudent = latestAssignmentByStudent(
+    targetAssignments.filter((a) => isPrimaryWorkNumber(a.work_number)),
+  );
 
   const seenOnTarget = new Set();
   const duplicatesToDelete = [];
   [...targetAssignments]
+    .filter((a) => isPrimaryWorkNumber(a.work_number))
     .sort((a, b) =>
       (b.updated_date || b.created_date) > (a.updated_date || a.created_date)
         ? 1
@@ -301,6 +367,7 @@ export async function cloneDayAssignments({ sourceDate, targetDate }) {
         student_name: src.student_name,
         workplace_id: targetWp.id,
         workplace_name: targetWp.name,
+        work_number: 1,
         rate: defaults.rate,
         hours: defaults.hours,
         role: null,

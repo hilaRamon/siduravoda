@@ -29,7 +29,8 @@ export function CohortSelectDialog({
   selected,
   onSelectedChange,
   filteredStudents,
-  assignmentByStudent,
+  assignmentByStudent = {},
+  assignmentsByStudent = {},
   onConfirm,
 }) {
   return (
@@ -70,7 +71,12 @@ export function CohortSelectDialog({
                 const ids = new Set();
                 filteredStudents.forEach((s) => {
                   if (selected.includes(s.cohort)) {
-                    ids.add(assignmentByStudent[s.id]?.id || s.id);
+                    const list = assignmentsByStudent?.[s.id];
+                    if (list?.length) {
+                      list.forEach((a) => ids.add(a.id));
+                    } else {
+                      ids.add(assignmentByStudent?.[s.id]?.id || s.id);
+                    }
                   }
                 });
                 onConfirm(ids);
@@ -219,7 +225,8 @@ export function BulkEditDialog({
   onBulkRateChange,
   rateColumnLabel,
   bulkSaving,
-  bulkProgress,
+  splitWork,
+  onSplitWorkChange,
   onSave,
 }) {
   return (
@@ -230,12 +237,29 @@ export function BulkEditDialog({
         </DialogHeader>
         <div className="space-y-4 mt-2">
           <p className="text-xs text-muted-foreground">
-            השדות שתמלא יעודכנו בכל השורות הנבחרות. שדה ריק לא ישתנה.
+            {splitWork
+              ? "נוספת שורת מקום עבודה חדשה לכל תלמיד שנבחר. השורה שנבחרה לא מוחלפת."
+              : "השדות שתמלא יעודכנו בכל השורות הנבחרות. שדה ריק לא ישתנה."}
           </p>
+
+          <label className="flex items-start gap-2 cursor-pointer">
+            <Checkbox
+              checked={splitWork}
+              onCheckedChange={(checked) => onSplitWorkChange(!!checked)}
+              className="mt-0.5"
+            />
+            <span>
+              <span className="text-sm font-medium block">פיצול עבודה</span>
+              <span className="text-xs text-muted-foreground">
+                נוספת שורת מקום עבודה חדשה; השורה שנבחרה לא מוחלפת.
+              </span>
+            </span>
+          </label>
 
           <div>
             <label className="text-xs font-medium text-muted-foreground mb-1 block">
               מקום עבודה
+              {splitWork ? " *" : ""}
             </label>
             <Popover
               open={bulkWorkplaceOpen}
@@ -248,7 +272,9 @@ export function BulkEditDialog({
                   >
                     {bulkWorkplace
                       ? workplaces.find((w) => w.id === bulkWorkplace)?.name
-                      : "— ללא שינוי —"}
+                      : splitWork
+                        ? "בחר מקום עבודה"
+                        : "— ללא שינוי —"}
                   </span>
                   <ChevronsUpDown size={14} className="opacity-50" />
                 </button>
@@ -262,16 +288,18 @@ export function BulkEditDialog({
                   <CommandList>
                     <CommandEmpty>לא נמצא</CommandEmpty>
                     <CommandGroup>
-                      <CommandItem
-                        value="__clear__"
-                        onSelect={() => {
-                          onBulkWorkplaceChange("");
-                          onBulkWorkplaceOpenChange(false);
-                        }}
-                        className="text-xs text-muted-foreground"
-                      >
-                        — ללא שינוי —
-                      </CommandItem>
+                      {!splitWork && (
+                        <CommandItem
+                          value="__clear__"
+                          onSelect={() => {
+                            onBulkWorkplaceChange("");
+                            onBulkWorkplaceOpenChange(false);
+                          }}
+                          className="text-xs text-muted-foreground"
+                        >
+                          — ללא שינוי —
+                        </CommandItem>
+                      )}
                       {workplaces.map((w) => (
                         <CommandItem
                           key={w.id}
@@ -301,7 +329,7 @@ export function BulkEditDialog({
               step="0.5"
               value={bulkHours}
               onChange={(e) => onBulkHoursChange(e.target.value)}
-              placeholder="— ללא שינוי —"
+              placeholder={splitWork ? "ברירת מחדל" : "— ללא שינוי —"}
               className="h-9 text-sm"
             />
           </div>
@@ -320,20 +348,7 @@ export function BulkEditDialog({
           </div>
 
           {bulkSaving && (
-            <div className="space-y-2">
-              <div className="flex justify-between text-xs text-muted-foreground">
-                <span>מעדכן שורות...</span>
-                <span className="font-medium text-primary">
-                  {bulkProgress}%
-                </span>
-              </div>
-              <div className="w-full h-3 bg-secondary rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-primary rounded-full transition-all duration-500 ease-out"
-                  style={{ width: `${bulkProgress}%` }}
-                />
-              </div>
-            </div>
+            <p className="text-xs text-muted-foreground">מעדכן שורות...</p>
           )}
 
           <div className="flex gap-2 justify-end pt-1">

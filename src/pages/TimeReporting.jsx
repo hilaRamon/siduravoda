@@ -1,5 +1,4 @@
 import { useState, useEffect, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { canReportTime } from '@/lib/permissions';
@@ -97,32 +96,32 @@ function WorkplaceGroup({ workplace, students, times, overrides, onGroupTimeChan
         <table className="w-full text-sm">
           <tbody className="divide-y divide-border">
             {students.map(a => {
-              const ov = overrides[a.student_id];
+              const ov = overrides[a.id];
               const effectiveStart = ov?.start ?? groupStart;
               const effectiveEnd = ov?.end ?? groupEnd;
               const hasOverride = ov !== undefined;
               const dur = calcDuration(effectiveStart, effectiveEnd);
 
               return (
-                <tr key={a.student_id} className={`hover:bg-secondary/10 transition-colors ${hasOverride ? 'bg-yellow-50/60' : ''}`}>
+                <tr key={a.id} className={`hover:bg-secondary/10 transition-colors ${hasOverride ? 'bg-yellow-50/60' : ''}`}>
                   <td className="px-4 py-2.5 font-medium w-48">{a.student_name}</td>
                   <td className="px-2 py-2.5">
                     <div className="flex items-center gap-2 flex-wrap">
                       <TimeInput
                         value={effectiveStart}
-                        onChange={v => onOverrideChange(a.student_id, 'start', v, groupStart, groupEnd)}
+                        onChange={v => onOverrideChange(a.id, 'start', v, groupStart, groupEnd)}
                       />
                       <span className="text-xs text-muted-foreground">—</span>
                       <TimeInput
                         value={effectiveEnd}
-                        onChange={v => onOverrideChange(a.student_id, 'end', v, groupStart, groupEnd)}
+                        onChange={v => onOverrideChange(a.id, 'end', v, groupStart, groupEnd)}
                       />
                       {dur !== null && (
                         <span className="text-xs font-mono text-muted-foreground">{dur.toFixed(2)} שע'</span>
                       )}
                       {hasOverride && (
                         <button
-                          onClick={() => onOverrideChange(a.student_id, null, null, null, null)}
+                          onClick={() => onOverrideChange(a.id, null, null, null, null)}
                           className="text-xs text-muted-foreground underline hover:text-destructive"
                         >
                           אפס
@@ -176,59 +175,39 @@ export default function TimeReporting() {
 
   const { data: assignments = [], isLoading } = useAssignments(selectedDate);
 
-  const { data: logisticsList = [] } = useQuery({
-    queryKey: ['workplace-logistics', selectedDate],
-    queryFn: () => base44.entities.WorkplaceLogistics.filter({ date: selectedDate }),
-  });
+  const visibleAssignments = useMemo(
+    () =>
+      assignments.filter(
+        (a) =>
+          a.student_name &&
+          a.workplace_id &&
+          !NON_WORK.includes(a.workplace_name?.trim()),
+      ),
+    [assignments],
+  );
 
-  // Build deduped assignment map per student
-  const assignmentByStudent = useMemo(() => {
-    const map = {};
-    assignments.forEach(a => {
-      const ex = map[a.student_id];
-      if (!ex || (a.updated_date || a.created_date) > (ex.updated_date || ex.created_date)) {
-        map[a.student_id] = a;
-      }
-    });
-    return map;
-  }, [assignments]);
-
-  // Get active workplaces from logistics (same logic as LogisticsSidebar)
-  const activeWorkplacesFromLogistics = useMemo(() => {
-    const logMap = {};
-    logisticsList.forEach(l => {
-      const ex = logMap[l.workplace_id];
-      if (!ex || l.updated_date > ex.updated_date) logMap[l.workplace_id] = l;
-    });
-    return Object.values(logMap).sort((a, b) => (a.workplace_name || '').localeCompare(b.workplace_name || '', 'he'));
-  }, [logisticsList]);
-
-  // Build workplace → students list from assignments
   const workplaceStudents = useMemo(() => {
     const map = {};
-    Object.values(assignmentByStudent).forEach(a => {
-      if (!a.student_name || !a.workplace_id || NON_WORK.includes(a.workplace_name?.trim())) return;
+    visibleAssignments.forEach((a) => {
       if (!map[a.workplace_id]) map[a.workplace_id] = [];
       map[a.workplace_id].push(a);
     });
     return map;
-  }, [assignmentByStudent]);
+  }, [visibleAssignments]);
 
-  // Use only workplaces that have actual assignments for this date
   const workplacesToShow = useMemo(() => {
     const seen = new Set();
-    return Object.values(assignmentByStudent)
-      .filter(a => a.workplace_id && a.workplace_name && !NON_WORK.includes(a.workplace_name?.trim()))
-      .filter(a => { if (seen.has(a.workplace_id)) return false; seen.add(a.workplace_id); return true; })
-      .map(a => ({ workplace_id: a.workplace_id, workplace_name: a.workplace_name }))
-      .sort((a, b) => a.workplace_name.localeCompare(b.workplace_name, 'he'));
-  }, [workplaceStudents, assignmentByStudent]);
+    return visibleAssignments
+      .filter((a) => {
+        if (seen.has(a.workplace_id)) return false;
+        seen.add(a.workplace_id);
+        return true;
+      })
+      .map((a) => ({ workplace_id: a.workplace_id, workplace_name: a.workplace_name }))
+      .sort((a, b) => a.workplace_name.localeCompare(b.workplace_name, "he"));
+  }, [visibleAssignments]);
 
-  // All students for search
-  const allStudents = useMemo(() =>
-    Object.values(assignmentByStudent).filter(a => a.student_name && a.workplace_id && !NON_WORK.includes(a.workplace_name?.trim())),
-    [assignmentByStudent]
-  );
+  const allStudents = visibleAssignments;
 
   const searchResults = useMemo(() => {
     if (!search.trim()) return [];
@@ -257,12 +236,12 @@ export default function TimeReporting() {
     }));
   };
 
-  const handleOverrideChange = (studentId, field, val, groupStart, groupEnd) => {
+  const handleOverrideChange = (assignmentId, field, val, groupStart, groupEnd) => {
     if (field === null) {
-      setOverrides(prev => { const n = { ...prev }; delete n[studentId]; return n; });
+      setOverrides(prev => { const n = { ...prev }; delete n[assignmentId]; return n; });
       return;
     }
-    const current = overrides[studentId] || { start: groupStart, end: groupEnd };
+    const current = overrides[assignmentId] || { start: groupStart, end: groupEnd };
     const newTimes = { ...current, [field]: val };
     if (!validateTimes(newTimes.start, newTimes.end)) {
       setTimeError('שעת יציאה חייבת להיות מאוחרת משעת כניסה');
@@ -271,7 +250,7 @@ export default function TimeReporting() {
     }
     setTimeError('');
     setOverrides(prev => {
-      return { ...prev, [studentId]: newTimes };
+      return { ...prev, [assignmentId]: newTimes };
     });
   };
 
@@ -281,8 +260,10 @@ export default function TimeReporting() {
     setProgressLabel('טוען נתונים קיימים...');
     try {
       const existing = await base44.entities.TimeReport.filter({ date: selectedDate });
-      const existingByStudent = {};
-      existing.forEach(r => { existingByStudent[r.student_id] = r; });
+      const existingByStudentWorkplace = {};
+      existing.forEach((r) => {
+        existingByStudentWorkplace[`${r.student_id}|${r.workplace_id}`] = r;
+      });
 
       // Build flat list of all student operations
       const ops = [];
@@ -292,7 +273,7 @@ export default function TimeReporting() {
         const groupStart = groupTimes[wpId]?.start ?? DEFAULT_START;
         const groupEnd = groupTimes[wpId]?.end ?? DEFAULT_END;
         for (const a of students) {
-          const ov = overrides[a.student_id];
+          const ov = overrides[a.id];
           ops.push({ a, groupStart, groupEnd, ov });
         }
       }
@@ -313,8 +294,9 @@ export default function TimeReporting() {
           status: 'ממתין',
         };
 
-        if (existingByStudent[a.student_id]) {
-          await base44.entities.TimeReport.update(existingByStudent[a.student_id].id, data);
+        const existingKey = `${a.student_id}|${a.workplace_id}`;
+        if (existingByStudentWorkplace[existingKey]) {
+          await base44.entities.TimeReport.update(existingByStudentWorkplace[existingKey].id, data);
         } else {
           await base44.entities.TimeReport.create(data);
         }
@@ -488,24 +470,24 @@ export default function TimeReporting() {
                 const wpId = a.workplace_id;
                 const groupStart = groupTimes[wpId]?.start ?? DEFAULT_START;
                 const groupEnd = groupTimes[wpId]?.end ?? DEFAULT_END;
-                const ov = overrides[a.student_id];
+                const ov = overrides[a.id];
                 const effectiveStart = ov?.start ?? groupStart;
                 const effectiveEnd = ov?.end ?? groupEnd;
                 const dur = calcDuration(effectiveStart, effectiveEnd);
 
                 return (
-                  <div key={a.student_id} className={`flex items-center gap-3 px-4 py-3 border-b border-border last:border-0 flex-wrap ${ov ? 'bg-yellow-50/60' : ''}`}>
+                  <div key={a.id} className={`flex items-center gap-3 px-4 py-3 border-b border-border last:border-0 flex-wrap ${ov ? 'bg-yellow-50/60' : ''}`}>
                     <div className="min-w-0 flex-1">
                       <div className="font-medium text-sm">{a.student_name}</div>
                       <div className="text-xs text-muted-foreground">{a.workplace_name}</div>
                     </div>
                     <div className="flex items-center gap-2 flex-wrap">
-                      <TimeInput value={effectiveStart} onChange={v => handleOverrideChange(a.student_id, 'start', v, groupStart, groupEnd)} />
+                      <TimeInput value={effectiveStart} onChange={v => handleOverrideChange(a.id, 'start', v, groupStart, groupEnd)} />
                       <span className="text-xs">—</span>
-                      <TimeInput value={effectiveEnd} onChange={v => handleOverrideChange(a.student_id, 'end', v, groupStart, groupEnd)} />
+                      <TimeInput value={effectiveEnd} onChange={v => handleOverrideChange(a.id, 'end', v, groupStart, groupEnd)} />
                       {dur !== null && <span className="text-xs font-mono text-muted-foreground">{dur.toFixed(2)} שע'</span>}
                       {ov && (
-                        <button onClick={() => handleOverrideChange(a.student_id, null, null, null, null)}
+                        <button onClick={() => handleOverrideChange(a.id, null, null, null, null)}
                           className="text-xs text-muted-foreground underline hover:text-destructive">
                           אפס
                         </button>

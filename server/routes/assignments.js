@@ -10,6 +10,7 @@ router.use(requireAuth);
 router.get("/", assignmentController.list);
 router.post("/", assignmentController.create);
 router.post("/bulk", assignmentController.bulkCreate);
+router.put("/bulk", assignmentController.bulkUpdate);
 router.post("/clone", assignmentController.cloneDay);
 router.get("/:id", assignmentController.getById);
 router.patch("/:id", assignmentController.update);
