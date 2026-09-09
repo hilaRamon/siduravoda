@@ -60,6 +60,21 @@ export function countStudentsAtWorkplace(assignmentList, workplaceId) {
   return ids.size;
 }
 
+/** True if two selected rows belong to the same student. */
+export function selectionHasDuplicateStudents(selectedIds, assignments = []) {
+  const assignmentById = {};
+  assignments.forEach((a) => {
+    assignmentById[a.id] = a;
+  });
+  const seen = new Set();
+  for (const selId of selectedIds) {
+    const studentId = assignmentById[selId]?.student_id || selId;
+    if (seen.has(studentId)) return true;
+    seen.add(studentId);
+  }
+  return false;
+}
+
 export function getRequestedVolunteers(farmerRequests, workplaceId) {
   const forWp = farmerRequests.filter((r) => r.workplace_id === workplaceId);
   if (forWp.length === 0) return null;
@@ -112,7 +127,7 @@ export async function warnIfNoAgreement(date, workplace) {
 
 /**
  * Pure planner for bulk edit — no API calls.
- * @returns {{ toCreate: object[], toUpdate: { id: string, fullRecord: object }[], skippedAbsent: number }}
+ * @returns {{ toCreate: object[], toUpdate: { id: string, fullRecord: object }[], skippedAbsent: number, skippedUnassigned: number, skippedForbidden: number }}
  */
 export function buildBulkAssignmentOps({
   selectedIds,
@@ -126,6 +141,7 @@ export function buildBulkAssignmentOps({
   defaults,
   dailyMode,
   parseRateInput,
+  splitWork = false,
 }) {
   const assignmentById = {};
   const assignmentByStudentId = {};
@@ -144,16 +160,58 @@ export function buildBulkAssignmentOps({
   const toCreate = [];
   const toUpdate = [];
   let skippedAbsent = 0;
+  let skippedUnassigned = 0;
+  let skippedForbidden = 0;
+
+  const parsedRate =
+    bulkRate !== ""
+      ? dailyMode
+        ? parseRateInput(parseFloat(bulkRate))
+        : parseFloat(bulkRate)
+      : null;
 
   for (const selId of selectedIds) {
     const existingAssignment =
       assignmentById[selId] || assignmentByStudentId[selId];
     const studentId = existingAssignment?.student_id || selId;
+    const student = studentById[studentId];
     const isAbsent = !!absentByStudentId[studentId];
     const changingWorkplace = wp && wp.name !== NOT_WORKING_WORKPLACE_NAME;
 
     if (isAbsent && changingWorkplace) {
       skippedAbsent++;
+      continue;
+    }
+
+    if (splitWork) {
+      if (!existingAssignment || !wp) {
+        skippedUnassigned++;
+        continue;
+      }
+      if (student?.forbidden_workplaces?.includes(wp.id)) {
+        skippedForbidden++;
+        continue;
+      }
+      const maxWorkNumber = Math.max(
+        0,
+        ...assignments
+          .filter((a) => a.student_id === existingAssignment.student_id)
+          .map(assignmentWorkNumber),
+        ...toCreate
+          .filter((a) => a.student_id === existingAssignment.student_id)
+          .map(assignmentWorkNumber),
+      );
+      toCreate.push({
+        date,
+        student_id: existingAssignment.student_id,
+        student_name:
+          existingAssignment.student_name || student?.full_name || "",
+        workplace_id: wp.id,
+        workplace_name: wp.name,
+        work_number: maxWorkNumber + 1,
+        rate: parsedRate ?? existingAssignment.rate ?? defaults.rate,
+        hours: bulkHours !== "" ? parseFloat(bulkHours) : defaults.hours,
+      });
       continue;
     }
 
@@ -166,13 +224,9 @@ export function buildBulkAssignmentOps({
         fullRecord.workplace_name = wp.name;
       }
       if (bulkHours !== "") fullRecord.hours = parseFloat(bulkHours);
-      if (bulkRate !== "") {
-        const parsedRate = parseFloat(bulkRate);
-        fullRecord.rate = dailyMode ? parseRateInput(parsedRate) : parsedRate;
-      }
+      if (parsedRate !== null) fullRecord.rate = parsedRate;
       toUpdate.push({ id, fullRecord });
     } else if (wp) {
-      const student = studentById[selId];
       if (student) {
         toCreate.push({
           date,
@@ -181,17 +235,18 @@ export function buildBulkAssignmentOps({
           workplace_id: wp.id,
           workplace_name: wp.name,
           work_number: 1,
-          rate:
-            bulkRate !== ""
-              ? dailyMode
-                ? parseRateInput(parseFloat(bulkRate))
-                : parseFloat(bulkRate)
-              : defaults.rate,
+          rate: parsedRate ?? defaults.rate,
           hours: bulkHours !== "" ? parseFloat(bulkHours) : defaults.hours,
         });
       }
     }
   }
 
-  return { toCreate, toUpdate, skippedAbsent };
+  return {
+    toCreate,
+    toUpdate,
+    skippedAbsent,
+    skippedUnassigned,
+    skippedForbidden,
+  };
 }

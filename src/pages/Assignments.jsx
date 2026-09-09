@@ -47,6 +47,7 @@ import {
   buildBulkAssignmentOps,
   countStudentsAtWorkplace,
   getRequestedVolunteers,
+  selectionHasDuplicateStudents,
   warnIfNoAgreement,
 } from "@/lib/assignmentHelpers";
 import { showAlert } from "@/components/AppAlert";
@@ -68,6 +69,7 @@ export default function Assignments() {
   const [bulkWorkplace, setBulkWorkplace] = useState("");
   const [bulkHours, setBulkHours] = useState("");
   const [bulkRate, setBulkRate] = useState("");
+  const [bulkSplitWork, setBulkSplitWork] = useState(false);
   const [bulkWorkplaceOpen, setBulkWorkplaceOpen] = useState(false);
   const [bulkSaving, setBulkSaving] = useState(false);
   const [bulkProgress, setBulkProgress] = useState(0);
@@ -395,21 +397,74 @@ export default function Assignments() {
     updateAssignmentItem(assignment.id, { [field]: value });
   };
 
+  const resetBulkFields = () => {
+    setBulkWorkplace("");
+    setBulkHours("");
+    setBulkRate("");
+    setBulkSplitWork(false);
+    setBulkProgress(0);
+  };
+
+  const openBulkEdit = async () => {
+    if (selectionHasDuplicateStudents(selectedIds, assignments)) {
+      await showAlert(
+        "סימנת את אותו תלמיד יותר מפעם אחת. בטל את הסימון הכפול ונסה שוב.",
+      );
+      return;
+    }
+    setShowBulkDialog(true);
+  };
+
+  const bulkSkipMessage = (
+    skippedAbsent,
+    skippedUnassigned,
+    skippedForbidden,
+  ) => {
+    const parts = [];
+    if (skippedAbsent > 0) {
+      parts.push(
+        `${skippedAbsent} תלמידים עם היעדרות מאושרת דולגו. יש לבטל את ההיעדרות לפני שיבוץ.`,
+      );
+    }
+    if (skippedUnassigned > 0) {
+      parts.push(`${skippedUnassigned} תלמידים ללא שיבוץ דולגו — אין מה לפצל.`);
+    }
+    if (skippedForbidden > 0) {
+      parts.push(
+        `${skippedForbidden} תלמידים דולגו כי מקום העבודה אסור עבורם.`,
+      );
+    }
+    return parts.join("\n");
+  };
+
   const handleBulkSave = async () => {
     if (bulkSaving) return;
     const wp = bulkWorkplace
       ? workplaces.find((w) => w.id === bulkWorkplace)
       : null;
+
+    if (bulkSplitWork && !wp) {
+      await showAlert("יש לבחור מקום עבודה לפיצול עבודה.");
+      return;
+    }
+
     const hasChanges = wp || bulkHours !== "" || bulkRate !== "";
     if (!hasChanges) {
       setShowBulkDialog(false);
+      resetBulkFields();
       return;
     }
 
     const canAssign = await warnIfNoAgreement(date, wp);
     if (!canAssign) return;
 
-    const { toCreate, toUpdate, skippedAbsent } = buildBulkAssignmentOps({
+    const {
+      toCreate,
+      toUpdate,
+      skippedAbsent,
+      skippedUnassigned,
+      skippedForbidden,
+    } = buildBulkAssignmentOps({
       selectedIds,
       assignments,
       students,
@@ -421,12 +476,17 @@ export default function Assignments() {
       defaults: assignmentDefaults,
       dailyMode,
       parseRateInput,
+      splitWork: bulkSplitWork,
     });
 
-    if (skippedAbsent > 0 && toCreate.length === 0 && toUpdate.length === 0) {
-      await showAlert(
-        `${skippedAbsent} תלמידים עם היעדרות מאושרת דולגו. יש לבטל את ההיעדרות לפני שיבוץ.`,
-      );
+    const skipMsg = bulkSkipMessage(
+      skippedAbsent,
+      skippedUnassigned,
+      skippedForbidden,
+    );
+
+    if (toCreate.length === 0 && toUpdate.length === 0) {
+      await showAlert(skipMsg || "לא נמצאו שורות לעדכון.");
       return;
     }
 
@@ -457,14 +517,9 @@ export default function Assignments() {
 
       setSelectedIds(new Set());
       setShowBulkDialog(false);
-      setBulkWorkplace("");
-      setBulkHours("");
-      setBulkRate("");
-      setBulkProgress(0);
-      if (skippedAbsent > 0) {
-        await showAlert(
-          `${skippedAbsent} תלמידים עם היעדרות מאושרת דולגו. יש לבטל את ההיעדרות לפני שיבוץ.`,
-        );
+      resetBulkFields();
+      if (skipMsg) {
+        await showAlert(skipMsg);
       }
     } finally {
       setBulkSaving(false);
@@ -530,7 +585,7 @@ export default function Assignments() {
 
         <AssignmentsBulkToolbar
           selectedCount={selectedIds.size}
-          onEdit={() => setShowBulkDialog(true)}
+          onEdit={openBulkEdit}
           onClear={() => setSelectedIds(new Set())}
         />
 
@@ -570,7 +625,10 @@ export default function Assignments() {
 
         <BulkEditDialog
           open={showBulkDialog}
-          onOpenChange={setShowBulkDialog}
+          onOpenChange={(open) => {
+            setShowBulkDialog(open);
+            if (!open) resetBulkFields();
+          }}
           selectedCount={selectedIds.size}
           workplaces={workplaces}
           bulkWorkplace={bulkWorkplace}
@@ -584,6 +642,8 @@ export default function Assignments() {
           rateColumnLabel={rateColumnLabel}
           bulkSaving={bulkSaving}
           bulkProgress={bulkProgress}
+          splitWork={bulkSplitWork}
+          onSplitWorkChange={setBulkSplitWork}
           onSave={handleBulkSave}
         />
 
