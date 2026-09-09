@@ -50,7 +50,7 @@ import {
   selectionHasDuplicateStudents,
   warnIfNoAgreement,
 } from "@/lib/assignmentHelpers";
-import { showAlert } from "@/components/AppAlert";
+import { confirmAlert, showAlert } from "@/components/AppAlert";
 
 export default function Assignments() {
   const [date, setDate] = useState(format(new Date(), "yyyy-MM-dd"));
@@ -72,7 +72,6 @@ export default function Assignments() {
   const [bulkSplitWork, setBulkSplitWork] = useState(false);
   const [bulkWorkplaceOpen, setBulkWorkplaceOpen] = useState(false);
   const [bulkSaving, setBulkSaving] = useState(false);
-  const [bulkProgress, setBulkProgress] = useState(0);
 
   const [showAddGuestDialog, setShowAddGuestDialog] = useState(false);
   const [guestName, setGuestName] = useState("");
@@ -402,7 +401,6 @@ export default function Assignments() {
     setBulkHours("");
     setBulkRate("");
     setBulkSplitWork(false);
-    setBulkProgress(0);
   };
 
   const openBulkEdit = async () => {
@@ -415,19 +413,12 @@ export default function Assignments() {
     setShowBulkDialog(true);
   };
 
-  const bulkSkipMessage = (
-    skippedAbsent,
-    skippedUnassigned,
-    skippedForbidden,
-  ) => {
+  const bulkSkipMessage = (skippedAbsent, skippedForbidden) => {
     const parts = [];
     if (skippedAbsent > 0) {
       parts.push(
         `${skippedAbsent} תלמידים עם היעדרות מאושרת דולגו. יש לבטל את ההיעדרות לפני שיבוץ.`,
       );
-    }
-    if (skippedUnassigned > 0) {
-      parts.push(`${skippedUnassigned} תלמידים ללא שיבוץ דולגו — אין מה לפצל.`);
     }
     if (skippedForbidden > 0) {
       parts.push(
@@ -462,7 +453,7 @@ export default function Assignments() {
       toCreate,
       toUpdate,
       skippedAbsent,
-      skippedUnassigned,
+      skippedUnassignedNames,
       skippedForbidden,
     } = buildBulkAssignmentOps({
       selectedIds,
@@ -479,11 +470,20 @@ export default function Assignments() {
       splitWork: bulkSplitWork,
     });
 
-    const skipMsg = bulkSkipMessage(
-      skippedAbsent,
-      skippedUnassigned,
-      skippedForbidden,
-    );
+    if (bulkSplitWork && skippedUnassignedNames.length > 0) {
+      const nameList = skippedUnassignedNames.join(", ");
+      const baseMsg = `לא ניתן לפצל עבודה לתלמידים ללא שיבוץ: ${nameList}`;
+      if (toCreate.length === 0) {
+        await showAlert(baseMsg);
+        return;
+      }
+      const confirmed = await confirmAlert(
+        `${baseMsg}\nאישור יפצל רק את התלמידים שכבר משובצים.`,
+      );
+      if (!confirmed) return;
+    }
+
+    const skipMsg = bulkSkipMessage(skippedAbsent, skippedForbidden);
 
     if (toCreate.length === 0 && toUpdate.length === 0) {
       await showAlert(skipMsg || "לא נמצאו שורות לעדכון.");
@@ -491,13 +491,11 @@ export default function Assignments() {
     }
 
     setBulkSaving(true);
-    setBulkProgress(0);
     try {
       await bulkUpsertMutation.mutateAsync({
         date,
         toCreate,
         toUpdate,
-        onProgress: setBulkProgress,
       });
 
       if (wp) {
@@ -641,7 +639,6 @@ export default function Assignments() {
           onBulkRateChange={setBulkRate}
           rateColumnLabel={rateColumnLabel}
           bulkSaving={bulkSaving}
-          bulkProgress={bulkProgress}
           splitWork={bulkSplitWork}
           onSplitWorkChange={setBulkSplitWork}
           onSave={handleBulkSave}

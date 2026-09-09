@@ -138,44 +138,22 @@ export function useAssignStudent() {
   });
 }
 
-const delay = (ms) => new Promise((r) => setTimeout(r, ms));
-
 /**
- * Chunked create + update for bulk edit dialog.
+ * Bulk create and/or update for the bulk edit dialog.
  * @returns {import('@tanstack/react-query').UseMutationResult<any, Error, any>}
  */
 export function useBulkUpsertAssignments() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ toCreate = [], toUpdate = [], onProgress }) => {
-      const CHUNK_SIZE = 5;
-      const totalOps =
-        Math.ceil(toCreate.length / CHUNK_SIZE) +
-        Math.ceil(toUpdate.length / CHUNK_SIZE);
-      let doneOps = 0;
-
-      for (let i = 0; i < toCreate.length; i += CHUNK_SIZE) {
-        await Promise.all(
-          toCreate
-            .slice(i, i + CHUNK_SIZE)
-            .map((record) => assignmentApi.create(record)),
-        );
-        doneOps++;
-        onProgress?.(Math.round((doneOps / Math.max(totalOps, 1)) * 100));
-        if (i + CHUNK_SIZE < toCreate.length) await delay(300);
+    mutationFn: async ({ toCreate = [], toUpdate = [] }) => {
+      if (toCreate.length) {
+        await assignmentApi.bulkCreate(toCreate);
       }
-      for (let i = 0; i < toUpdate.length; i += CHUNK_SIZE) {
-        await Promise.all(
-          toUpdate
-            .slice(i, i + CHUNK_SIZE)
-            .map(({ id, fullRecord }) => assignmentApi.update(id, fullRecord)),
+      if (toUpdate.length) {
+        await assignmentApi.bulkUpdate(
+          toUpdate.map(({ id, fullRecord }) => ({ ...fullRecord, id })),
         );
-        doneOps++;
-        onProgress?.(Math.round((doneOps / Math.max(totalOps, 1)) * 100));
-        if (i + CHUNK_SIZE < toUpdate.length) await delay(300);
       }
-      onProgress?.(100);
-      await delay(400);
     },
     onSuccess: (_result, variables) => {
       invalidateAssignmentQueries(queryClient, variables?.date);

@@ -127,7 +127,7 @@ export async function warnIfNoAgreement(date, workplace) {
 
 /**
  * Pure planner for bulk edit — no API calls.
- * @returns {{ toCreate: object[], toUpdate: { id: string, fullRecord: object }[], skippedAbsent: number, skippedUnassigned: number, skippedForbidden: number }}
+ * @returns {{ toCreate: object[], toUpdate: { id: string, fullRecord: object }[], skippedAbsent: number, skippedUnassigned: number, skippedUnassignedNames: string[], skippedForbidden: number }}
  */
 export function buildBulkAssignmentOps({
   selectedIds,
@@ -160,7 +160,7 @@ export function buildBulkAssignmentOps({
   const toCreate = [];
   const toUpdate = [];
   let skippedAbsent = 0;
-  let skippedUnassigned = 0;
+  const skippedUnassignedNames = [];
   let skippedForbidden = 0;
 
   const parsedRate =
@@ -184,8 +184,14 @@ export function buildBulkAssignmentOps({
     }
 
     if (splitWork) {
-      if (!existingAssignment || !wp) {
-        skippedUnassigned++;
+      const isUnassigned =
+        !existingAssignment ||
+        !wp ||
+        existingAssignment.workplace_name === PRE_ASSIGNMENT_WORKPLACE_NAME;
+      if (isUnassigned) {
+        skippedUnassignedNames.push(
+          existingAssignment?.student_name || student?.full_name || "תלמיד",
+        );
         continue;
       }
       if (student?.forbidden_workplaces?.includes(wp.id)) {
@@ -246,7 +252,8 @@ export function buildBulkAssignmentOps({
     toCreate,
     toUpdate,
     skippedAbsent,
-    skippedUnassigned,
+    skippedUnassigned: skippedUnassignedNames.length,
+    skippedUnassignedNames,
     skippedForbidden,
   };
 }

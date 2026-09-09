@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import Assignment from "../models/Assignment.js";
 import AppSettings from "../models/AppSettings.js";
 import Workplace from "../models/Workplace.js";
@@ -157,6 +158,37 @@ export async function updateAssignment(id, body) {
     throw new AssignmentError("Assignment not found", 404);
   }
   return doc;
+}
+
+export async function bulkUpdateAssignments(items) {
+  if (!Array.isArray(items)) {
+    throw new AssignmentError("Request body must be an array");
+  }
+  if (items.length === 0) return [];
+
+  const patches = items.map((item, index) => {
+    if (!item || typeof item !== "object" || Array.isArray(item)) {
+      throw new AssignmentError(`Item ${index} must be an object`);
+    }
+    const { id, ...rest } = item;
+    if (!id) {
+      throw new AssignmentError("Each item must include id");
+    }
+    if (!mongoose.isValidObjectId(id)) {
+      throw new AssignmentError("Assignment not found", 404);
+    }
+    const data = normalizeAssignmentInput(rest, { partial: true });
+    if (Object.keys(data).length === 0) {
+      throw new AssignmentError("No fields to update");
+    }
+    return { id: String(id), data };
+  });
+
+  const result = await assignmentRepository.bulkUpdate(patches);
+  if (result?.missing?.length) {
+    throw new AssignmentError("Assignment not found", 404);
+  }
+  return result;
 }
 
 async function compactWorkNumbers(date, studentId) {

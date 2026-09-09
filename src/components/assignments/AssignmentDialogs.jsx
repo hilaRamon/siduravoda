@@ -225,7 +225,6 @@ export function BulkEditDialog({
   onBulkRateChange,
   rateColumnLabel,
   bulkSaving,
-  bulkProgress,
   splitWork,
   onSplitWorkChange,
   onSave,
@@ -349,20 +348,7 @@ export function BulkEditDialog({
           </div>
 
           {bulkSaving && (
-            <div className="space-y-2">
-              <div className="flex justify-between text-xs text-muted-foreground">
-                <span>מעדכן שורות...</span>
-                <span className="font-medium text-primary">
-                  {bulkProgress}%
-                </span>
-              </div>
-              <div className="w-full h-3 bg-secondary rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-primary rounded-full transition-all duration-500 ease-out"
-                  style={{ width: `${bulkProgress}%` }}
-                />
-              </div>
-            </div>
+            <p className="text-xs text-muted-foreground">מעדכן שורות...</p>
           )}
 
           <div className="flex gap-2 justify-end pt-1">
