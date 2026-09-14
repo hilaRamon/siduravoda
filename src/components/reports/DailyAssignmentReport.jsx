@@ -1,6 +1,4 @@
 import { useState, useMemo, useRef } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import { Download, Loader2 } from "lucide-react";
 import { format } from "date-fns";
@@ -14,6 +12,7 @@ import {
 } from "@/components/reports/dailyReportPdf";
 import { useAssignments } from "@/queries/assignmentQueries";
 import { useStudents } from "@/queries/studentQueries";
+import { useWorkplaceLogisticsByDate } from "@/queries/workplaceLogisticsQueries";
 
 export default function DailyAssignmentReport() {
   const [date, setDate] = useState(format(new Date(), "yyyy-MM-dd"));
@@ -22,27 +21,18 @@ export default function DailyAssignmentReport() {
 
   const { data: assignments = [], isLoading } = useAssignments(date);
 
-  const { data: logisticsList = [] } = useQuery({
-    queryKey: ["workplace-logistics", date],
-    queryFn: () => base44.entities.WorkplaceLogistics.filter({ date }),
-  });
+  const { data: logisticsList = [] } = useWorkplaceLogisticsByDate(date);
 
   const { students } = useStudents();
 
-  const { logisticsMap, logisticsMapByName, studentsMap } = useMemo(
+  const { logisticsMap, studentsMap } = useMemo(
     () => buildLookupMaps(logisticsList, students),
     [logisticsList, students],
   );
 
   const reportGroups = useMemo(
-    () =>
-      buildReportGroups(
-        assignments,
-        logisticsMap,
-        logisticsMapByName,
-        studentsMap,
-      ),
-    [assignments, logisticsMap, logisticsMapByName, studentsMap],
+    () => buildReportGroups(assignments, logisticsMap, studentsMap),
+    [assignments, logisticsMap, studentsMap],
   );
 
   const gregDate = toGregDate(date);

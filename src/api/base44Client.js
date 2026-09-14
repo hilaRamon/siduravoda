@@ -166,10 +166,8 @@ export const base44 = {
   },
   entities: {
     User: createEntityClient("User"),
-    Vehicle: createEntityClient("Vehicle"),
     Role: createEntityClient("Role"),
     Workplace: createEntityClient("Workplace"),
-    WorkplaceLogistics: createEntityClient("WorkplaceLogistics"),
     BackupSettings: createEntityClient("BackupSettings"),
     TimeReport: createEntityClient("TimeReport"),
     AppSettings: createEntityClient("AppSettings"),

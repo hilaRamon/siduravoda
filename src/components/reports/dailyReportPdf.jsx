@@ -79,10 +79,16 @@ export function toGregDate(dateStr) {
   });
 }
 
+function vehicleLabel(log) {
+  return [log.vehicle, log.vehicle_2, log.vehicle_3]
+    .map((vehicle) => vehicle?.name)
+    .filter(Boolean)
+    .join(" + ");
+}
+
 export function buildReportGroups(
   assignments,
   logisticsMap,
-  logisticsMapByName,
   studentsMap,
 ) {
   // Include all assignments that have a workplace id and name
@@ -125,14 +131,8 @@ export function buildReportGroups(
     .filter((g) => g.students.length > 0)
     .sort((a, b) => a.name.localeCompare(b.name, "he"))
     .map((g) => {
-      const log = logisticsMap[g.id] || logisticsMapByName[g.name] || {};
-      const vehicles = [
-        log.vehicle_name,
-        log.vehicle_name_2,
-        log.vehicle_name_3,
-      ]
-        .filter(Boolean)
-        .join(" + ");
+      const log = logisticsMap[g.id] || {};
+      const vehicles = vehicleLabel(log);
 
       // Sort students: cohort alphabetically, then name alphabetically
       const sortedStudents = [...g.students].sort((a, b) => {
@@ -154,15 +154,12 @@ export function buildReportGroups(
 }
 
 /** Build the logistics + students lookup maps used by buildReportGroups. */
-/** @returns {{ logisticsMap: Record<string, unknown>, logisticsMapByName: Record<string, unknown>, studentsMap: Record<string, unknown> }} */
+/** @returns {{ logisticsMap: Record<string, unknown>, studentsMap: Record<string, unknown> }} */
 export function buildLookupMaps(logisticsList, students) {
   /** @type {Record<string, unknown>} */
   const logisticsMap = {};
-  /** @type {Record<string, unknown>} */
-  const logisticsMapByName = {};
   logisticsList.forEach((l) => {
     if (l.workplace_id) logisticsMap[l.workplace_id] = l;
-    if (l.workplace_name) logisticsMapByName[l.workplace_name] = l;
   });
 
   /** @type {Record<string, unknown>} */
@@ -171,7 +168,7 @@ export function buildLookupMaps(logisticsList, students) {
     studentsMap[s.id] = s;
   });
 
-  return { logisticsMap, logisticsMapByName, studentsMap };
+  return { logisticsMap, studentsMap };
 }
 
 /** @type {Record<string, import('react').CSSProperties>} */

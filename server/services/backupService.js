@@ -4,6 +4,7 @@ import * as XLSX from "xlsx";
 import JSZip from "jszip";
 import { getModel } from "../models/index.js";
 import Assignment from "../models/Assignment.js";
+import Vehicle from "../models/Vehicle.js";
 import { sendVerificationToRecipients, sendWeeklyBackupToRecipients } from "../lib/email.js";
 import {
   mapAssignmentExportRow,
@@ -28,7 +29,6 @@ function workbookToBuffer(wb) {
 
 async function loadBackupData() {
   const Workplace = getModel("Workplace");
-  const Vehicle = getModel("Vehicle");
   const AppSettings = getModel("AppSettings");
 
   const [students, workplaces, vehicles, assignments, settingsDoc] = await Promise.all([

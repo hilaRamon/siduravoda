@@ -1,9 +1,13 @@
 import { useState, useMemo, useEffect } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { base44 } from '@/api/base44Client';
 import { Truck, Clock, Check, ChevronDown, ChevronUp } from 'lucide-react';
 import VehicleSlot from './VehicleSlot';
 import { useFarmerRequestsByDate } from '@/queries/farmerRequestQueries';
+import { useVehicles } from '@/queries/vehicleQueries';
+import {
+  useCreateWorkplaceLogistics,
+  useUpdateWorkplaceLogistics,
+  useWorkplaceLogisticsByDate,
+} from '@/queries/workplaceLogisticsQueries';
 
 function WorkplaceLogisticsCard({
   date,
@@ -17,10 +21,7 @@ function WorkplaceLogisticsCard({
 }) {
   const [expanded, setExpanded] = useState(false);
 
-  const { data: vehicles = [] } = useQuery({
-    queryKey: ['vehicles'],
-    queryFn: () => base44.entities.Vehicle.list(),
-  });
+  const { data: vehicles = [] } = useVehicles();
 
   const [localData, setLocalData] = useState(logistics || {});
   useEffect(() => {
@@ -41,13 +42,16 @@ function WorkplaceLogisticsCard({
     slotIndex !== 3 && localData.vehicle_id_3,
   ].filter(Boolean);
 
-  const handleVehicleSelect = (vehicleId, vehicleName, slotIndex) => {
+  const vehicleNameById = (vehicleId) =>
+    vehicles.find((vehicle) => vehicle.id === vehicleId)?.name;
+
+  const handleVehicleSelect = (vehicleId, _vehicleName, slotIndex) => {
     const newData = { ...localData };
-    if (slotIndex === 1) { newData.vehicle_id = vehicleId || null; newData.vehicle_name = vehicleName || null; }
-    else if (slotIndex === 2) { newData.vehicle_id_2 = vehicleId || null; newData.vehicle_name_2 = vehicleName || null; }
-    else if (slotIndex === 3) { newData.vehicle_id_3 = vehicleId || null; newData.vehicle_name_3 = vehicleName || null; }
+    if (slotIndex === 1) newData.vehicle_id = vehicleId || null;
+    else if (slotIndex === 2) newData.vehicle_id_2 = vehicleId || null;
+    else if (slotIndex === 3) newData.vehicle_id_3 = vehicleId || null;
     setLocalData(newData);
-    onSave(workplaceId, workplaceName, newData);
+    onSave(workplaceId, newData);
   };
 
   const [timeInput, setTimeInput] = useState(localData.exit_time || '06:35');
@@ -58,7 +62,7 @@ function WorkplaceLogisticsCard({
   const handleTimeSave = () => {
     const newData = { ...localData, exit_time: timeInput };
     setLocalData(newData);
-    onSave(workplaceId, workplaceName, newData);
+    onSave(workplaceId, newData);
   };
 
   return (
@@ -121,7 +125,7 @@ function WorkplaceLogisticsCard({
               onBlur={(e) => {
                 const newData = { ...localData, notes: e.target.value };
                 setLocalData(newData);
-                onSave(workplaceId, workplaceName, newData);
+                onSave(workplaceId, newData);
               }}
               placeholder="הערות למקום עבודה..."
               rows={2}
@@ -129,9 +133,9 @@ function WorkplaceLogisticsCard({
             />
           </div>
 
-          <VehicleSlot slotIndex={1} vehicleId={localData.vehicle_id} vehicleName={localData.vehicle_name} availableVehicles={availableVehicles} otherIds={getOtherIds(1)} onSelect={handleVehicleSelect} />
-          <VehicleSlot slotIndex={2} vehicleId={localData.vehicle_id_2} vehicleName={localData.vehicle_name_2} availableVehicles={availableVehicles} otherIds={getOtherIds(2)} onSelect={handleVehicleSelect} />
-          <VehicleSlot slotIndex={3} vehicleId={localData.vehicle_id_3} vehicleName={localData.vehicle_name_3} availableVehicles={availableVehicles} otherIds={getOtherIds(3)} onSelect={handleVehicleSelect} />
+          <VehicleSlot slotIndex={1} vehicleId={localData.vehicle_id} vehicleName={vehicleNameById(localData.vehicle_id)} availableVehicles={availableVehicles} otherIds={getOtherIds(1)} onSelect={handleVehicleSelect} />
+          <VehicleSlot slotIndex={2} vehicleId={localData.vehicle_id_2} vehicleName={vehicleNameById(localData.vehicle_id_2)} availableVehicles={availableVehicles} otherIds={getOtherIds(2)} onSelect={handleVehicleSelect} />
+          <VehicleSlot slotIndex={3} vehicleId={localData.vehicle_id_3} vehicleName={vehicleNameById(localData.vehicle_id_3)} availableVehicles={availableVehicles} otherIds={getOtherIds(3)} onSelect={handleVehicleSelect} />
         </div>
       )}
     </div>
@@ -139,12 +143,11 @@ function WorkplaceLogisticsCard({
 }
 
 export default function LogisticsSidebar({ date, assignments }) {
-  const queryClient = useQueryClient();
+  /** @type {import('@tanstack/react-query').UseMutationResult<any, Error, any>} */
+  const createLogistics = useCreateWorkplaceLogistics();
+  const updateLogistics = useUpdateWorkplaceLogistics();
 
-  const { data: logisticsList = [] } = useQuery({
-    queryKey: ['workplace-logistics', date],
-    queryFn: () => base44.entities.WorkplaceLogistics.filter({ date }),
-  });
+  const { data: logisticsList = [] } = useWorkplaceLogisticsByDate(date);
 
   const { data: farmerRequests = [] } = useFarmerRequestsByDate(date);
 
@@ -206,14 +209,24 @@ export default function LogisticsSidebar({ date, assignments }) {
       }));
   }, [assignments, requestByWorkplace]);
 
-  const handleSave = async (workplaceId, workplaceName, data) => {
+  const handleSave = async (workplaceId, data) => {
+    const payload = {
+      vehicle_id: data.vehicle_id || null,
+      vehicle_id_2: data.vehicle_id_2 || null,
+      vehicle_id_3: data.vehicle_id_3 || null,
+      exit_time: data.exit_time,
+      notes: data.notes,
+    };
     const existing = logisticsMap[workplaceId];
     if (existing) {
-      await base44.entities.WorkplaceLogistics.update(existing.id, data);
+      await updateLogistics.mutateAsync({ id: existing.id, data: payload, date });
     } else {
-      await base44.entities.WorkplaceLogistics.create({ date, workplace_id: workplaceId, workplace_name: workplaceName, exit_time: '06:35', ...data });
+      await createLogistics.mutateAsync({
+        date,
+        workplace_id: workplaceId,
+        ...payload,
+      });
     }
-    queryClient.invalidateQueries({ queryKey: ['workplace-logistics', date] });
   };
 
   if (activeWorkplaces.length === 0) {

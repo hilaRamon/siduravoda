@@ -20,6 +20,8 @@ import assignmentsRouter from "./routes/assignments.js";
 import publishedSchedulesRouter from "./routes/publishedSchedules.js";
 import timeReportsRouter from "./routes/timeReports.js";
 import studentsRouter from "./routes/students.js";
+import workplaceLogisticsRouter from "./routes/workplaceLogistics.js";
+import vehiclesRouter from "./routes/vehicles.js";
 import { ensureAdminUser } from "./lib/bootstrap.js";
 import { migrateAssignmentWorkNumber } from "./lib/migrateAssignmentWorkNumber.js";
 import { migrateLegacyUserRoles } from "./lib/migrateUserRoles.js";
@@ -65,6 +67,8 @@ app.use("/api/assignments", assignmentsRouter);
 app.use("/api/published-schedules", publishedSchedulesRouter);
 app.use("/api/time-reports", timeReportsRouter);
 app.use("/api/students", studentsRouter);
+app.use("/api/workplace-logistics", workplaceLogisticsRouter);
+app.use("/api/vehicles", vehiclesRouter);
 
 const distDir = path.resolve(process.cwd(), "dist");
 const hasFrontendBuild = fs.existsSync(path.join(distDir, "index.html"));

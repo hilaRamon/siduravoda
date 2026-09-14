@@ -10,7 +10,6 @@ function isReadMethod(method) {
 }
 
 const REPORTER_READ_ENTITIES = new Set([
-  "WorkplaceLogistics",
   "Workplace",
 ]);
 

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { assignmentApi } from '@/api/assignmentApi';
 import { studentApi } from '@/api/studentApi';
+import { vehicleApi } from '@/api/vehicleApi';
 import { Button } from '@/components/ui/button';
 import { Loader2, Database, Archive } from 'lucide-react';
 import * as XLSX from 'xlsx';
@@ -21,7 +22,7 @@ async function buildAllWorkbooks() {
   const [students, workplaces, vehicles, assignments, settingsList] = await Promise.all([
     studentApi.list({ sort: 'full_name', limit: 1000 }),
     base44.entities.Workplace.list('name', 1000),
-    base44.entities.Vehicle.list('name', 1000),
+    vehicleApi.list({ sort: 'name', limit: 1000 }),
     assignmentApi.list({ sort: 'date', limit: 10000 }),
     base44.entities.AppSettings.list(),
   ]);
@@ -104,7 +105,7 @@ async function exportWorkplaces() {
 }
 
 async function exportVehicles() {
-  const vehicles = await base44.entities.Vehicle.list('name', 1000);
+  const vehicles = await vehicleApi.list({ sort: 'name', limit: 1000 });
   const rows = vehicles.map(v => ({
     'שם / מספר רכב': v.name || '',
     'לוחית רישוי': v.license_plate || '',

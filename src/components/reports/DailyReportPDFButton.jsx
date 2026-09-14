@@ -1,5 +1,4 @@
 import { useState, useRef } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import { Download, Loader2, Share2 } from "lucide-react";
@@ -21,6 +20,7 @@ import {
   isScheduleVisible,
 } from "@/lib/scheduleVisibility";
 import { useStudents } from "@/queries/studentQueries";
+import { useWorkplaceLogisticsByDate } from "@/queries/workplaceLogisticsQueries";
 
 const PUBLISH_TOAST_MS = 5000;
 
@@ -33,10 +33,7 @@ export default function DailyReportPDFButton({ date, assignments }) {
   const toastTimerRef = useRef(null);
   const publishSchedule = usePublishSchedule();
 
-  const { data: logisticsList = [] } = useQuery({
-    queryKey: ["workplace-logistics", date],
-    queryFn: () => base44.entities.WorkplaceLogistics.filter({ date }),
-  });
+  const { data: logisticsList = [] } = useWorkplaceLogisticsByDate(date);
 
   const { students } = useStudents();
 
@@ -51,19 +48,14 @@ export default function DailyReportPDFButton({ date, assignments }) {
   const showToast = showPublishToast;
   const showStatus = !showToast && Boolean(recordForDate);
 
-  const { logisticsMap, logisticsMapByName, studentsMap } = buildLookupMaps(
+  const { logisticsMap, studentsMap } = buildLookupMaps(
     logisticsList,
     students,
   );
 
   const gregDate = toGregDate(date);
   const hebrewDate = toHebrewDate(date);
-  const reportGroups = buildReportGroups(
-    assignments,
-    logisticsMap,
-    logisticsMapByName,
-    studentsMap,
-  );
+  const reportGroups = buildReportGroups(assignments, logisticsMap, studentsMap);
 
   const handleExport = async () => {
     setExporting(true);

@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { base44 } from '@/api/base44Client';
+import { vehicleApi } from '@/api/vehicleApi';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Upload, CheckCircle2, AlertCircle } from 'lucide-react';
@@ -51,7 +51,7 @@ export default function ImportVehiclesModal({ onClose }) {
 
   const handleImport = async () => {
     setLoading(true);
-    const existing = await base44.entities.Vehicle.list();
+    const existing = await vehicleApi.list();
     const existingByName = {};
     existing.forEach(v => { existingByName[v.name?.trim()] = v; });
 
@@ -65,10 +65,10 @@ export default function ImportVehiclesModal({ onClose }) {
       if (mapping.notes !== undefined && row[mapping.notes]) data.notes = String(row[mapping.notes]).trim();
 
       if (existingByName[name]) {
-        await base44.entities.Vehicle.update(existingByName[name].id, data);
+        await vehicleApi.update(existingByName[name].id, data);
         updated++;
       } else {
-        await base44.entities.Vehicle.create(data);
+        await vehicleApi.create(data);
         created++;
       }
     }

@@ -1,12 +1,18 @@
 import { useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { base44 } from '@/api/base44Client';
+import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Plus, Pencil, Trash2, Upload } from 'lucide-react';
 import ImportVehiclesModal from '@/components/vehicles/ImportVehiclesModal';
 import { confirmAlert } from '@/components/AppAlert';
+import {
+  useCreateVehicle,
+  useDeleteVehicle,
+  useUpdateVehicle,
+  useVehicles,
+  vehicleKeys,
+} from '@/queries/vehicleQueries';
 
 function VehicleFormModal({ vehicle, onSave, onClose }) {
   const [form, setForm] = useState({
@@ -55,11 +61,11 @@ export default function Vehicles() {
   const [showForm, setShowForm] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const queryClient = useQueryClient();
+  const createVehicle = useCreateVehicle();
+  const updateVehicle = useUpdateVehicle();
+  const deleteVehicle = useDeleteVehicle();
 
-  const { data: vehicles = [], isLoading } = useQuery({
-    queryKey: ['vehicles'],
-    queryFn: () => base44.entities.Vehicle.list(),
-  });
+  const { data: vehicles = [], isLoading } = useVehicles();
 
   const filtered = vehicles.filter(v =>
     v.name?.includes(search) || v.license_plate?.includes(search)
@@ -67,19 +73,17 @@ export default function Vehicles() {
 
   const handleSave = async (data) => {
     if (editVehicle) {
-      await base44.entities.Vehicle.update(editVehicle.id, data);
+      await updateVehicle.mutateAsync({ id: editVehicle.id, data });
     } else {
-      await base44.entities.Vehicle.create(data);
+      await createVehicle.mutateAsync(data);
     }
-    queryClient.invalidateQueries({ queryKey: ['vehicles'] });
     setShowForm(false);
     setEditVehicle(null);
   };
 
   const handleDelete = async (id) => {
     if (!(await confirmAlert('למחוק רכב זה?'))) return;
-    await base44.entities.Vehicle.delete(id);
-    queryClient.invalidateQueries({ queryKey: ['vehicles'] });
+    await deleteVehicle.mutateAsync(id);
   };
 
   return (
@@ -158,7 +162,7 @@ export default function Vehicles() {
 
       {showImport && (
         <ImportVehiclesModal
-          onClose={() => { setShowImport(false); queryClient.invalidateQueries({ queryKey: ['vehicles'] }); }}
+          onClose={() => { setShowImport(false); queryClient.invalidateQueries({ queryKey: vehicleKeys.all }); }}
         />
       )}
     </div>
