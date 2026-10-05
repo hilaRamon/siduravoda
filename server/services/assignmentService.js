@@ -19,6 +19,7 @@ import { isPrimaryWorkNumber } from "../lib/assignmentWorkNumber.js";
 import * as absenceRequestRepository from "../repositories/absenceRequestRepository.js";
 import * as assignmentRepository from "../repositories/assignmentRepository.js";
 import * as studentRepository from "../repositories/studentRepository.js";
+import * as workplaceLogisticsRepository from "../repositories/workplaceLogisticsRepository.js";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -80,6 +81,10 @@ function normalizeAssignmentInput(body = {}, { partial = false } = {}) {
     if (body[key] !== undefined) data[key] = body[key];
   }
 
+  if (body.is_piecework !== undefined) {
+    data.is_piecework = Boolean(body.is_piecework);
+  }
+
   for (const key of ["rate", "hours", "bonus"]) {
     if (body[key] === undefined) continue;
     if (body[key] === null || body[key] === "") {
@@ -93,6 +98,49 @@ function normalizeAssignmentInput(body = {}, { partial = false } = {}) {
     data[key] = num;
   }
 
+  return data;
+}
+
+async function findLogisticsForWorkplace(date, workplaceId) {
+  if (!date || !workplaceId) return null;
+  const rows = await workplaceLogisticsRepository.find(
+    { date, workplace_id: String(workplaceId) },
+    { sort: { is_piecework: -1, updated_date: -1 }, limit: 1 },
+  );
+  return rows[0] || null;
+}
+
+export async function syncAssignmentsPieceworkForWorkplace(date, workplaceId) {
+  if (!date || !workplaceId) return;
+  const logistics = await findLogisticsForWorkplace(date, workplaceId);
+  const isPiecework = Boolean(logistics?.is_piecework);
+  const defaults = await getAssignmentDefaultsFromSettings();
+  const data = isPiecework
+    ? { is_piecework: true, rate: null }
+    : { is_piecework: false, rate: defaults.rate };
+  await assignmentRepository.updateMany(
+    { date, workplace_id: String(workplaceId) },
+    data,
+  );
+}
+
+async function overlayPiecework(data, existing = null) {
+  const date = data.date || existing?.date;
+  const workplaceId = data.workplace_id || existing?.workplace_id;
+  if (!date || !workplaceId) return data;
+
+  const logistics = await findLogisticsForWorkplace(date, workplaceId);
+  if (logistics?.is_piecework) {
+    data.is_piecework = true;
+    data.rate = null;
+    return data;
+  }
+
+  data.is_piecework = false;
+  if (existing?.is_piecework && (data.rate === undefined || data.rate === null)) {
+    const defaults = await getAssignmentDefaultsFromSettings();
+    data.rate = defaults.rate;
+  }
   return data;
 }
 
@@ -134,7 +182,9 @@ export async function getAssignment(id) {
 }
 
 export async function createAssignment(body) {
-  const data = normalizeAssignmentInput(body, { partial: false });
+  const data = await overlayPiecework(
+    normalizeAssignmentInput(body, { partial: false }),
+  );
   return assignmentRepository.create(data);
 }
 
@@ -142,9 +192,12 @@ export async function bulkCreateAssignments(items) {
   if (!Array.isArray(items)) {
     throw new AssignmentError("Request body must be an array");
   }
-  const normalized = items.map((item) =>
-    normalizeAssignmentInput(item, { partial: false }),
-  );
+  const normalized = [];
+  for (const item of items) {
+    normalized.push(
+      await overlayPiecework(normalizeAssignmentInput(item, { partial: false })),
+    );
+  }
   return assignmentRepository.bulkCreate(normalized);
 }
 
@@ -153,7 +206,12 @@ export async function updateAssignment(id, body) {
   if (Object.keys(data).length === 0) {
     throw new AssignmentError("No fields to update");
   }
-  const doc = await assignmentRepository.updateById(id, data);
+  let next = data;
+  if (data.workplace_id) {
+    const existing = await assignmentRepository.findById(id);
+    next = await overlayPiecework(data, existing);
+  }
+  const doc = await assignmentRepository.updateById(id, next);
   if (!doc) {
     throw new AssignmentError("Assignment not found", 404);
   }
@@ -166,7 +224,8 @@ export async function bulkUpdateAssignments(items) {
   }
   if (items.length === 0) return [];
 
-  const patches = items.map((item, index) => {
+  const patches = [];
+  for (const [index, item] of items.entries()) {
     if (!item || typeof item !== "object" || Array.isArray(item)) {
       throw new AssignmentError(`Item ${index} must be an object`);
     }
@@ -177,12 +236,16 @@ export async function bulkUpdateAssignments(items) {
     if (!mongoose.isValidObjectId(id)) {
       throw new AssignmentError("Assignment not found", 404);
     }
-    const data = normalizeAssignmentInput(rest, { partial: true });
+    let data = normalizeAssignmentInput(rest, { partial: true });
     if (Object.keys(data).length === 0) {
       throw new AssignmentError("No fields to update");
     }
-    return { id: String(id), data };
-  });
+    if (data.workplace_id) {
+      const existing = await assignmentRepository.findById(id);
+      data = await overlayPiecework(data, existing);
+    }
+    patches.push({ id: String(id), data });
+  }
 
   const result = await assignmentRepository.bulkUpdate(patches);
   if (result?.missing?.length) {
@@ -381,6 +444,14 @@ export async function cloneDayAssignments({ sourceDate, targetDate }) {
   );
   if (toCreate.length > 0) {
     await assignmentRepository.bulkCreate(toCreate);
+  }
+
+  const workplaceIds = new Set([
+    ...toUpdate.map(({ data }) => data.workplace_id).filter(Boolean),
+    ...toCreate.map((row) => row.workplace_id).filter(Boolean),
+  ]);
+  for (const workplaceId of workplaceIds) {
+    await syncAssignmentsPieceworkForWorkplace(targetDate, workplaceId);
   }
 
   return { created: toCreate.length, updated: toUpdate.length };

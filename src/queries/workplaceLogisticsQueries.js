@@ -9,8 +9,10 @@ export const workplaceLogisticsKeys = {
 function invalidateWorkplaceLogisticsQueries(queryClient, date) {
   if (date) {
     queryClient.invalidateQueries({ queryKey: workplaceLogisticsKeys.byDate(date) });
+    queryClient.invalidateQueries({ queryKey: ["assignments", date] });
   } else {
     queryClient.invalidateQueries({ queryKey: workplaceLogisticsKeys.all });
+    queryClient.invalidateQueries({ queryKey: ["assignments"] });
   }
 }
 

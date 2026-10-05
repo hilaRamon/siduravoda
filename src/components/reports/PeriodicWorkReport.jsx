@@ -34,6 +34,12 @@ import * as XLSX from "xlsx";
 import { format, subMonths } from "date-fns";
 import { useWorkByWorkplaceReport } from "@/queries/reports/useWorkByWorkplaceReport";
 import { useWorkplaces } from "@/queries/reports/useWorkplaces";
+import {
+  formatPayReportAvgHours,
+  formatPayReportDailyUnits,
+  formatPayReportHoursOrUnits,
+  formatPayReportRate,
+} from "@/lib/pieceworkReport";
 
 const MONTHS = [
   { value: "01", label: "ינואר" },
@@ -199,21 +205,21 @@ export default function PeriodicWorkReport() {
                 משק: farm,
                 תאריך: formatDate(r.date),
                 "מקום עבודה": r.workplaceName,
-                "תעריף יומי": r.dailyRate,
+                "תעריף יומי": formatPayReportRate(r, true),
                 "תשלום נוסף": r.bonus,
                 "כמות תלמידים": r.studentCount,
-                "ממוצע יחידות יומיות לתלמיד": r.avgDailyUnits,
+                "ממוצע יחידות יומיות לתלמיד": formatPayReportDailyUnits(r),
                 מחיר: r.totalPrice,
               }
             : {
                 משק: farm,
                 תאריך: formatDate(r.date),
                 "מקום עבודה": r.workplaceName,
-                תעריף: r.rate,
+                תעריף: formatPayReportRate(r, false),
                 "תשלום נוסף": r.bonus,
                 "כמות תלמידים": r.studentCount,
-                "סך שעות": r.totalHours,
-                "ממוצע שעות": r.avgHours,
+                "סך שעות": formatPayReportHoursOrUnits(r),
+                "ממוצע שעות": formatPayReportAvgHours(r),
                 מחיר: r.totalPrice,
               },
         ),
@@ -461,7 +467,7 @@ export default function PeriodicWorkReport() {
                             {r.workplaceName}
                           </td>
                           <td className="border border-gray-300 px-2 py-1.5 text-center">
-                            {isDailyPricing ? r.dailyRate : r.rate}
+                            {formatPayReportRate(r, isDailyPricing)}
                           </td>
                           <td className="border border-gray-300 px-2 py-1.5 text-center">
                             {r.bonus}
@@ -471,15 +477,15 @@ export default function PeriodicWorkReport() {
                           </td>
                           {isDailyPricing ? (
                             <td className="border border-gray-300 px-2 py-1.5 text-center">
-                              {r.avgDailyUnits}
+                              {formatPayReportDailyUnits(r)}
                             </td>
                           ) : (
                             <>
                               <td className="border border-gray-300 px-2 py-1.5 text-center">
-                                {r.totalHours}
+                                {formatPayReportHoursOrUnits(r)}
                               </td>
                               <td className="border border-gray-300 px-2 py-1.5 text-center">
-                                {r.avgHours}
+                                {formatPayReportAvgHours(r)}
                               </td>
                             </>
                           )}

@@ -8,6 +8,12 @@ import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import * as XLSX from 'xlsx';
 import { useWorkByWorkplaceReport } from '@/queries/reports/useWorkByWorkplaceReport';
+import {
+  formatPayReportAvgHours,
+  formatPayReportDailyUnits,
+  formatPayReportHoursOrUnits,
+  formatPayReportRate,
+} from '@/lib/pieceworkReport';
 
 export default function PeriodWorkReport() {
   const [startDate, setStartDate] = useState('');
@@ -75,20 +81,20 @@ export default function PeriodWorkReport() {
           ? {
               'מקום עבודה': wp,
               'תאריך': formatDate(r.date),
-              'תעריף יומי': r.dailyRate,
+              'תעריף יומי': formatPayReportRate(r, true),
               'תשלום נוסף': r.bonus,
               'כמות תלמידים': r.studentCount,
-              'ממוצע יחידות יומיות לתלמיד': r.avgDailyUnits,
+              'ממוצע יחידות יומיות לתלמיד': formatPayReportDailyUnits(r),
               'מחיר': r.totalPrice,
             }
           : {
               'מקום עבודה': wp,
               'תאריך': formatDate(r.date),
-              'תעריף': r.rate,
+              'תעריף': formatPayReportRate(r, false),
               'תשלום נוסף': r.bonus,
               'כמות תלמידים': r.studentCount,
-              'סך שעות': r.totalHours,
-              'ממוצע שעות': r.avgHours,
+              'סך שעות': formatPayReportHoursOrUnits(r),
+              'ממוצע שעות': formatPayReportAvgHours(r),
               'מחיר': r.totalPrice,
             },
       ));
@@ -227,16 +233,16 @@ export default function PeriodWorkReport() {
                         <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                           <td className="border border-gray-300 px-2 py-1.5">{formatDate(r.date)}</td>
                           <td className="border border-gray-300 px-2 py-1.5 text-center">
-                            {isDailyPricing ? r.dailyRate : r.rate}
+                            {formatPayReportRate(r, isDailyPricing)}
                           </td>
                           <td className="border border-gray-300 px-2 py-1.5 text-center">{r.bonus}</td>
                           <td className="border border-gray-300 px-2 py-1.5 text-center">{r.studentCount}</td>
                           {isDailyPricing ? (
-                            <td className="border border-gray-300 px-2 py-1.5 text-center">{r.avgDailyUnits}</td>
+                            <td className="border border-gray-300 px-2 py-1.5 text-center">{formatPayReportDailyUnits(r)}</td>
                           ) : (
                             <>
-                              <td className="border border-gray-300 px-2 py-1.5 text-center">{r.totalHours}</td>
-                              <td className="border border-gray-300 px-2 py-1.5 text-center">{r.avgHours}</td>
+                              <td className="border border-gray-300 px-2 py-1.5 text-center">{formatPayReportHoursOrUnits(r)}</td>
+                              <td className="border border-gray-300 px-2 py-1.5 text-center">{formatPayReportAvgHours(r)}</td>
                             </>
                           )}
                           <td className="border border-gray-300 px-2 py-1.5 text-center">{r.totalPrice} ₪</td>

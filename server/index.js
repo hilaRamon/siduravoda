@@ -24,6 +24,7 @@ import workplaceLogisticsRouter from "./routes/workplaceLogistics.js";
 import vehiclesRouter from "./routes/vehicles.js";
 import { ensureAdminUser } from "./lib/bootstrap.js";
 import { migrateAssignmentWorkNumber } from "./lib/migrateAssignmentWorkNumber.js";
+import { migrateWorkplaceLogisticsUnique } from "./lib/migrateWorkplaceLogisticsUnique.js";
 import { migrateLegacyUserRoles } from "./lib/migrateUserRoles.js";
 import { ensurePermissionRulesSeeded } from "./services/permissionRuleService.js";
 
@@ -99,6 +100,7 @@ app.use((error, _req, res, _next) => {
 async function start() {
   await mongoose.connect(mongoUri);
   await migrateAssignmentWorkNumber();
+  await migrateWorkplaceLogisticsUnique();
   await ensurePermissionRulesSeeded();
   await migrateLegacyUserRoles();
   await ensureAdminUser();

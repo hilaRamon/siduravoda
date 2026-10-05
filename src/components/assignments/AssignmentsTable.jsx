@@ -13,6 +13,42 @@ import {
   RoleCell,
   WorkplaceCell,
 } from "@/components/assignments/AssignmentCells";
+import {
+  formatPieceworkRate,
+  isPieceworkRow,
+} from "@/lib/assignmentHelpers";
+
+function RateCell({
+  assignment,
+  logisticsMap,
+  assignmentDefaults,
+  dailyMode,
+  formatRateDisplay,
+  parseRateInput,
+  onUpdateField,
+}) {
+  if (isPieceworkRow(assignment, logisticsMap)) {
+    const logistics = logisticsMap[assignment?.workplace_id] || {};
+    return (
+      <td className="px-3 py-2 border-b border-border">
+        <span className="h-8 text-xs flex items-center text-amber-800 bg-amber-50 border border-amber-200 rounded-md px-2">
+          {formatPieceworkRate(logistics) || "עבודת קבלנות"}
+        </span>
+      </td>
+    );
+  }
+  return (
+    <EditableNumberCell
+      value={assignment?.rate}
+      defaultValue={assignmentDefaults.rate}
+      assignment={assignment}
+      field="rate"
+      onUpdate={onUpdateField}
+      formatDisplay={dailyMode ? formatRateDisplay : undefined}
+      parseCommit={dailyMode ? parseRateInput : undefined}
+    />
+  );
+}
 
 export default function AssignmentsTable({
   tableRows,
@@ -45,6 +81,7 @@ export default function AssignmentsTable({
   onRemove,
   onUpdateRole,
   onUpdateField,
+  logisticsMap = {},
 }) {
   return (
     <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden">
@@ -224,14 +261,14 @@ export default function AssignmentsTable({
                     roles={roles}
                     onUpdateRole={onUpdateRole}
                   />
-                  <EditableNumberCell
-                    value={assignment?.rate}
-                    defaultValue={assignmentDefaults.rate}
+                  <RateCell
                     assignment={assignment}
-                    field="rate"
-                    onUpdate={onUpdateField}
-                    formatDisplay={dailyMode ? formatRateDisplay : undefined}
-                    parseCommit={dailyMode ? parseRateInput : undefined}
+                    logisticsMap={logisticsMap}
+                    assignmentDefaults={assignmentDefaults}
+                    dailyMode={dailyMode}
+                    formatRateDisplay={formatRateDisplay}
+                    parseRateInput={parseRateInput}
+                    onUpdateField={onUpdateField}
                   />
                   <EditableNumberCell
                     value={assignment?.hours}
@@ -305,14 +342,14 @@ export default function AssignmentsTable({
                   roles={roles}
                   onUpdateRole={onUpdateRole}
                 />
-                <EditableNumberCell
-                  value={ga.rate}
-                  defaultValue={assignmentDefaults.rate}
+                <RateCell
                   assignment={ga}
-                  field="rate"
-                  onUpdate={onUpdateField}
-                  formatDisplay={dailyMode ? formatRateDisplay : undefined}
-                  parseCommit={dailyMode ? parseRateInput : undefined}
+                  logisticsMap={logisticsMap}
+                  assignmentDefaults={assignmentDefaults}
+                  dailyMode={dailyMode}
+                  formatRateDisplay={formatRateDisplay}
+                  parseRateInput={parseRateInput}
+                  onUpdateField={onUpdateField}
                 />
                 <EditableNumberCell
                   value={ga.hours}

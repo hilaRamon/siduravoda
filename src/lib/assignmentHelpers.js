@@ -9,6 +9,34 @@ export function assignmentWorkNumber(assignment) {
   return Number.isInteger(n) && n >= 1 ? n : 1;
 }
 
+export function pickCanonicalLogistics(a, b) {
+  if (!a) return b;
+  if (!b) return a;
+  if (Boolean(a.is_piecework) !== Boolean(b.is_piecework)) {
+    return a.is_piecework ? a : b;
+  }
+  return (a.updated_date || "") >= (b.updated_date || "") ? a : b;
+}
+
+export function isPieceworkRow(assignment, logisticsMap) {
+  if (assignment?.is_piecework) return true;
+  const workplaceId = assignment?.workplace_id;
+  return Boolean(workplaceId && logisticsMap?.[workplaceId]?.is_piecework);
+}
+
+export function formatPieceworkRate(logistics) {
+  if (!logistics) return "";
+  const name = logistics.units_name || "יחידה";
+  if (logistics.rate == null || logistics.rate === "") return name;
+  return `${logistics.rate} ₪ / ${name}`;
+}
+
+export function formatPieceworkUnits(logistics) {
+  if (logistics?.units == null || logistics.units === "") return "";
+  const name = logistics.units_name || "";
+  return name ? `${logistics.units} ${name}` : String(logistics.units);
+}
+
 function isNewerAssignment(candidate, existing) {
   return (
     (candidate.updated_date || candidate.created_date) >
@@ -217,6 +245,7 @@ export function buildBulkAssignmentOps({
         work_number: maxWorkNumber + 1,
         rate: parsedRate ?? existingAssignment.rate ?? defaults.rate,
         hours: bulkHours !== "" ? parseFloat(bulkHours) : defaults.hours,
+        is_piecework: false,
       });
       continue;
     }
@@ -230,7 +259,9 @@ export function buildBulkAssignmentOps({
         fullRecord.workplace_name = wp.name;
       }
       if (bulkHours !== "") fullRecord.hours = parseFloat(bulkHours);
-      if (parsedRate !== null) fullRecord.rate = parsedRate;
+      if (parsedRate !== null && !existingAssignment.is_piecework) {
+        fullRecord.rate = parsedRate;
+      }
       toUpdate.push({ id, fullRecord });
     } else if (wp) {
       if (student) {
@@ -243,6 +274,7 @@ export function buildBulkAssignmentOps({
           work_number: 1,
           rate: parsedRate ?? defaults.rate,
           hours: bulkHours !== "" ? parseFloat(bulkHours) : defaults.hours,
+          is_piecework: false,
         });
       }
     }

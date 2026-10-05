@@ -11,6 +11,11 @@ import {
   PRICING_METHODS,
   round2,
 } from "../lib/pricing.js";
+import * as workplaceLogisticsRepository from "../repositories/workplaceLogisticsRepository.js";
+import {
+  logisticsKey,
+  pickCanonicalLogistics,
+} from "../lib/pieceworkLogistics.js";
 
 async function getAppSettings() {
   const AppSettings = getModel("AppSettings");
@@ -159,6 +164,9 @@ export async function getWorkByWorkplaceReport({
         totalBonus: { $sum: { $ifNull: ["$bonus", 0] } },
         studentCount: { $sum: 1 },
         rate: { $first: "$rate" },
+        hasPiecework: {
+          $max: { $cond: [{ $eq: ["$is_piecework", true] }, 1, 0] },
+        },
       },
     },
     { $sort: { "_id.workplace_id": 1, "_id.date": 1 } },
@@ -166,6 +174,24 @@ export async function getWorkByWorkplaceReport({
 
   const workplaceOptionsSet = new Set();
   const rowBuckets = {};
+
+  const workplaceIds = [
+    ...new Set(aggregated.map((item) => String(item._id.workplace_id))),
+  ];
+  const logisticsByKey = {};
+  if (workplaceIds.length > 0) {
+    const logisticsRows = await workplaceLogisticsRepository.find(
+      {
+        date: { $gte: startDate, $lte: endDate },
+        workplace_id: { $in: workplaceIds },
+      },
+      { limit: 10000 },
+    );
+    for (const row of logisticsRows) {
+      const key = logisticsKey(row.date, row.workplace_id);
+      logisticsByKey[key] = pickCanonicalLogistics(logisticsByKey[key], row);
+    }
+  }
 
   for (const item of aggregated) {
     const workplaceId = item._id.workplace_id;
@@ -185,36 +211,48 @@ export async function getWorkByWorkplaceReport({
       continue;
     }
 
+    const logistics = logisticsByKey[logisticsKey(item._id.date, workplaceId)];
+    const isPiecework = Boolean(item.hasPiecework || logistics?.is_piecework);
+
     const hourlyRate = item.rate ?? assignmentDefaults.rate;
-    const totalHours = round2(item.totalHours);
+    const totalHours = isPiecework ? 0 : round2(item.totalHours);
     const bonus = round2(item.totalBonus);
     const studentCount = item.studentCount;
-    const avgHours = studentCount ? round2(totalHours / studentCount) : 0;
+    const avgHours = studentCount && !isPiecework ? round2(totalHours / studentCount) : 0;
+    const pieceRate = logistics?.rate ?? 0;
+    const units = logistics?.units ?? 0;
+    const unitsName = logistics?.units_name || "";
     const dailyRate = hourlyToDailyRate(
       hourlyRate,
       appSettings.hours_per_daily_unit,
     );
-    const avgDailyUnits = calcAvgDailyUnits(
-      totalHours,
-      studentCount,
-      appSettings.hours_per_daily_unit,
-    );
-    const totalPrice =
-      appSettings.pricing_method === PRICING_METHODS.DAILY
+    const avgDailyUnits = isPiecework
+      ? 0
+      : calcAvgDailyUnits(
+          totalHours,
+          studentCount,
+          appSettings.hours_per_daily_unit,
+        );
+    const totalPrice = isPiecework
+      ? calcTotalPrice(units, pieceRate, bonus)
+      : appSettings.pricing_method === PRICING_METHODS.DAILY
         ? calcTotalPriceDaily(studentCount, avgDailyUnits, dailyRate, bonus)
         : calcTotalPrice(totalHours, hourlyRate, bonus);
 
     const row = {
       date: item._id.date,
       workplaceName,
-      rate: hourlyRate,
-      dailyRate,
+      rate: isPiecework ? pieceRate : hourlyRate,
+      dailyRate: isPiecework ? pieceRate : dailyRate,
       bonus,
       studentCount,
       totalHours,
       avgHours,
       avgDailyUnits,
       totalPrice,
+      is_piecework: isPiecework,
+      units,
+      units_name: unitsName,
     };
 
     if (!rowBuckets[workplaceId]) {

@@ -16,16 +16,48 @@ function requireLogisticsRead(req, res, next) {
 }
 
 function requireLogisticsWrite(req, res, next) {
+  if (isAdmin(req.user) || isRegularUser(req.user) || isReporterOnly(req.user)) {
+    return next();
+  }
+  return res.status(403).json({ message: "Forbidden" });
+}
+
+function requireLogisticsDelete(req, res, next) {
   if (isAdmin(req.user) || isRegularUser(req.user)) {
     return next();
   }
   return res.status(403).json({ message: "Forbidden" });
 }
 
+function restrictReporterPayload(req, res, next) {
+  if (!isReporterOnly(req.user)) return next();
+  const nextBody = {};
+  if (req.body?.date !== undefined) nextBody.date = req.body.date;
+  if (req.body?.workplace_id !== undefined) {
+    nextBody.workplace_id = req.body.workplace_id;
+  }
+  if (req.body?.units !== undefined) nextBody.units = req.body.units;
+  if (req.body?.is_piecework !== undefined) {
+    nextBody.is_piecework = req.body.is_piecework;
+  }
+  req.body = nextBody;
+  return next();
+}
+
 router.get("/", requireLogisticsRead, workplaceLogisticsController.list);
-router.post("/", requireLogisticsWrite, workplaceLogisticsController.create);
+router.post(
+  "/",
+  requireLogisticsWrite,
+  restrictReporterPayload,
+  workplaceLogisticsController.create,
+);
 router.get("/:id", requireLogisticsRead, workplaceLogisticsController.getById);
-router.patch("/:id", requireLogisticsWrite, workplaceLogisticsController.update);
-router.delete("/:id", requireLogisticsWrite, workplaceLogisticsController.remove);
+router.patch(
+  "/:id",
+  requireLogisticsWrite,
+  restrictReporterPayload,
+  workplaceLogisticsController.update,
+);
+router.delete("/:id", requireLogisticsDelete, workplaceLogisticsController.remove);
 
 export default router;

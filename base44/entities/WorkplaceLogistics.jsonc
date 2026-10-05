@@ -34,6 +34,23 @@
     "notes": {
       "type": "string",
       "description": "הערות"
+    },
+    "is_piecework": {
+      "type": "boolean",
+      "description": "עבודת קבלנות",
+      "default": false
+    },
+    "units_name": {
+      "type": "string",
+      "description": "שם יחידה"
+    },
+    "units": {
+      "type": "number",
+      "description": "כמות יחידות לקבוצה"
+    },
+    "rate": {
+      "type": "number",
+      "description": "תעריף ליחידה"
     }
   },
   "required": [

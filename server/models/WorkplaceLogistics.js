@@ -11,11 +11,15 @@ const workplaceLogisticsSchema = new mongoose.Schema(
     vehicle_id_3: { type: String, ref: "Vehicle" },
     exit_time: { type: String },
     notes: { type: String },
+    is_piecework: { type: Boolean, default: false },
+    units_name: { type: String },
+    units: { type: Number },
+    rate: { type: Number },
   },
   baseSchemaOptions,
 );
 
-workplaceLogisticsSchema.index({ date: 1, workplace_id: 1 });
+workplaceLogisticsSchema.index({ date: 1, workplace_id: 1 }, { unique: true });
 
 const WorkplaceLogistics =
   mongoose.models.WorkplaceLogistics ||

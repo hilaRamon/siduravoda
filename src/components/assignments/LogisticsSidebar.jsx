@@ -1,13 +1,15 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Truck, Clock, Check, ChevronDown, ChevronUp } from 'lucide-react';
 import VehicleSlot from './VehicleSlot';
+import { Switch } from '@/components/ui/switch';
+import { useLogisticsByWorkplace } from '@/hooks/assignments/useLogisticsByWorkplace';
 import { useLogisticsWorkplaces } from '@/hooks/assignments/useLogisticsWorkplaces';
 import { useVehicles } from '@/queries/vehicleQueries';
 import {
   useCreateWorkplaceLogistics,
   useUpdateWorkplaceLogistics,
-  useWorkplaceLogisticsByDate,
 } from '@/queries/workplaceLogisticsQueries';
+import { formatPieceworkUnits } from '@/lib/assignmentHelpers';
 
 function WorkplaceLogisticsCard({
   date,
@@ -65,6 +67,15 @@ function WorkplaceLogisticsCard({
     onSave(workplaceId, newData);
   };
 
+  const persist = (patch) => {
+    const newData = { ...localData, ...patch };
+    setLocalData(newData);
+    onSave(workplaceId, newData);
+  };
+
+  const isPiecework = Boolean(localData.is_piecework);
+  const unitsLabel = formatPieceworkUnits(localData);
+
   return (
     <div className="bg-card border border-border rounded-xl overflow-hidden">
       {/* Collapsed header — always visible */}
@@ -77,6 +88,11 @@ function WorkplaceLogisticsCard({
           <span className="text-xs bg-primary/10 text-primary font-medium px-2 py-0.5 rounded-full shrink-0 leading-none">
             {studentCount}
           </span>
+          {Boolean(logistics?.is_piecework) && (
+            <span className="text-xs bg-amber-100 text-amber-700 font-medium px-2 py-0.5 rounded-full shrink-0 leading-none">
+              קבלנות
+            </span>
+          )}
           {requestedVolunteers != null && (
             <span
               className="text-xs bg-orange-100 text-orange-600 font-medium px-2 py-0.5 rounded-full shrink-0 leading-none"
@@ -133,6 +149,53 @@ function WorkplaceLogisticsCard({
             />
           </div>
 
+          <div className="space-y-2 pt-1">
+            <div className="text-xs text-muted-foreground flex items-center justify-between gap-2">
+              <span>עבודת קבלנות</span>
+              <Switch
+                checked={isPiecework}
+                onCheckedChange={(checked) => persist({ is_piecework: checked })}
+              />
+            </div>
+            {isPiecework && (
+              <div className="space-y-2">
+                <div className="space-y-1">
+                  <label className="text-xs text-muted-foreground">שם יחידה</label>
+                  <input
+                    type="text"
+                    defaultValue={localData.units_name || ''}
+                    key={`units-name-${localData.units_name || 'empty'}`}
+                    onBlur={(e) => persist({ units_name: e.target.value })}
+                    placeholder="ארגז, ק״ג..."
+                    className="w-full h-8 text-xs border border-border rounded-md px-2 bg-background focus:outline-none focus:ring-1 focus:ring-primary/40"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs text-muted-foreground">תעריף ליחידה</label>
+                  <input
+                    type="number"
+                    defaultValue={localData.rate ?? ''}
+                    key={`rate-${localData.rate ?? 'empty'}`}
+                    onBlur={(e) => {
+                      const val = e.target.value === '' ? null : Number(e.target.value);
+                      persist({ rate: Number.isFinite(val) ? val : null });
+                    }}
+                    placeholder="0"
+                    className="w-full h-8 text-xs border border-border rounded-md px-2 bg-background focus:outline-none focus:ring-1 focus:ring-primary/40"
+                    step="0.5"
+                  />
+                </div>
+                {unitsLabel ? (
+                  <p className="text-xs text-muted-foreground bg-secondary/60 rounded-md px-2 py-1.5">
+                    כמות: {unitsLabel}
+                  </p>
+                ) : (
+                  <p className="text-xs text-muted-foreground">הכמות תדווח בדיווח הזמנים</p>
+                )}
+              </div>
+            )}
+          </div>
+
           <VehicleSlot slotIndex={1} vehicleId={localData.vehicle_id} vehicleName={vehicleNameById(localData.vehicle_id)} availableVehicles={availableVehicles} otherIds={getOtherIds(1)} onSelect={handleVehicleSelect} />
           <VehicleSlot slotIndex={2} vehicleId={localData.vehicle_id_2} vehicleName={vehicleNameById(localData.vehicle_id_2)} availableVehicles={availableVehicles} otherIds={getOtherIds(2)} onSelect={handleVehicleSelect} />
           <VehicleSlot slotIndex={3} vehicleId={localData.vehicle_id_3} vehicleName={vehicleNameById(localData.vehicle_id_3)} availableVehicles={availableVehicles} otherIds={getOtherIds(3)} onSelect={handleVehicleSelect} />
@@ -147,19 +210,8 @@ export default function LogisticsSidebar({ date, assignments }) {
   const createLogistics = useCreateWorkplaceLogistics();
   const updateLogistics = useUpdateWorkplaceLogistics();
 
-  const { data: logisticsList = [] } = useWorkplaceLogisticsByDate(date);
+  const { logisticsList, logisticsMap } = useLogisticsByWorkplace(date);
   const { workplaces } = useLogisticsWorkplaces(date, assignments);
-
-  const logisticsMap = useMemo(() => {
-    const map = {};
-    logisticsList.forEach(l => {
-      const existing = map[l.workplace_id];
-      if (!existing || l.updated_date > existing.updated_date) {
-        map[l.workplace_id] = l;
-      }
-    });
-    return map;
-  }, [logisticsList]);
 
   const handleSave = async (workplaceId, data) => {
     const payload = {
@@ -168,6 +220,9 @@ export default function LogisticsSidebar({ date, assignments }) {
       vehicle_id_3: data.vehicle_id_3 || null,
       exit_time: data.exit_time,
       notes: data.notes,
+      is_piecework: Boolean(data.is_piecework),
+      units_name: data.is_piecework ? (data.units_name || "") : "",
+      rate: data.is_piecework ? (data.rate ?? null) : null,
     };
     const existing = logisticsMap[workplaceId];
     if (existing) {

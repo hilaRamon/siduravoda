@@ -9,6 +9,21 @@ import * as XLSX from 'xlsx';
 import { format } from 'date-fns';
 import JSZip from 'jszip';
 import { mapAssignmentExportRow, normalizeAppSettings } from '@/lib/pricing';
+import { workplaceLogisticsApi } from '@/api/workplaceLogisticsApi';
+
+function mapLogisticsExportRow(row) {
+  return {
+    תאריך: row.date || '',
+    'מזהה מקום עבודה': row.workplace_id || '',
+    'מקום עבודה': row.workplace?.name || '',
+    'עבודת קבלנות': row.is_piecework ? 'כן' : 'לא',
+    'שם יחידה': row.units_name || '',
+    'כמות יחידות': row.units ?? '',
+    'תעריף ליחידה': row.rate ?? '',
+    'שעת יציאה': row.exit_time || '',
+    הערות: row.notes || '',
+  };
+}
 
 function downloadWorkbook(wb, filename) {
   XLSX.writeFile(wb, filename);
@@ -19,11 +34,12 @@ function workbookToBuffer(wb) {
 }
 
 async function buildAllWorkbooks() {
-  const [students, workplaces, vehicles, assignments, settingsList] = await Promise.all([
+  const [students, workplaces, vehicles, assignments, logistics, settingsList] = await Promise.all([
     studentApi.list({ sort: 'full_name', limit: 1000 }),
     base44.entities.Workplace.list('name', 1000),
     vehicleApi.list({ sort: 'name', limit: 1000 }),
     assignmentApi.list({ sort: 'date', limit: 10000 }),
+    workplaceLogisticsApi.list(),
     base44.entities.AppSettings.list(),
   ]);
   const appSettings = normalizeAppSettings(settingsList[0]);
@@ -63,11 +79,16 @@ async function buildAllWorkbooks() {
   const wbAssignments = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wbAssignments, wsAssignments, 'שיבוצים');
 
+  const wsLogistics = XLSX.utils.json_to_sheet((logistics || []).map(mapLogisticsExportRow));
+  const wbLogistics = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wbLogistics, wsLogistics, 'לוגיסטיקה');
+
   return [
     { name: `גיבוי_תלמידים_${today}.xlsx`, wb: wbStudents },
     { name: `גיבוי_מקומות_עבודה_${today}.xlsx`, wb: wbWorkplaces },
     { name: `גיבוי_רכבים_${today}.xlsx`, wb: wbVehicles },
     { name: `גיבוי_שיבוצים_${today}.xlsx`, wb: wbAssignments },
+    { name: `גיבוי_לוגיסטיקה_${today}.xlsx`, wb: wbLogistics },
   ];
 }
 
@@ -137,6 +158,14 @@ async function exportAssignments() {
   downloadWorkbook(wb, `גיבוי_שיבוצים_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
 }
 
+async function exportLogistics() {
+  const logistics = await workplaceLogisticsApi.list();
+  const ws = XLSX.utils.json_to_sheet((logistics || []).map(mapLogisticsExportRow));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'לוגיסטיקה');
+  downloadWorkbook(wb, `גיבוי_לוגיסטיקה_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
+}
+
 const EXPORTS = [
   {
     key: 'students',
@@ -161,6 +190,12 @@ const EXPORTS = [
     label: 'שיבוצים יומיים',
     desc: 'תאריך, שם תלמיד, מקום עבודה, תפקיד, שעות, תעריף — שורה לכל שיבוץ',
     fn: exportAssignments,
+  },
+  {
+    key: 'logistics',
+    label: 'לוגיסטיקה יומית',
+    desc: 'תאריך, מקום עבודה, עבודת קבלנות, כמות, תעריף',
+    fn: exportLogistics,
   },
 ];
 

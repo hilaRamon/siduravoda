@@ -7,7 +7,9 @@ import { canApproveTimeReports } from '@/lib/permissions';
 import { Button } from '@/components/ui/button';
 import { CheckCircle2, XCircle, Clock, CalendarDays, Building2, User } from 'lucide-react';
 import { format } from 'date-fns';
-import { assignmentKeys } from '@/queries/assignmentQueries';
+import { assignmentKeys, useAssignments } from '@/queries/assignmentQueries';
+import { useLogisticsByWorkplace } from '@/hooks/assignments/useLogisticsByWorkplace';
+import UnitsQuantityInput from '@/components/timeReports/UnitsQuantityInput';
 
 const STATUS_STYLES = {
   'ממתין': 'bg-yellow-100 text-yellow-700',
@@ -100,6 +102,8 @@ export default function TimeReportsAdmin() {
     queryKey: ['time-reports', selectedDate],
     queryFn: () => base44.entities.TimeReport.filter({ date: selectedDate }, 'student_name', 500),
   });
+  const { logisticsMap } = useLogisticsByWorkplace(selectedDate);
+  const { data: assignments = [] } = useAssignments(selectedDate);
 
   // Fetch all pending reports to show which dates have unreviewed items
   const { data: allPending = [] } = useQuery({
@@ -113,8 +117,11 @@ export default function TimeReportsAdmin() {
     return [...dates].sort();
   }, [allPending]);
 
+  const isPieceworkWorkplace = (workplaceId) =>
+    Boolean(logisticsMap[workplaceId]?.is_piecework);
+
   const changedReports = reports
-    .filter(isCustomHours)
+    .filter((r) => isCustomHours(r) || isPieceworkWorkplace(r.workplace_id))
     .sort((a, b) => (a.workplace_name || '').localeCompare(b.workplace_name || '', 'he'));
 
   const hasPendingForDate = reports.some(r => r.status === 'ממתין')
@@ -124,8 +131,6 @@ export default function TimeReportsAdmin() {
   const approved = changedReports.filter(r => r.status === 'אושר');
   const rejected = changedReports.filter(r => r.status === 'נדחה');
   const tabReports = activeTab === 'ממתין' ? pending : activeTab === 'אושר' ? approved : rejected;
-
-  // Group reports into: workplace-level rows + individual-override rows
   const { workplaceGroups, individualRows } = useMemo(() => {
     // Group by workplace
     const byWorkplace = {};
@@ -168,11 +173,42 @@ export default function TimeReportsAdmin() {
       });
     });
 
+    if (activeTab === 'ממתין') {
+      const groupedIds = new Set(workplaceGroups.map((g) => g.workplace_id));
+      const reportedWpIds = new Set(reports.map((r) => r.workplace_id));
+      const assignmentsByWp = {};
+      assignments.forEach((a) => {
+        if (!assignmentsByWp[a.workplace_id]) assignmentsByWp[a.workplace_id] = [];
+        assignmentsByWp[a.workplace_id].push(a);
+      });
+      Object.entries(logisticsMap).forEach(([wpId, logistics]) => {
+        if (!logistics?.is_piecework || groupedIds.has(wpId) || reportedWpIds.has(wpId)) return;
+        if (logistics.units == null) return;
+        const wpAssignments = assignmentsByWp[wpId] || [];
+        if (wpAssignments.length === 0) return;
+        workplaceGroups.push({
+          workplace_id: wpId,
+          workplace_name: wpAssignments[0]?.workplace_name || '',
+          representative: {
+            start_time: DEFAULT_START,
+            end_time: DEFAULT_END,
+            status: 'ממתין',
+          },
+          studentCount: wpAssignments.length,
+          isUniform: true,
+        });
+      });
+    }
+
     workplaceGroups.sort((a, b) => (a.workplace_name || '').localeCompare(b.workplace_name || '', 'he'));
     individualRows.sort((a, b) => (a.workplace_name || '').localeCompare(b.workplace_name || '', 'he'));
 
     return { workplaceGroups, individualRows };
-  }, [tabReports]);
+  }, [tabReports, activeTab, assignments, logisticsMap, reports]);
+
+  const showUnitsColumn = workplaceGroups.some(
+    (g) => logisticsMap[g.workplace_id]?.is_piecework,
+  );
 
   const invalidateAfterStatusChange = () => {
     queryClient.invalidateQueries({ queryKey: ['time-reports', selectedDate] });
@@ -317,7 +353,7 @@ export default function TimeReportsAdmin() {
         <div className="space-y-3">
           {[1,2,3,4].map(i => <div key={i} className="h-16 bg-secondary rounded-xl animate-pulse" />)}
         </div>
-      ) : tabReports.length === 0 ? (
+      ) : workplaceGroups.length === 0 && individualRows.length === 0 ? (
         <div className="text-center py-16 text-muted-foreground">
           <Clock size={48} className="mx-auto mb-3 opacity-30" />
           <p>
@@ -347,6 +383,9 @@ export default function TimeReportsAdmin() {
                       <th className="text-right px-4 py-3 text-base font-semibold text-muted-foreground">כניסה</th>
                       <th className="text-right px-4 py-3 text-base font-semibold text-muted-foreground">יציאה</th>
                       <th className="text-right px-4 py-3 text-base font-semibold text-muted-foreground">שעות</th>
+                      {showUnitsColumn && (
+                        <th className="text-right px-4 py-3 text-base font-semibold text-muted-foreground">יחידות</th>
+                      )}
                       <th className="text-right px-4 py-3 text-base font-semibold text-muted-foreground">סטטוס</th>
                       <th className="px-4 py-3"></th>
                     </tr>
@@ -354,6 +393,8 @@ export default function TimeReportsAdmin() {
                   <tbody className="divide-y divide-border">
                     {workplaceGroups.map(({ workplace_id, workplace_name, representative, studentCount, isUniform }) => {
                       const duration = calcDuration(representative.start_time, representative.end_time);
+                      const logistics = logisticsMap[workplace_id];
+                      const isPiecework = Boolean(logistics?.is_piecework);
                       return (
                         <tr key={workplace_id} className="hover:bg-secondary/20 transition-colors">
                           <td className="px-4 py-3 font-semibold text-base">{workplace_name}</td>
@@ -370,6 +411,27 @@ export default function TimeReportsAdmin() {
                           <td className="px-4 py-3 font-mono font-semibold text-base">
                             {duration !== null ? duration.toFixed(2) : '—'}
                           </td>
+                          {showUnitsColumn && (
+                          <td className="px-4 py-3">
+                            {isPiecework && activeTab === 'ממתין' && !readOnly ? (
+                              <UnitsQuantityInput
+                                date={selectedDate}
+                                workplaceId={workplace_id}
+                                logistics={logistics}
+                                unitsName={logistics?.units_name || ""}
+                                compact
+                              />
+                            ) : isPiecework ? (
+                              <span className="font-mono text-sm">
+                                {logistics?.units != null
+                                  ? `${logistics.units}${logistics.units_name ? ` ${logistics.units_name}` : ""}`
+                                  : "—"}
+                              </span>
+                            ) : (
+                              <span className="text-muted-foreground">—</span>
+                            )}
+                          </td>
+                          )}
                           <td className="px-4 py-3"><StatusBadge status={representative.status} /></td>
                           <td className="px-4 py-3">
                            {!readOnly && (
