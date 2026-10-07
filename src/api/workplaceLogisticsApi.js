@@ -14,8 +14,8 @@ function buildQuery(params = {}) {
 const BASE = "/api/workplace-logistics";
 
 export const workplaceLogisticsApi = {
-  list(filters = {}) {
-    return apiRequest(`${BASE}${buildQuery(filters)}`);
+  list(filters = {}, options = {}) {
+    return apiRequest(`${BASE}${buildQuery(filters)}`, options);
   },
 
   getById(id) {

@@ -1,15 +1,15 @@
-import { useState, useEffect } from 'react';
-import { Truck, Clock, Check, ChevronDown, ChevronUp } from 'lucide-react';
-import VehicleSlot from './VehicleSlot';
-import { Switch } from '@/components/ui/switch';
-import { useLogisticsByWorkplace } from '@/hooks/assignments/useLogisticsByWorkplace';
-import { useLogisticsWorkplaces } from '@/hooks/assignments/useLogisticsWorkplaces';
-import { useVehicles } from '@/queries/vehicleQueries';
+import { useState, useEffect } from "react";
+import { Truck, Clock, ChevronDown, ChevronUp } from "lucide-react";
+import VehicleSlot from "./VehicleSlot";
+import { Switch } from "@/components/ui/switch";
+import { useLogisticsByWorkplace } from "@/hooks/assignments/useLogisticsByWorkplace";
+import { useLogisticsWorkplaces } from "@/hooks/assignments/useLogisticsWorkplaces";
+import { useVehicles } from "@/queries/vehicleQueries";
 import {
   useCreateWorkplaceLogistics,
   useUpdateWorkplaceLogistics,
-} from '@/queries/workplaceLogisticsQueries';
-import { formatPieceworkUnits } from '@/lib/assignmentHelpers';
+} from "@/queries/workplaceLogisticsQueries";
+import { formatPieceworkUnits } from "@/lib/assignmentHelpers";
 
 function WorkplaceLogisticsCard({
   date,
@@ -30,19 +30,28 @@ function WorkplaceLogisticsCard({
     setLocalData(logistics || {});
   }, [logistics]);
 
-  const selectedVehicleIds = [localData.vehicle_id, localData.vehicle_id_2, localData.vehicle_id_3].filter(Boolean);
+  const selectedVehicleIds = [
+    localData.vehicle_id,
+    localData.vehicle_id_2,
+    localData.vehicle_id_3,
+  ].filter(Boolean);
 
   const allTakenVehicleIds = new Set(
-    allLogistics.flatMap(l => [l.vehicle_id, l.vehicle_id_2, l.vehicle_id_3].filter(Boolean))
+    allLogistics.flatMap((l) =>
+      [l.vehicle_id, l.vehicle_id_2, l.vehicle_id_3].filter(Boolean),
+    ),
   );
 
-  const availableVehicles = vehicles.filter(v => !allTakenVehicleIds.has(v.id) || selectedVehicleIds.includes(v.id));
+  const availableVehicles = vehicles.filter(
+    (v) => !allTakenVehicleIds.has(v.id) || selectedVehicleIds.includes(v.id),
+  );
 
-  const getOtherIds = (slotIndex) => [
-    slotIndex !== 1 && localData.vehicle_id,
-    slotIndex !== 2 && localData.vehicle_id_2,
-    slotIndex !== 3 && localData.vehicle_id_3,
-  ].filter(Boolean);
+  const getOtherIds = (slotIndex) =>
+    [
+      slotIndex !== 1 && localData.vehicle_id,
+      slotIndex !== 2 && localData.vehicle_id_2,
+      slotIndex !== 3 && localData.vehicle_id_3,
+    ].filter(Boolean);
 
   const vehicleNameById = (vehicleId) =>
     vehicles.find((vehicle) => vehicle.id === vehicleId)?.name;
@@ -56,16 +65,10 @@ function WorkplaceLogisticsCard({
     onSave(workplaceId, newData);
   };
 
-  const [timeInput, setTimeInput] = useState(localData.exit_time || '06:35');
+  const [timeInput, setTimeInput] = useState(localData.exit_time || "06:35");
   useEffect(() => {
-    setTimeInput(localData.exit_time || '06:35');
+    setTimeInput(localData.exit_time || "06:35");
   }, [localData.exit_time]);
-
-  const handleTimeSave = () => {
-    const newData = { ...localData, exit_time: timeInput };
-    setLocalData(newData);
-    onSave(workplaceId, newData);
-  };
 
   const persist = (patch) => {
     const newData = { ...localData, ...patch };
@@ -73,18 +76,20 @@ function WorkplaceLogisticsCard({
     onSave(workplaceId, newData);
   };
 
-  const isPiecework = Boolean(localData.is_piecework);
+  const isPiecework = Boolean(logistics?.is_piecework);
   const unitsLabel = formatPieceworkUnits(localData);
 
   return (
     <div className="bg-card border border-border rounded-xl overflow-hidden">
       {/* Collapsed header — always visible */}
       <button
-        onClick={() => setExpanded(v => !v)}
+        onClick={() => setExpanded((v) => !v)}
         className="w-full flex items-center justify-between px-3 py-2.5 hover:bg-secondary/40 transition-colors min-h-[40px]"
       >
         <div className="flex items-center gap-2 min-w-0">
-          <span className="font-semibold text-sm leading-none truncate">{workplaceName}</span>
+          <span className="font-semibold text-sm leading-none truncate">
+            {workplaceName}
+          </span>
           <span className="text-xs bg-primary/10 text-primary font-medium px-2 py-0.5 rounded-full shrink-0 leading-none">
             {studentCount}
           </span>
@@ -102,10 +107,11 @@ function WorkplaceLogisticsCard({
             </span>
           )}
         </div>
-        {expanded
-          ? <ChevronUp size={14} className="text-muted-foreground shrink-0" />
-          : <ChevronDown size={14} className="text-muted-foreground shrink-0" />
-        }
+        {expanded ? (
+          <ChevronUp size={14} className="text-muted-foreground shrink-0" />
+        ) : (
+          <ChevronDown size={14} className="text-muted-foreground shrink-0" />
+        )}
       </button>
 
       {/* Expanded details */}
@@ -115,29 +121,21 @@ function WorkplaceLogisticsCard({
             <label className="text-xs text-muted-foreground flex items-center gap-1">
               <Clock size={11} /> שעת יציאה
             </label>
-            <div className="flex items-center gap-1">
-              <input
-                type="time"
-                value={timeInput}
-                onChange={e => setTimeInput(e.target.value)}
-                dir="ltr"
-                className="flex-1 h-8 text-xs border border-border rounded-md px-2 bg-background focus:outline-none focus:ring-1 focus:ring-primary/40 text-center"
-              />
-              <button
-                onClick={handleTimeSave}
-                className="h-8 w-8 flex items-center justify-center bg-primary text-white rounded-md hover:bg-primary/90 transition-colors shrink-0"
-                title="אשר שעה"
-              >
-                <Check size={14} />
-              </button>
-            </div>
+            <input
+              type="time"
+              value={timeInput}
+              onChange={(e) => setTimeInput(e.target.value)}
+              onBlur={() => persist({ exit_time: timeInput })}
+              dir="ltr"
+              className="w-full h-8 text-xs border border-border rounded-md px-2 bg-background focus:outline-none focus:ring-1 focus:ring-primary/40 text-center"
+            />
           </div>
 
           <div className="space-y-1">
             <label className="text-xs text-muted-foreground">הערות</label>
             <textarea
-              defaultValue={localData.notes || ''}
-              key={`notes-${localData.notes || 'empty'}`}
+              defaultValue={localData.notes || ""}
+              key={`notes-${localData.notes || "empty"}`}
               onBlur={(e) => {
                 const newData = { ...localData, notes: e.target.value };
                 setLocalData(newData);
@@ -154,30 +152,37 @@ function WorkplaceLogisticsCard({
               <span>עבודת קבלנות</span>
               <Switch
                 checked={isPiecework}
-                onCheckedChange={(checked) => persist({ is_piecework: checked })}
+                onCheckedChange={(checked) =>
+                  persist({ is_piecework: checked })
+                }
               />
             </div>
             {isPiecework && (
               <div className="space-y-2">
                 <div className="space-y-1">
-                  <label className="text-xs text-muted-foreground">שם יחידה</label>
+                  <label className="text-xs text-muted-foreground">
+                    שם יחידה
+                  </label>
                   <input
                     type="text"
-                    defaultValue={localData.units_name || ''}
-                    key={`units-name-${localData.units_name || 'empty'}`}
+                    defaultValue={localData.units_name || ""}
+                    key={`units-name-${localData.units_name || "empty"}`}
                     onBlur={(e) => persist({ units_name: e.target.value })}
                     placeholder="ארגז, ק״ג..."
                     className="w-full h-8 text-xs border border-border rounded-md px-2 bg-background focus:outline-none focus:ring-1 focus:ring-primary/40"
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-xs text-muted-foreground">תעריף ליחידה</label>
+                  <label className="text-xs text-muted-foreground">
+                    תעריף ליחידה
+                  </label>
                   <input
                     type="number"
-                    defaultValue={localData.rate ?? ''}
-                    key={`rate-${localData.rate ?? 'empty'}`}
+                    defaultValue={localData.rate ?? ""}
+                    key={`rate-${localData.rate ?? "empty"}`}
                     onBlur={(e) => {
-                      const val = e.target.value === '' ? null : Number(e.target.value);
+                      const val =
+                        e.target.value === "" ? null : Number(e.target.value);
                       persist({ rate: Number.isFinite(val) ? val : null });
                     }}
                     placeholder="0"
@@ -190,15 +195,38 @@ function WorkplaceLogisticsCard({
                     כמות: {unitsLabel}
                   </p>
                 ) : (
-                  <p className="text-xs text-muted-foreground">הכמות תדווח בדיווח הזמנים</p>
+                  <p className="text-xs text-muted-foreground">
+                    הכמות תדווח בדיווח הזמנים
+                  </p>
                 )}
               </div>
             )}
           </div>
 
-          <VehicleSlot slotIndex={1} vehicleId={localData.vehicle_id} vehicleName={vehicleNameById(localData.vehicle_id)} availableVehicles={availableVehicles} otherIds={getOtherIds(1)} onSelect={handleVehicleSelect} />
-          <VehicleSlot slotIndex={2} vehicleId={localData.vehicle_id_2} vehicleName={vehicleNameById(localData.vehicle_id_2)} availableVehicles={availableVehicles} otherIds={getOtherIds(2)} onSelect={handleVehicleSelect} />
-          <VehicleSlot slotIndex={3} vehicleId={localData.vehicle_id_3} vehicleName={vehicleNameById(localData.vehicle_id_3)} availableVehicles={availableVehicles} otherIds={getOtherIds(3)} onSelect={handleVehicleSelect} />
+          <VehicleSlot
+            slotIndex={1}
+            vehicleId={localData.vehicle_id}
+            vehicleName={vehicleNameById(localData.vehicle_id)}
+            availableVehicles={availableVehicles}
+            otherIds={getOtherIds(1)}
+            onSelect={handleVehicleSelect}
+          />
+          <VehicleSlot
+            slotIndex={2}
+            vehicleId={localData.vehicle_id_2}
+            vehicleName={vehicleNameById(localData.vehicle_id_2)}
+            availableVehicles={availableVehicles}
+            otherIds={getOtherIds(2)}
+            onSelect={handleVehicleSelect}
+          />
+          <VehicleSlot
+            slotIndex={3}
+            vehicleId={localData.vehicle_id_3}
+            vehicleName={vehicleNameById(localData.vehicle_id_3)}
+            availableVehicles={availableVehicles}
+            otherIds={getOtherIds(3)}
+            onSelect={handleVehicleSelect}
+          />
         </div>
       )}
     </div>
@@ -221,12 +249,16 @@ export default function LogisticsSidebar({ date, assignments }) {
       exit_time: data.exit_time,
       notes: data.notes,
       is_piecework: Boolean(data.is_piecework),
-      units_name: data.is_piecework ? (data.units_name || "") : "",
+      units_name: data.is_piecework ? data.units_name || "" : "",
       rate: data.is_piecework ? (data.rate ?? null) : null,
     };
     const existing = logisticsMap[workplaceId];
-    if (existing) {
-      await updateLogistics.mutateAsync({ id: existing.id, data: payload, date });
+    if (existing?.id) {
+      await updateLogistics.mutateAsync({
+        id: existing.id,
+        data: payload,
+        date,
+      });
     } else {
       await createLogistics.mutateAsync({
         date,
@@ -255,7 +287,7 @@ export default function LogisticsSidebar({ date, assignments }) {
         <h3 className="font-semibold text-sm flex items-center gap-2 px-1">
           <Truck size={15} className="text-primary" /> לוגיסטיקה יומית
         </h3>
-        {workplaces.map(wp => (
+        {workplaces.map((wp) => (
           <WorkplaceLogisticsCard
             key={wp.id}
             date={date}
