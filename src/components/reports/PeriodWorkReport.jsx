@@ -9,6 +9,11 @@ import html2canvas from 'html2canvas';
 import * as XLSX from 'xlsx';
 import { useWorkByWorkplaceReport } from '@/queries/reports/useWorkByWorkplaceReport';
 
+function displayValue(value) {
+  if (value == null || value === '') return '—';
+  return value;
+}
+
 export default function PeriodWorkReport() {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -26,11 +31,16 @@ export default function PeriodWorkReport() {
 
   const groups = data?.groups ?? [];
   const workplaceOptions = data?.workplaceOptions ?? []; // workplaces in range (from report API)
-  const isDailyPricing = data?.pricingMethod === 'daily';
 
-  const tableHeaders = isDailyPricing
-    ? ['תאריך', 'תעריף יומי', 'תשלום נוסף', 'כמות תלמידים', 'ממוצע יחידות יומיות לתלמיד', 'מחיר']
-    : ['תאריך', 'תעריף', 'תשלום נוסף', 'כמות תלמידים', 'סך שעות', 'ממוצע שעות', 'מחיר'];
+  const tableHeaders = [
+    'תאריך',
+    'תעריף',
+    'יחידה',
+    'כמות תלמידים',
+    'סה״כ יחידות',
+    'ממוצע יחידות לתלמיד',
+    'מחיר',
+  ];
 
   const formatDate = (d) => { const [y, m, day] = d.split('-'); return `${day}/${m}/${y}`; };
 
@@ -70,50 +80,26 @@ export default function PeriodWorkReport() {
     const rows = [];
     groups.forEach((group) => {
       const wp = group.workplaceName;
-      group.rows.forEach((r) => rows.push(
-        isDailyPricing
-          ? {
-              'מקום עבודה': wp,
-              'תאריך': formatDate(r.date),
-              'תעריף יומי': r.dailyRate,
-              'תשלום נוסף': r.bonus,
-              'כמות תלמידים': r.studentCount,
-              'ממוצע יחידות יומיות לתלמיד': r.avgDailyUnits,
-              'מחיר': r.totalPrice,
-            }
-          : {
-              'מקום עבודה': wp,
-              'תאריך': formatDate(r.date),
-              'תעריף': r.rate,
-              'תשלום נוסף': r.bonus,
-              'כמות תלמידים': r.studentCount,
-              'סך שעות': r.totalHours,
-              'ממוצע שעות': r.avgHours,
-              'מחיר': r.totalPrice,
-            },
-      ));
-      rows.push(
-        isDailyPricing
-          ? {
-              'מקום עבודה': '',
-              'תאריך': 'סה"כ',
-              'תעריף יומי': '',
-              'תשלום נוסף': group.totals.bonus,
-              'כמות תלמידים': '',
-              'ממוצע יחידות יומיות לתלמיד': '',
-              'מחיר': group.totals.totalPrice,
-            }
-          : {
-              'מקום עבודה': '',
-              'תאריך': 'סה"כ',
-              'תעריף': '',
-              'תשלום נוסף': group.totals.bonus,
-              'כמות תלמידים': '',
-              'סך שעות': group.totals.totalHours,
-              'ממוצע שעות': '',
-              'מחיר': group.totals.totalPrice,
-            },
-      );
+      group.rows.forEach((r) => rows.push({
+        'מקום עבודה': wp,
+        'תאריך': formatDate(r.date),
+        'תעריף': displayValue(r.rate),
+        'יחידה': r.unitName || '',
+        'כמות תלמידים': r.studentCount,
+        'סה״כ יחידות': displayValue(r.totalUnits),
+        'ממוצע יחידות לתלמיד': displayValue(r.avgUnitsPerStudent),
+        'מחיר': r.totalPrice,
+      }));
+      rows.push({
+        'מקום עבודה': '',
+        'תאריך': 'סה"כ',
+        'תעריף': '',
+        'יחידה': '',
+        'כמות תלמידים': '',
+        'סה״כ יחידות': '',
+        'ממוצע יחידות לתלמיד': '',
+        'מחיר': group.totals.totalPrice,
+      });
       rows.push({});
     });
     const ws = XLSX.utils.json_to_sheet(rows);
@@ -226,19 +212,11 @@ export default function PeriodWorkReport() {
                       {rows.map((r, i) => (
                         <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                           <td className="border border-gray-300 px-2 py-1.5">{formatDate(r.date)}</td>
-                          <td className="border border-gray-300 px-2 py-1.5 text-center">
-                            {isDailyPricing ? r.dailyRate : r.rate}
-                          </td>
-                          <td className="border border-gray-300 px-2 py-1.5 text-center">{r.bonus}</td>
+                          <td className="border border-gray-300 px-2 py-1.5 text-center">{displayValue(r.rate)}</td>
+                          <td className="border border-gray-300 px-2 py-1.5 text-center">{r.unitName}</td>
                           <td className="border border-gray-300 px-2 py-1.5 text-center">{r.studentCount}</td>
-                          {isDailyPricing ? (
-                            <td className="border border-gray-300 px-2 py-1.5 text-center">{r.avgDailyUnits}</td>
-                          ) : (
-                            <>
-                              <td className="border border-gray-300 px-2 py-1.5 text-center">{r.totalHours}</td>
-                              <td className="border border-gray-300 px-2 py-1.5 text-center">{r.avgHours}</td>
-                            </>
-                          )}
+                          <td className="border border-gray-300 px-2 py-1.5 text-center">{displayValue(r.totalUnits)}</td>
+                          <td className="border border-gray-300 px-2 py-1.5 text-center">{displayValue(r.avgUnitsPerStudent)}</td>
                           <td className="border border-gray-300 px-2 py-1.5 text-center">{r.totalPrice} ₪</td>
                         </tr>
                       ))}
@@ -246,11 +224,9 @@ export default function PeriodWorkReport() {
                     <tfoot>
                       <tr className="bg-gray-200 font-bold">
                         <td colSpan={2} className="border border-gray-300 px-2 py-1.5 text-right">סה"כ</td>
-                        <td className="border border-gray-300 px-2 py-1.5 text-center">{group.totals.bonus}</td>
                         <td className="border border-gray-300 px-2 py-1.5"></td>
-                        {!isDailyPricing && (
-                          <td className="border border-gray-300 px-2 py-1.5 text-center">{group.totals.totalHours}</td>
-                        )}
+                        <td className="border border-gray-300 px-2 py-1.5"></td>
+                        <td className="border border-gray-300 px-2 py-1.5"></td>
                         <td className="border border-gray-300 px-2 py-1.5"></td>
                         <td className="border border-gray-300 px-2 py-1.5 text-center">{group.totals.totalPrice} ₪</td>
                       </tr>

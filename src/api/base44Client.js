@@ -153,11 +153,6 @@ async function htmlToPdf({ html }) {
   return response.blob();
 }
 
-function joinList(values) {
-  if (!values?.length) return undefined;
-  return values.join(",");
-}
-
 export const base44 = {
   public: {
     getPublishedSchedule() {
@@ -166,10 +161,8 @@ export const base44 = {
   },
   entities: {
     User: createEntityClient("User"),
-    Vehicle: createEntityClient("Vehicle"),
     Role: createEntityClient("Role"),
     Workplace: createEntityClient("Workplace"),
-    WorkplaceLogistics: createEntityClient("WorkplaceLogistics"),
     BackupSettings: createEntityClient("BackupSettings"),
     TimeReport: createEntityClient("TimeReport"),
     AppSettings: createEntityClient("AppSettings"),
@@ -178,33 +171,6 @@ export const base44 = {
     Core: {
       UploadFile: uploadFile,
       HtmlToPdf: htmlToPdf,
-    },
-  },
-  reports: {
-    workByWorkplace({ startDate, endDate, workplaces, farms, groupBy }) {
-      return apiRequest(
-        `/api/reports/work-by-workplace${buildQuery({
-          startDate,
-          endDate,
-          workplaces: joinList(workplaces),
-          farms: joinList(farms),
-          groupBy,
-        })}`,
-      );
-    },
-    studentWork({ startDate, endDate, students }) {
-      return apiRequest(
-        `/api/reports/student-work${buildQuery({
-          startDate,
-          endDate,
-          students: joinList(students),
-        })}`,
-      );
-    },
-    arzenu({ startDate, endDate }) {
-      return apiRequest(
-        `/api/reports/arzenu${buildQuery({ startDate, endDate })}`,
-      );
     },
   },
   auth: {

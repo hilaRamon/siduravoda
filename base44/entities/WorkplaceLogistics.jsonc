@@ -5,55 +5,52 @@
     "date": {
       "type": "string",
       "format": "date",
-      "description": "\u05ea\u05d0\u05e8\u05d9\u05da"
+      "description": "תאריך"
     },
     "workplace_id": {
       "type": "string",
-      "description": "\u05de\u05d6\u05d4\u05d4 \u05de\u05e7\u05d5\u05dd \u05e2\u05d1\u05d5\u05d3\u05d4"
-    },
-    "workplace_name": {
-      "type": "string",
-      "description": "\u05e9\u05dd \u05de\u05e7\u05d5\u05dd \u05e2\u05d1\u05d5\u05d3\u05d4"
+      "description": "מזהה מקום עבודה"
     },
     "driver_student_id": {
       "type": "string",
-      "description": "\u05de\u05d6\u05d4\u05d4 \u05e0\u05d4\u05d2 (\u05ea\u05dc\u05de\u05d9\u05d3)"
-    },
-    "driver_student_name": {
-      "type": "string",
-      "description": "\u05e9\u05dd \u05e0\u05d4\u05d2"
+      "description": "מזהה נהג (תלמיד)"
     },
     "vehicle_id": {
       "type": "string",
-      "description": "\u05de\u05d6\u05d4\u05d4 \u05e8\u05db\u05d1 1"
-    },
-    "vehicle_name": {
-      "type": "string",
-      "description": "\u05e9\u05dd \u05e8\u05db\u05d1 1"
+      "description": "מזהה רכב 1"
     },
     "vehicle_id_2": {
       "type": "string",
-      "description": "\u05de\u05d6\u05d4\u05d4 \u05e8\u05db\u05d1 2"
-    },
-    "vehicle_name_2": {
-      "type": "string",
-      "description": "\u05e9\u05dd \u05e8\u05db\u05d1 2"
+      "description": "מזהה רכב 2"
     },
     "vehicle_id_3": {
       "type": "string",
-      "description": "\u05de\u05d6\u05d4\u05d4 \u05e8\u05db\u05d1 3"
-    },
-    "vehicle_name_3": {
-      "type": "string",
-      "description": "\u05e9\u05dd \u05e8\u05db\u05d1 3"
+      "description": "מזהה רכב 3"
     },
     "exit_time": {
       "type": "string",
-      "description": "\u05e9\u05e2\u05ea \u05d9\u05e6\u05d9\u05d0\u05d4"
+      "description": "שעת יציאה"
     },
     "notes": {
       "type": "string",
-      "description": "\u05d4\u05e2\u05e8\u05d5\u05ea"
+      "description": "הערות"
+    },
+    "is_piecework": {
+      "type": "boolean",
+      "description": "עבודת קבלנות",
+      "default": false
+    },
+    "units_name": {
+      "type": "string",
+      "description": "שם יחידה"
+    },
+    "units": {
+      "type": "number",
+      "description": "כמות יחידות לקבוצה"
+    },
+    "rate": {
+      "type": "number",
+      "description": "תעריף ליחידה"
     }
   },
   "required": [

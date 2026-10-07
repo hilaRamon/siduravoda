@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import LogisticsSidebar from "@/components/assignments/LogisticsSidebar";
+import { useLogisticsByWorkplace } from "@/hooks/assignments/useLogisticsByWorkplace";
 import AssignmentsHeader from "@/components/assignments/AssignmentsHeader";
 import AssignmentsDateNav from "@/components/assignments/AssignmentsDateNav";
 import AssignmentsBulkToolbar from "@/components/assignments/AssignmentsBulkToolbar";
@@ -90,6 +91,7 @@ export default function Assignments() {
     parseDisplayRateInput(displayRate, appSettings);
 
   const { data: assignments = [] } = useAssignments(date);
+  const { logisticsMap } = useLogisticsByWorkplace(date);
   const { students } = useStudents();
   const { data: workplaces = [] } = useWorkplaces();
   const { data: roles = [] } = useRoles();
@@ -675,6 +677,7 @@ export default function Assignments() {
           onRemove={handleRemove}
           onUpdateRole={handleUpdateRole}
           onUpdateField={handleUpdateField}
+          logisticsMap={logisticsMap}
         />
       </div>
       <LogisticsSidebar date={date} assignments={assignments} />

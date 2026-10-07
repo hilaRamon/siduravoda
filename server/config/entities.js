@@ -15,15 +15,6 @@ export const entityDefinitions = {
     },
     indexes: [{ fields: { email: 1 }, options: { unique: true } }],
   },
-  Vehicle: {
-    required: ["name"],
-    schema: {
-      name: { type: String, required: true, trim: true },
-      license_plate: { type: String, trim: true },
-      insurance: { type: String },
-      notes: { type: String },
-    },
-  },
   Role: {
     required: ["name"],
     schema: {
@@ -44,25 +35,6 @@ export const entityDefinitions = {
       accounting_email: { type: String },
       has_agreement: { type: Boolean, default: false },
     },
-  },
-  WorkplaceLogistics: {
-    required: ["date", "workplace_id"],
-    schema: {
-      date: { type: String, required: true },
-      workplace_id: { type: String, required: true },
-      workplace_name: { type: String },
-      driver_student_id: { type: String },
-      driver_student_name: { type: String },
-      vehicle_id: { type: String },
-      vehicle_name: { type: String },
-      vehicle_id_2: { type: String },
-      vehicle_name_2: { type: String },
-      vehicle_id_3: { type: String },
-      vehicle_name_3: { type: String },
-      exit_time: { type: String },
-      notes: { type: String },
-    },
-    indexes: [{ fields: { date: 1, workplace_id: 1 } }],
   },
   BackupSettings: {
     required: [],

@@ -7,6 +7,8 @@ import { Input } from '@/components/ui/input';
 import { format } from 'date-fns';
 import { Send, Clock, CheckCircle2, ChevronDown, ChevronUp, Search, CalendarDays, Check, ChevronRight, ChevronLeft, ShieldOff, LogOut } from 'lucide-react';
 import { useAssignments } from '@/queries/assignmentQueries';
+import { useLogisticsByWorkplace } from '@/hooks/assignments/useLogisticsByWorkplace';
+import UnitsQuantityInput from '@/components/timeReports/UnitsQuantityInput';
 
 const DEFAULT_START = '07:00';
 const DEFAULT_END = '11:45';
@@ -59,11 +61,12 @@ function TimeInput({ value, onChange }) {
   );
 }
 
-function WorkplaceGroup({ workplace, students, times, overrides, onGroupTimeChange, onOverrideChange }) {
+function WorkplaceGroup({ workplace, students, times, overrides, onGroupTimeChange, onOverrideChange, logistics, date }) {
   const [collapsed, setCollapsed] = useState(true);
   const groupStart = times[workplace.id]?.start ?? DEFAULT_START;
   const groupEnd = times[workplace.id]?.end ?? DEFAULT_END;
   const duration = calcDuration(groupStart, groupEnd);
+  const isPiecework = Boolean(logistics?.is_piecework || students.some((s) => s.is_piecework));
 
   return (
     <div className="bg-card border border-border rounded-2xl overflow-hidden mb-3 shadow-sm">
@@ -79,6 +82,17 @@ function WorkplaceGroup({ workplace, students, times, overrides, onGroupTimeChan
           </span>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
+          {isPiecework && (
+            <>
+              <span className="text-xs text-muted-foreground">כמות:</span>
+              <UnitsQuantityInput
+                date={date}
+                workplaceId={workplace.id}
+                logistics={logistics}
+                unitsName={logistics?.units_name || ""}
+              />
+            </>
+          )}
           <span className="text-xs text-muted-foreground">כניסה:</span>
           <TimeInput value={groupStart} onChange={v => onGroupTimeChange(workplace.id, 'start', v)} />
           <span className="text-xs text-muted-foreground">יציאה:</span>
@@ -174,6 +188,7 @@ export default function TimeReporting() {
   }, [selectedDate]);
 
   const { data: assignments = [], isLoading } = useAssignments(selectedDate);
+  const { logisticsMap } = useLogisticsByWorkplace(selectedDate);
 
   const visibleAssignments = useMemo(
     () =>
@@ -533,6 +548,8 @@ export default function TimeReporting() {
                 overrides={overrides}
                 onGroupTimeChange={handleGroupTimeChange}
                 onOverrideChange={handleOverrideChange}
+                logistics={logisticsMap[wpId]}
+                date={selectedDate}
               />
             );
           })

@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { base44 } from "@/api/base44Client";
+import { reportApi } from "@/api/reportApi";
 import { reportKeys } from "./keys";
 
 /**
@@ -22,7 +22,7 @@ export function useStudentWorkReport({
   return useQuery({
     queryKey: reportKeys.studentWork({ startDate, endDate, students }),
     queryFn: () =>
-      base44.reports.studentWork({ startDate, endDate, students }),
+      reportApi.studentWork({ startDate, endDate, students }),
     enabled: enabled && !!startDate && !!endDate,
   });
 }

@@ -15,6 +15,8 @@ import Assignment from "../models/Assignment.js";
 import PublishedSchedule from "../models/PublishedSchedule.js";
 import AbsenceRequest from "../models/AbsenceRequest.js";
 import FarmerRequest from "../models/FarmerRequest.js";
+import WorkplaceLogistics from "../models/WorkplaceLogistics.js";
+import Vehicle from "../models/Vehicle.js";
 import { hashPassword } from "../lib/password.js";
 import { ROLES } from "../config/permissions.js";
 import { ensurePermissionRulesSeeded } from "../services/permissionRuleService.js";
@@ -285,12 +287,15 @@ function pickWorkplace(student, dateLetter, farms, specials, index) {
   return pool[index % pool.length];
 }
 
-function buildSnapshot(date, dayAssignments, logisticsDocs, studentDocs) {
+function buildSnapshot(date, dayAssignments, logisticsDocs, studentDocs, vehicleDocs = []) {
   const studentsMap = Object.fromEntries(
     studentDocs.map((student) => [idOf(student), student]),
   );
   const logisticsMap = Object.fromEntries(
     logisticsDocs.map((row) => [row.workplace_id, row]),
+  );
+  const vehiclesById = Object.fromEntries(
+    vehicleDocs.map((vehicle) => [idOf(vehicle), vehicle]),
   );
 
   const byWorkplace = {};
@@ -308,7 +313,8 @@ function buildSnapshot(date, dayAssignments, logisticsDocs, studentDocs) {
   const reportGroups = Object.entries(byWorkplace)
     .map(([workplaceId, group]) => {
       const log = logisticsMap[workplaceId] || {};
-      const vehicles = [log.vehicle_name, log.vehicle_name_2, log.vehicle_name_3]
+      const vehicles = [log.vehicle_id, log.vehicle_id_2, log.vehicle_id_3]
+        .map((vehicleId) => vehiclesById[vehicleId]?.name)
         .filter(Boolean)
         .join(" + ");
       const sortedStudents = [...group.students].sort((a, b) => {
@@ -373,11 +379,11 @@ async function resetOperationalData() {
     AbsenceRequest.deleteMany({}),
     FarmerRequest.deleteMany({}),
     getModel("Workplace").deleteMany({}),
-    getModel("WorkplaceLogistics").deleteMany({}),
+    WorkplaceLogistics.deleteMany({}),
     getModel("TimeReport").deleteMany({}),
     getModel("AppSettings").deleteMany({}),
     getModel("Role").deleteMany({}),
-    getModel("Vehicle").deleteMany({}),
+    Vehicle.deleteMany({}),
   ]);
 
   await User.deleteMany({
@@ -494,7 +500,6 @@ async function main() {
   );
   const activeStudents = studentDocs.filter((student) => student.is_active !== false);
 
-  const Vehicle = getModel("Vehicle");
   const vehicleDocs = await Vehicle.insertMany(VEHICLES);
 
   const today = israelToday();
@@ -540,7 +545,6 @@ async function main() {
 
   const assignmentDocs = await Assignment.insertMany(assignments);
 
-  const WorkplaceLogistics = getModel("WorkplaceLogistics");
   const logisticsDocs = [];
   for (const date of workDates) {
     const dayRows = assignmentDocs.filter((row) => row.date === date);
@@ -564,11 +568,8 @@ async function main() {
       logisticsDocs.push({
         date,
         workplace_id: group.workplace_id,
-        workplace_name: group.workplace_name,
         driver_student_id: driver.student_id,
-        driver_student_name: driver.student_name,
         vehicle_id: idOf(vehicle),
-        vehicle_name: vehicle.name,
         exit_time: "06:35",
       });
     });
@@ -732,6 +733,7 @@ async function main() {
       publishAssignments,
       publishLogistics,
       studentDocs,
+      vehicleDocs,
     ),
   });
 

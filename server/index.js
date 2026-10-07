@@ -20,8 +20,11 @@ import assignmentsRouter from "./routes/assignments.js";
 import publishedSchedulesRouter from "./routes/publishedSchedules.js";
 import timeReportsRouter from "./routes/timeReports.js";
 import studentsRouter from "./routes/students.js";
+import workplaceLogisticsRouter from "./routes/workplaceLogistics.js";
+import vehiclesRouter from "./routes/vehicles.js";
 import { ensureAdminUser } from "./lib/bootstrap.js";
 import { migrateAssignmentWorkNumber } from "./lib/migrateAssignmentWorkNumber.js";
+import { migrateWorkplaceLogisticsUnique } from "./lib/migrateWorkplaceLogisticsUnique.js";
 import { migrateLegacyUserRoles } from "./lib/migrateUserRoles.js";
 import { ensurePermissionRulesSeeded } from "./services/permissionRuleService.js";
 
@@ -65,6 +68,8 @@ app.use("/api/assignments", assignmentsRouter);
 app.use("/api/published-schedules", publishedSchedulesRouter);
 app.use("/api/time-reports", timeReportsRouter);
 app.use("/api/students", studentsRouter);
+app.use("/api/workplace-logistics", workplaceLogisticsRouter);
+app.use("/api/vehicles", vehiclesRouter);
 
 const distDir = path.resolve(process.cwd(), "dist");
 const hasFrontendBuild = fs.existsSync(path.join(distDir, "index.html"));
@@ -95,6 +100,7 @@ app.use((error, _req, res, _next) => {
 async function start() {
   await mongoose.connect(mongoUri);
   await migrateAssignmentWorkNumber();
+  await migrateWorkplaceLogisticsUnique();
   await ensurePermissionRulesSeeded();
   await migrateLegacyUserRoles();
   await ensureAdminUser();

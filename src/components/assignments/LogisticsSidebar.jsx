@@ -1,9 +1,15 @@
-import { useState, useMemo, useEffect } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { base44 } from '@/api/base44Client';
+import { useState, useEffect } from 'react';
 import { Truck, Clock, Check, ChevronDown, ChevronUp } from 'lucide-react';
 import VehicleSlot from './VehicleSlot';
-import { useFarmerRequestsByDate } from '@/queries/farmerRequestQueries';
+import { Switch } from '@/components/ui/switch';
+import { useLogisticsByWorkplace } from '@/hooks/assignments/useLogisticsByWorkplace';
+import { useLogisticsWorkplaces } from '@/hooks/assignments/useLogisticsWorkplaces';
+import { useVehicles } from '@/queries/vehicleQueries';
+import {
+  useCreateWorkplaceLogistics,
+  useUpdateWorkplaceLogistics,
+} from '@/queries/workplaceLogisticsQueries';
+import { formatPieceworkUnits } from '@/lib/assignmentHelpers';
 
 function WorkplaceLogisticsCard({
   date,
@@ -17,10 +23,7 @@ function WorkplaceLogisticsCard({
 }) {
   const [expanded, setExpanded] = useState(false);
 
-  const { data: vehicles = [] } = useQuery({
-    queryKey: ['vehicles'],
-    queryFn: () => base44.entities.Vehicle.list(),
-  });
+  const { data: vehicles = [] } = useVehicles();
 
   const [localData, setLocalData] = useState(logistics || {});
   useEffect(() => {
@@ -41,13 +44,16 @@ function WorkplaceLogisticsCard({
     slotIndex !== 3 && localData.vehicle_id_3,
   ].filter(Boolean);
 
-  const handleVehicleSelect = (vehicleId, vehicleName, slotIndex) => {
+  const vehicleNameById = (vehicleId) =>
+    vehicles.find((vehicle) => vehicle.id === vehicleId)?.name;
+
+  const handleVehicleSelect = (vehicleId, _vehicleName, slotIndex) => {
     const newData = { ...localData };
-    if (slotIndex === 1) { newData.vehicle_id = vehicleId || null; newData.vehicle_name = vehicleName || null; }
-    else if (slotIndex === 2) { newData.vehicle_id_2 = vehicleId || null; newData.vehicle_name_2 = vehicleName || null; }
-    else if (slotIndex === 3) { newData.vehicle_id_3 = vehicleId || null; newData.vehicle_name_3 = vehicleName || null; }
+    if (slotIndex === 1) newData.vehicle_id = vehicleId || null;
+    else if (slotIndex === 2) newData.vehicle_id_2 = vehicleId || null;
+    else if (slotIndex === 3) newData.vehicle_id_3 = vehicleId || null;
     setLocalData(newData);
-    onSave(workplaceId, workplaceName, newData);
+    onSave(workplaceId, newData);
   };
 
   const [timeInput, setTimeInput] = useState(localData.exit_time || '06:35');
@@ -58,8 +64,17 @@ function WorkplaceLogisticsCard({
   const handleTimeSave = () => {
     const newData = { ...localData, exit_time: timeInput };
     setLocalData(newData);
-    onSave(workplaceId, workplaceName, newData);
+    onSave(workplaceId, newData);
   };
+
+  const persist = (patch) => {
+    const newData = { ...localData, ...patch };
+    setLocalData(newData);
+    onSave(workplaceId, newData);
+  };
+
+  const isPiecework = Boolean(localData.is_piecework);
+  const unitsLabel = formatPieceworkUnits(localData);
 
   return (
     <div className="bg-card border border-border rounded-xl overflow-hidden">
@@ -73,6 +88,11 @@ function WorkplaceLogisticsCard({
           <span className="text-xs bg-primary/10 text-primary font-medium px-2 py-0.5 rounded-full shrink-0 leading-none">
             {studentCount}
           </span>
+          {Boolean(logistics?.is_piecework) && (
+            <span className="text-xs bg-amber-100 text-amber-700 font-medium px-2 py-0.5 rounded-full shrink-0 leading-none">
+              קבלנות
+            </span>
+          )}
           {requestedVolunteers != null && (
             <span
               className="text-xs bg-orange-100 text-orange-600 font-medium px-2 py-0.5 rounded-full shrink-0 leading-none"
@@ -121,7 +141,7 @@ function WorkplaceLogisticsCard({
               onBlur={(e) => {
                 const newData = { ...localData, notes: e.target.value };
                 setLocalData(newData);
-                onSave(workplaceId, workplaceName, newData);
+                onSave(workplaceId, newData);
               }}
               placeholder="הערות למקום עבודה..."
               rows={2}
@@ -129,9 +149,56 @@ function WorkplaceLogisticsCard({
             />
           </div>
 
-          <VehicleSlot slotIndex={1} vehicleId={localData.vehicle_id} vehicleName={localData.vehicle_name} availableVehicles={availableVehicles} otherIds={getOtherIds(1)} onSelect={handleVehicleSelect} />
-          <VehicleSlot slotIndex={2} vehicleId={localData.vehicle_id_2} vehicleName={localData.vehicle_name_2} availableVehicles={availableVehicles} otherIds={getOtherIds(2)} onSelect={handleVehicleSelect} />
-          <VehicleSlot slotIndex={3} vehicleId={localData.vehicle_id_3} vehicleName={localData.vehicle_name_3} availableVehicles={availableVehicles} otherIds={getOtherIds(3)} onSelect={handleVehicleSelect} />
+          <div className="space-y-2 pt-1">
+            <div className="text-xs text-muted-foreground flex items-center justify-between gap-2">
+              <span>עבודת קבלנות</span>
+              <Switch
+                checked={isPiecework}
+                onCheckedChange={(checked) => persist({ is_piecework: checked })}
+              />
+            </div>
+            {isPiecework && (
+              <div className="space-y-2">
+                <div className="space-y-1">
+                  <label className="text-xs text-muted-foreground">שם יחידה</label>
+                  <input
+                    type="text"
+                    defaultValue={localData.units_name || ''}
+                    key={`units-name-${localData.units_name || 'empty'}`}
+                    onBlur={(e) => persist({ units_name: e.target.value })}
+                    placeholder="ארגז, ק״ג..."
+                    className="w-full h-8 text-xs border border-border rounded-md px-2 bg-background focus:outline-none focus:ring-1 focus:ring-primary/40"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs text-muted-foreground">תעריף ליחידה</label>
+                  <input
+                    type="number"
+                    defaultValue={localData.rate ?? ''}
+                    key={`rate-${localData.rate ?? 'empty'}`}
+                    onBlur={(e) => {
+                      const val = e.target.value === '' ? null : Number(e.target.value);
+                      persist({ rate: Number.isFinite(val) ? val : null });
+                    }}
+                    placeholder="0"
+                    className="w-full h-8 text-xs border border-border rounded-md px-2 bg-background focus:outline-none focus:ring-1 focus:ring-primary/40"
+                    step="0.5"
+                  />
+                </div>
+                {unitsLabel ? (
+                  <p className="text-xs text-muted-foreground bg-secondary/60 rounded-md px-2 py-1.5">
+                    כמות: {unitsLabel}
+                  </p>
+                ) : (
+                  <p className="text-xs text-muted-foreground">הכמות תדווח בדיווח הזמנים</p>
+                )}
+              </div>
+            )}
+          </div>
+
+          <VehicleSlot slotIndex={1} vehicleId={localData.vehicle_id} vehicleName={vehicleNameById(localData.vehicle_id)} availableVehicles={availableVehicles} otherIds={getOtherIds(1)} onSelect={handleVehicleSelect} />
+          <VehicleSlot slotIndex={2} vehicleId={localData.vehicle_id_2} vehicleName={vehicleNameById(localData.vehicle_id_2)} availableVehicles={availableVehicles} otherIds={getOtherIds(2)} onSelect={handleVehicleSelect} />
+          <VehicleSlot slotIndex={3} vehicleId={localData.vehicle_id_3} vehicleName={vehicleNameById(localData.vehicle_id_3)} availableVehicles={availableVehicles} otherIds={getOtherIds(3)} onSelect={handleVehicleSelect} />
         </div>
       )}
     </div>
@@ -139,84 +206,37 @@ function WorkplaceLogisticsCard({
 }
 
 export default function LogisticsSidebar({ date, assignments }) {
-  const queryClient = useQueryClient();
+  /** @type {import('@tanstack/react-query').UseMutationResult<any, Error, any>} */
+  const createLogistics = useCreateWorkplaceLogistics();
+  const updateLogistics = useUpdateWorkplaceLogistics();
 
-  const { data: logisticsList = [] } = useQuery({
-    queryKey: ['workplace-logistics', date],
-    queryFn: () => base44.entities.WorkplaceLogistics.filter({ date }),
-  });
+  const { logisticsList, logisticsMap } = useLogisticsByWorkplace(date);
+  const { workplaces } = useLogisticsWorkplaces(date, assignments);
 
-  const { data: farmerRequests = [] } = useFarmerRequestsByDate(date);
-
-  const logisticsMap = useMemo(() => {
-    const map = {};
-    logisticsList.forEach(l => {
-      const existing = map[l.workplace_id];
-      if (!existing || l.updated_date > existing.updated_date) {
-        map[l.workplace_id] = l;
-      }
-    });
-    return map;
-  }, [logisticsList]);
-
-  const requestByWorkplace = useMemo(() => {
-    const map = {};
-    farmerRequests.forEach((r) => {
-      if (!r.workplace_id) return;
-      if (!map[r.workplace_id]) {
-        map[r.workplace_id] = {
-          name: r.workplace_name || '',
-          requested: null,
-        };
-      }
-      if (r.workplace_name) map[r.workplace_id].name = r.workplace_name;
-      if (r.requested_volunteers != null) {
-        map[r.workplace_id].requested =
-          (map[r.workplace_id].requested ?? 0) + r.requested_volunteers;
-      }
-    });
-    return map;
-  }, [farmerRequests]);
-
-  const activeWorkplaces = useMemo(() => {
-    const map = {};
-    assignments
-      .filter(a => a.workplace_id && a.workplace_name)
-      .forEach(a => {
-        if (!map[a.workplace_id]) map[a.workplace_id] = { name: a.workplace_name, students: new Set() };
-        map[a.workplace_id].students.add(a.student_id);
-      });
-
-    Object.entries(requestByWorkplace).forEach(([id, req]) => {
-      if (!map[id]) {
-        map[id] = { name: req.name, students: new Set() };
-      } else if (req.name && !map[id].name) {
-        map[id].name = req.name;
-      }
-    });
-
-    return Object.entries(map)
-      .filter(([id, v]) => v.students.size > 0 || requestByWorkplace[id])
-      .sort(([, a], [, b]) => a.name.localeCompare(b.name, 'he'))
-      .map(([id, v]) => ({
-        id,
-        name: v.name,
-        count: v.students.size,
-        requestedVolunteers: requestByWorkplace[id]?.requested ?? null,
-      }));
-  }, [assignments, requestByWorkplace]);
-
-  const handleSave = async (workplaceId, workplaceName, data) => {
+  const handleSave = async (workplaceId, data) => {
+    const payload = {
+      vehicle_id: data.vehicle_id || null,
+      vehicle_id_2: data.vehicle_id_2 || null,
+      vehicle_id_3: data.vehicle_id_3 || null,
+      exit_time: data.exit_time,
+      notes: data.notes,
+      is_piecework: Boolean(data.is_piecework),
+      units_name: data.is_piecework ? (data.units_name || "") : "",
+      rate: data.is_piecework ? (data.rate ?? null) : null,
+    };
     const existing = logisticsMap[workplaceId];
     if (existing) {
-      await base44.entities.WorkplaceLogistics.update(existing.id, data);
+      await updateLogistics.mutateAsync({ id: existing.id, data: payload, date });
     } else {
-      await base44.entities.WorkplaceLogistics.create({ date, workplace_id: workplaceId, workplace_name: workplaceName, exit_time: '06:35', ...data });
+      await createLogistics.mutateAsync({
+        date,
+        workplace_id: workplaceId,
+        ...payload,
+      });
     }
-    queryClient.invalidateQueries({ queryKey: ['workplace-logistics', date] });
   };
 
-  if (activeWorkplaces.length === 0) {
+  if (workplaces.length === 0) {
     return (
       <div className="w-64 shrink-0">
         <div className="fixed top-8 bg-card border border-border rounded-2xl p-4 w-64 z-10 flex flex-col gap-2">
@@ -235,7 +255,7 @@ export default function LogisticsSidebar({ date, assignments }) {
         <h3 className="font-semibold text-sm flex items-center gap-2 px-1">
           <Truck size={15} className="text-primary" /> לוגיסטיקה יומית
         </h3>
-        {activeWorkplaces.map(wp => (
+        {workplaces.map(wp => (
           <WorkplaceLogisticsCard
             key={wp.id}
             date={date}

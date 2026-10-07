@@ -4,6 +4,8 @@ import * as XLSX from "xlsx";
 import JSZip from "jszip";
 import { getModel } from "../models/index.js";
 import Assignment from "../models/Assignment.js";
+import Vehicle from "../models/Vehicle.js";
+import WorkplaceLogistics from "../models/WorkplaceLogistics.js";
 import { sendVerificationToRecipients, sendWeeklyBackupToRecipients } from "../lib/email.js";
 import {
   mapAssignmentExportRow,
@@ -28,14 +30,14 @@ function workbookToBuffer(wb) {
 
 async function loadBackupData() {
   const Workplace = getModel("Workplace");
-  const Vehicle = getModel("Vehicle");
   const AppSettings = getModel("AppSettings");
 
-  const [students, workplaces, vehicles, assignments, settingsDoc] = await Promise.all([
+  const [students, workplaces, vehicles, assignments, logistics, settingsDoc] = await Promise.all([
     studentRepository.find({}, { sort: { full_name: 1 }, limit: 1000 }),
     Workplace.find().sort({ name: 1 }).limit(1000).lean(),
     Vehicle.find().sort({ name: 1 }).limit(1000).lean(),
     Assignment.find().sort({ date: 1 }).lean(),
+    WorkplaceLogistics.find().sort({ date: 1 }).lean(),
     AppSettings.findOne().sort({ updated_date: -1, created_date: -1 }).lean(),
   ]);
 
@@ -44,6 +46,7 @@ async function loadBackupData() {
     workplaces,
     vehicles,
     assignments,
+    logistics,
     appSettings: normalizeAppSettings(settingsDoc),
   };
 }
@@ -53,7 +56,7 @@ function mapAssignmentRows(assignments, appSettings) {
 }
 
 function buildWorkbookFiles(data, exportDateStr) {
-  const { students, workplaces, vehicles, assignments, appSettings } = data;
+  const { students, workplaces, vehicles, assignments, logistics, appSettings } = data;
 
   const wsStudents = XLSX.utils.json_to_sheet(
     students.map((s) => ({
@@ -100,11 +103,27 @@ function buildWorkbookFiles(data, exportDateStr) {
   const wbAssignments = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wbAssignments, wsAssignments, "שיבוצים");
 
+  const wsLogistics = XLSX.utils.json_to_sheet(
+    (logistics || []).map((row) => ({
+      תאריך: row.date || "",
+      "מזהה מקום עבודה": row.workplace_id ? String(row.workplace_id) : "",
+      "עבודת קבלנות": row.is_piecework ? "כן" : "לא",
+      "שם יחידה": row.units_name || "",
+      "כמות יחידות": row.units ?? "",
+      "תעריף ליחידה": row.rate ?? "",
+      "שעת יציאה": row.exit_time || "",
+      הערות: row.notes || "",
+    })),
+  );
+  const wbLogistics = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wbLogistics, wsLogistics, "לוגיסטיקה");
+
   return [
     { name: `גיבוי_תלמידים_${exportDateStr}.xlsx`, buffer: workbookToBuffer(wbStudents) },
     { name: `גיבוי_מקומות_עבודה_${exportDateStr}.xlsx`, buffer: workbookToBuffer(wbWorkplaces) },
     { name: `גיבוי_רכבים_${exportDateStr}.xlsx`, buffer: workbookToBuffer(wbVehicles) },
     { name: `גיבוי_שיבוצים_${exportDateStr}.xlsx`, buffer: workbookToBuffer(wbAssignments) },
+    { name: `גיבוי_לוגיסטיקה_${exportDateStr}.xlsx`, buffer: workbookToBuffer(wbLogistics) },
   ];
 }
 

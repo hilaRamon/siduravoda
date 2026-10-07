@@ -64,6 +64,10 @@ export async function bulkUpdate(items) {
   return ids.map((id) => byId[String(id)]);
 }
 
+export async function updateMany(filter, data) {
+  return Assignment.updateMany(filter, { $set: data });
+}
+
 export async function deleteById(id) {
   const doc = await Assignment.findByIdAndDelete(id);
   return toJson(doc);

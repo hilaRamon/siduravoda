@@ -151,6 +151,7 @@ export function mapAssignmentExportRow(assignment, settings) {
       assignment.rate,
       settings,
     ),
+    "עבודת קבלנות": assignment.is_piecework ? "כן" : "לא",
     שעות: assignment.hours ?? "",
     "תשלום נוסף": assignment.bonus ?? "",
     הערות: assignment.notes || "",

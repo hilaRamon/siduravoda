@@ -13,6 +13,42 @@ import {
   RoleCell,
   WorkplaceCell,
 } from "@/components/assignments/AssignmentCells";
+import {
+  formatPieceworkRate,
+  isPieceworkRow,
+} from "@/lib/assignmentHelpers";
+
+function RateCell({
+  assignment,
+  logisticsMap,
+  assignmentDefaults,
+  dailyMode,
+  formatRateDisplay,
+  parseRateInput,
+  onUpdateField,
+}) {
+  if (isPieceworkRow(assignment, logisticsMap)) {
+    const logistics = logisticsMap[assignment?.workplace_id] || {};
+    return (
+      <td className="px-3 py-2 border-b border-border">
+        <span className="h-8 text-xs flex items-center text-amber-800 bg-amber-50 border border-amber-200 rounded-md px-2">
+          {formatPieceworkRate(logistics) || "עבודת קבלנות"}
+        </span>
+      </td>
+    );
+  }
+  return (
+    <EditableNumberCell
+      value={assignment?.rate}
+      defaultValue={assignmentDefaults.rate}
+      assignment={assignment}
+      field="rate"
+      onUpdate={onUpdateField}
+      formatDisplay={dailyMode ? formatRateDisplay : undefined}
+      parseCommit={dailyMode ? parseRateInput : undefined}
+    />
+  );
+}
 
 export default function AssignmentsTable({
   tableRows,
@@ -45,6 +81,7 @@ export default function AssignmentsTable({
   onRemove,
   onUpdateRole,
   onUpdateField,
+  logisticsMap = {},
 }) {
   return (
     <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden">
@@ -150,9 +187,6 @@ export default function AssignmentsTable({
             <th className="px-3 py-2 text-right font-semibold text-muted-foreground w-20">
               <span className="text-xs">שעות</span>
             </th>
-            <th className="px-3 py-2 text-right font-semibold text-muted-foreground w-24">
-              <span className="text-xs">תשלום נוסף</span>
-            </th>
             <th className="px-3 py-2 text-right font-semibold text-muted-foreground">
               <div className="flex flex-col gap-1">
                 <span className="text-xs">שיבוץ</span>
@@ -177,7 +211,7 @@ export default function AssignmentsTable({
           {tableRows.length === 0 ? (
             <tr>
               <td
-                colSpan={10}
+                colSpan={9}
                 className="text-center py-12 text-muted-foreground"
               >
                 {students.length === 0
@@ -224,27 +258,20 @@ export default function AssignmentsTable({
                     roles={roles}
                     onUpdateRole={onUpdateRole}
                   />
-                  <EditableNumberCell
-                    value={assignment?.rate}
-                    defaultValue={assignmentDefaults.rate}
+                  <RateCell
                     assignment={assignment}
-                    field="rate"
-                    onUpdate={onUpdateField}
-                    formatDisplay={dailyMode ? formatRateDisplay : undefined}
-                    parseCommit={dailyMode ? parseRateInput : undefined}
+                    logisticsMap={logisticsMap}
+                    assignmentDefaults={assignmentDefaults}
+                    dailyMode={dailyMode}
+                    formatRateDisplay={formatRateDisplay}
+                    parseRateInput={parseRateInput}
+                    onUpdateField={onUpdateField}
                   />
                   <EditableNumberCell
                     value={assignment?.hours}
                     defaultValue={assignmentDefaults.hours}
                     assignment={assignment}
                     field="hours"
-                    onUpdate={onUpdateField}
-                  />
-                  <EditableNumberCell
-                    value={assignment?.bonus}
-                    defaultValue={null}
-                    assignment={assignment}
-                    field="bonus"
                     onUpdate={onUpdateField}
                   />
                   <td className="px-3 py-2 border-b border-border text-muted-foreground text-xs">
@@ -305,27 +332,20 @@ export default function AssignmentsTable({
                   roles={roles}
                   onUpdateRole={onUpdateRole}
                 />
-                <EditableNumberCell
-                  value={ga.rate}
-                  defaultValue={assignmentDefaults.rate}
+                <RateCell
                   assignment={ga}
-                  field="rate"
-                  onUpdate={onUpdateField}
-                  formatDisplay={dailyMode ? formatRateDisplay : undefined}
-                  parseCommit={dailyMode ? parseRateInput : undefined}
+                  logisticsMap={logisticsMap}
+                  assignmentDefaults={assignmentDefaults}
+                  dailyMode={dailyMode}
+                  formatRateDisplay={formatRateDisplay}
+                  parseRateInput={parseRateInput}
+                  onUpdateField={onUpdateField}
                 />
                 <EditableNumberCell
                   value={ga.hours}
                   defaultValue={assignmentDefaults.hours}
                   assignment={ga}
                   field="hours"
-                  onUpdate={onUpdateField}
-                />
-                <EditableNumberCell
-                  value={ga.bonus}
-                  defaultValue={null}
-                  assignment={ga}
-                  field="bonus"
                   onUpdate={onUpdateField}
                 />
                 <td className="px-3 py-2 border-b border-border text-muted-foreground text-xs">

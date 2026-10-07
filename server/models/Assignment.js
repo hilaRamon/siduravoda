@@ -9,6 +9,7 @@ const assignmentSchema = new mongoose.Schema(
     workplace_id: { type: String, required: true },
     workplace_name: { type: String },
     role: { type: String },
+    is_piecework: { type: Boolean, default: false },
     rate: { type: Number, default: 40 },
     hours: { type: Number, default: 4.75 },
     bonus: { type: Number },
