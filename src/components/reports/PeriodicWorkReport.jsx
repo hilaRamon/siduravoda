@@ -34,12 +34,11 @@ import * as XLSX from "xlsx";
 import { format, subMonths } from "date-fns";
 import { useWorkByWorkplaceReport } from "@/queries/reports/useWorkByWorkplaceReport";
 import { useWorkplaces } from "@/queries/reports/useWorkplaces";
-import {
-  formatPayReportAvgHours,
-  formatPayReportDailyUnits,
-  formatPayReportHoursOrUnits,
-  formatPayReportRate,
-} from "@/lib/pieceworkReport";
+
+function displayValue(value) {
+  if (value == null || value === "") return "—";
+  return value;
+}
 
 const MONTHS = [
   { value: "01", label: "ינואר" },
@@ -97,28 +96,17 @@ export default function PeriodicWorkReport() {
   });
 
   const groups = data?.groups ?? [];
-  const isDailyPricing = data?.pricingMethod === "daily";
 
-  const tableHeaders = isDailyPricing
-    ? [
-        "תאריך",
-        "שם מקום עבודה",
-        "תעריף יומי",
-        "תשלום נוסף",
-        "כמות תלמידים",
-        "ממוצע יחידות יומיות לתלמיד",
-        "מחיר",
-      ]
-    : [
-        "תאריך",
-        "שם מקום עבודה",
-        "תעריף",
-        "תשלום נוסף",
-        "כמות תלמידים",
-        "סך שעות",
-        "ממוצע שעות",
-        "מחיר",
-      ];
+  const tableHeaders = [
+    "תאריך",
+    "שם מקום עבודה",
+    "תעריף",
+    "יחידה",
+    "כמות תלמידים",
+    "סה״כ יחידות",
+    "ממוצע יחידות לתלמיד",
+    "מחיר",
+  ];
 
   const toggleFarm = (farm) => {
     setSelectedFarms((prev) =>
@@ -199,55 +187,29 @@ export default function PeriodicWorkReport() {
       const farm = group.farmName;
       const farmRows = group.rows;
       farmRows.forEach((r) =>
-        rows.push(
-          isDailyPricing
-            ? {
-                משק: farm,
-                תאריך: formatDate(r.date),
-                "מקום עבודה": r.workplaceName,
-                "תעריף יומי": formatPayReportRate(r, true),
-                "תשלום נוסף": r.bonus,
-                "כמות תלמידים": r.studentCount,
-                "ממוצע יחידות יומיות לתלמיד": formatPayReportDailyUnits(r),
-                מחיר: r.totalPrice,
-              }
-            : {
-                משק: farm,
-                תאריך: formatDate(r.date),
-                "מקום עבודה": r.workplaceName,
-                תעריף: formatPayReportRate(r, false),
-                "תשלום נוסף": r.bonus,
-                "כמות תלמידים": r.studentCount,
-                "סך שעות": formatPayReportHoursOrUnits(r),
-                "ממוצע שעות": formatPayReportAvgHours(r),
-                מחיר: r.totalPrice,
-              },
-        ),
+        rows.push({
+          משק: farm,
+          תאריך: formatDate(r.date),
+          "מקום עבודה": r.workplaceName,
+          תעריף: displayValue(r.rate),
+          יחידה: r.unitName || "",
+          "כמות תלמידים": r.studentCount,
+          "סה״כ יחידות": displayValue(r.totalUnits),
+          "ממוצע יחידות לתלמיד": displayValue(r.avgUnitsPerStudent),
+          מחיר: r.totalPrice,
+        }),
       );
-      rows.push(
-        isDailyPricing
-          ? {
-              משק: "",
-              תאריך: "",
-              "מקום עבודה": 'סה"כ',
-              "תעריף יומי": "",
-              "תשלום נוסף": group.totals.bonus,
-              "כמות תלמידים": "",
-              "ממוצע יחידות יומיות לתלמיד": "",
-              מחיר: group.totals.totalPrice,
-            }
-          : {
-              משק: "",
-              תאריך: "",
-              "מקום עבודה": 'סה"כ',
-              תעריף: "",
-              "תשלום נוסף": group.totals.bonus,
-              "כמות תלמידים": "",
-              "סך שעות": group.totals.totalHours,
-              "ממוצע שעות": "",
-              מחיר: group.totals.totalPrice,
-            },
-      );
+      rows.push({
+        משק: "",
+        תאריך: "",
+        "מקום עבודה": 'סה"כ',
+        תעריף: "",
+        יחידה: "",
+        "כמות תלמידים": "",
+        "סה״כ יחידות": "",
+        "ממוצע יחידות לתלמיד": "",
+        מחיר: group.totals.totalPrice,
+      });
       rows.push({});
     });
     const ws = XLSX.utils.json_to_sheet(rows);
@@ -467,28 +429,20 @@ export default function PeriodicWorkReport() {
                             {r.workplaceName}
                           </td>
                           <td className="border border-gray-300 px-2 py-1.5 text-center">
-                            {formatPayReportRate(r, isDailyPricing)}
+                            {displayValue(r.rate)}
                           </td>
                           <td className="border border-gray-300 px-2 py-1.5 text-center">
-                            {r.bonus}
+                            {r.unitName}
                           </td>
                           <td className="border border-gray-300 px-2 py-1.5 text-center">
                             {r.studentCount}
                           </td>
-                          {isDailyPricing ? (
-                            <td className="border border-gray-300 px-2 py-1.5 text-center">
-                              {formatPayReportDailyUnits(r)}
-                            </td>
-                          ) : (
-                            <>
-                              <td className="border border-gray-300 px-2 py-1.5 text-center">
-                                {formatPayReportHoursOrUnits(r)}
-                              </td>
-                              <td className="border border-gray-300 px-2 py-1.5 text-center">
-                                {formatPayReportAvgHours(r)}
-                              </td>
-                            </>
-                          )}
+                          <td className="border border-gray-300 px-2 py-1.5 text-center">
+                            {displayValue(r.totalUnits)}
+                          </td>
+                          <td className="border border-gray-300 px-2 py-1.5 text-center">
+                            {displayValue(r.avgUnitsPerStudent)}
+                          </td>
                           <td className="border border-gray-300 px-2 py-1.5 text-center">
                             {r.totalPrice} ₪
                           </td>
@@ -503,15 +457,9 @@ export default function PeriodicWorkReport() {
                         >
                           סה"כ
                         </td>
-                        <td className="border border-gray-300 px-2 py-1.5 text-center">
-                          {group.totals.bonus}
-                        </td>
                         <td className="border border-gray-300 px-2 py-1.5"></td>
-                        {!isDailyPricing && (
-                          <td className="border border-gray-300 px-2 py-1.5 text-center">
-                            {group.totals.totalHours}
-                          </td>
-                        )}
+                        <td className="border border-gray-300 px-2 py-1.5"></td>
+                        <td className="border border-gray-300 px-2 py-1.5"></td>
                         <td className="border border-gray-300 px-2 py-1.5"></td>
                         <td className="border border-gray-300 px-2 py-1.5 text-center">
                           {group.totals.totalPrice} ₪

@@ -52,20 +52,63 @@ function resolveWorkplaceName(workplaceId, assignmentName, byId) {
   return assignmentName || "";
 }
 
-function buildTotals(rows, pricingMethod) {
-  const totals = {
+function buildTotals(rows) {
+  return {
     bonus: round2(rows.reduce((sum, row) => sum + row.bonus, 0)),
     totalPrice: round2(rows.reduce((sum, row) => sum + row.totalPrice, 0)),
   };
-  if (pricingMethod === "hourly") {
-    totals.totalHours = round2(
-      rows.reduce((sum, row) => sum + row.totalHours, 0),
-    );
-  }
-  return totals;
 }
 
-function toWorkplaceGroups(rowBuckets, pricingMethod) {
+function buildDisplayUnits({
+  isPiecework,
+  isDaily,
+  hourlyRate,
+  dailyRate,
+  totalHours,
+  avgHours,
+  avgDailyUnits,
+  studentCount,
+  hoursPerDailyUnit,
+  pieceRate,
+  reportedUnits,
+  unitsName,
+}) {
+  if (isPiecework) {
+    const totalUnits =
+      reportedUnits == null || !Number.isFinite(Number(reportedUnits))
+        ? null
+        : Number(reportedUnits);
+    return {
+      rate: pieceRate,
+      unitName: unitsName || "יחידה",
+      totalUnits,
+      avgUnitsPerStudent:
+        totalUnits == null || !studentCount
+          ? null
+          : round2(totalUnits / studentCount),
+    };
+  }
+
+  if (isDaily) {
+    return {
+      rate: dailyRate,
+      unitName: "יומי",
+      totalUnits: hoursPerDailyUnit
+        ? round2(totalHours / hoursPerDailyUnit)
+        : 0,
+      avgUnitsPerStudent: avgDailyUnits,
+    };
+  }
+
+  return {
+    rate: hourlyRate,
+    unitName: "שעה",
+    totalUnits: totalHours,
+    avgUnitsPerStudent: avgHours,
+  };
+}
+
+function toWorkplaceGroups(rowBuckets) {
   return Object.values(rowBuckets)
     .map((group) => {
       const rows = [...group.rows].sort((a, b) => a.date.localeCompare(b.date));
@@ -73,13 +116,13 @@ function toWorkplaceGroups(rowBuckets, pricingMethod) {
         workplaceName: group.workplaceName,
         farmName: group.farmName,
         rows,
-        totals: buildTotals(rows, pricingMethod),
+        totals: buildTotals(rows),
       };
     })
     .sort((a, b) => a.workplaceName.localeCompare(b.workplaceName, "he"));
 }
 
-function toFarmGroups(rowBuckets, pricingMethod) {
+function toFarmGroups(rowBuckets) {
   const farmBuckets = {};
 
   for (const wpGroup of Object.values(rowBuckets)) {
@@ -103,7 +146,7 @@ function toFarmGroups(rowBuckets, pricingMethod) {
       return {
         farmName: group.farmName,
         rows,
-        totals: buildTotals(rows, pricingMethod),
+        totals: buildTotals(rows),
       };
     })
     .sort((a, b) => a.farmName.localeCompare(b.farmName, "he"));
@@ -213,14 +256,18 @@ export async function getWorkByWorkplaceReport({
 
     const logistics = logisticsByKey[logisticsKey(item._id.date, workplaceId)];
     const isPiecework = Boolean(item.hasPiecework || logistics?.is_piecework);
+    const isDaily = appSettings.pricing_method === PRICING_METHODS.DAILY;
 
     const hourlyRate = item.rate ?? assignmentDefaults.rate;
     const totalHours = isPiecework ? 0 : round2(item.totalHours);
     const bonus = round2(item.totalBonus);
     const studentCount = item.studentCount;
     const avgHours = studentCount && !isPiecework ? round2(totalHours / studentCount) : 0;
-    const pieceRate = logistics?.rate ?? 0;
-    const units = logistics?.units ?? 0;
+    const reportedUnits =
+      logistics?.units == null || logistics.units === "" ? null : logistics.units;
+    const priceUnits = reportedUnits ?? 0;
+    const pieceRate =
+      logistics?.rate == null || logistics.rate === "" ? null : logistics.rate;
     const unitsName = logistics?.units_name || "";
     const dailyRate = hourlyToDailyRate(
       hourlyRate,
@@ -233,17 +280,34 @@ export async function getWorkByWorkplaceReport({
           studentCount,
           appSettings.hours_per_daily_unit,
         );
+    const display = buildDisplayUnits({
+      isPiecework,
+      isDaily,
+      hourlyRate,
+      dailyRate,
+      totalHours,
+      avgHours,
+      avgDailyUnits,
+      studentCount,
+      hoursPerDailyUnit: appSettings.hours_per_daily_unit,
+      pieceRate,
+      reportedUnits,
+      unitsName,
+    });
     const totalPrice = isPiecework
-      ? calcTotalPrice(units, pieceRate, bonus)
-      : appSettings.pricing_method === PRICING_METHODS.DAILY
+      ? calcTotalPrice(priceUnits, pieceRate ?? 0, bonus)
+      : isDaily
         ? calcTotalPriceDaily(studentCount, avgDailyUnits, dailyRate, bonus)
         : calcTotalPrice(totalHours, hourlyRate, bonus);
 
     const row = {
       date: item._id.date,
       workplaceName,
-      rate: isPiecework ? pieceRate : hourlyRate,
-      dailyRate: isPiecework ? pieceRate : dailyRate,
+      rate: display.rate,
+      unitName: display.unitName,
+      totalUnits: display.totalUnits,
+      avgUnitsPerStudent: display.avgUnitsPerStudent,
+      dailyRate: isPiecework ? (pieceRate ?? 0) : dailyRate,
       bonus,
       studentCount,
       totalHours,
@@ -251,7 +315,7 @@ export async function getWorkByWorkplaceReport({
       avgDailyUnits,
       totalPrice,
       is_piecework: isPiecework,
-      units,
+      units: priceUnits,
       units_name: unitsName,
     };
 
@@ -267,8 +331,8 @@ export async function getWorkByWorkplaceReport({
 
   const groups =
     groupBy === "farm"
-      ? toFarmGroups(rowBuckets, appSettings.pricing_method)
-      : toWorkplaceGroups(rowBuckets, appSettings.pricing_method);
+      ? toFarmGroups(rowBuckets)
+      : toWorkplaceGroups(rowBuckets);
 
   const workplaceOptions = [...workplaceOptionsSet].sort((a, b) =>
     a.localeCompare(b, "he"),

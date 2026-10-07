@@ -187,9 +187,6 @@ export default function AssignmentsTable({
             <th className="px-3 py-2 text-right font-semibold text-muted-foreground w-20">
               <span className="text-xs">שעות</span>
             </th>
-            <th className="px-3 py-2 text-right font-semibold text-muted-foreground w-24">
-              <span className="text-xs">תשלום נוסף</span>
-            </th>
             <th className="px-3 py-2 text-right font-semibold text-muted-foreground">
               <div className="flex flex-col gap-1">
                 <span className="text-xs">שיבוץ</span>
@@ -214,7 +211,7 @@ export default function AssignmentsTable({
           {tableRows.length === 0 ? (
             <tr>
               <td
-                colSpan={10}
+                colSpan={9}
                 className="text-center py-12 text-muted-foreground"
               >
                 {students.length === 0
@@ -275,13 +272,6 @@ export default function AssignmentsTable({
                     defaultValue={assignmentDefaults.hours}
                     assignment={assignment}
                     field="hours"
-                    onUpdate={onUpdateField}
-                  />
-                  <EditableNumberCell
-                    value={assignment?.bonus}
-                    defaultValue={null}
-                    assignment={assignment}
-                    field="bonus"
                     onUpdate={onUpdateField}
                   />
                   <td className="px-3 py-2 border-b border-border text-muted-foreground text-xs">
@@ -356,13 +346,6 @@ export default function AssignmentsTable({
                   defaultValue={assignmentDefaults.hours}
                   assignment={ga}
                   field="hours"
-                  onUpdate={onUpdateField}
-                />
-                <EditableNumberCell
-                  value={ga.bonus}
-                  defaultValue={null}
-                  assignment={ga}
-                  field="bonus"
                   onUpdate={onUpdateField}
                 />
                 <td className="px-3 py-2 border-b border-border text-muted-foreground text-xs">
