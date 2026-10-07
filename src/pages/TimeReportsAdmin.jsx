@@ -1,13 +1,16 @@
 import { useState, useMemo } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { base44 } from '@/api/base44Client';
-import { timeReportApi } from '@/api/timeReportApi';
 import { useAuth } from '@/lib/AuthContext';
 import { canApproveTimeReports } from '@/lib/permissions';
 import { Button } from '@/components/ui/button';
-import { CheckCircle2, XCircle, Clock, CalendarDays, Building2, User } from 'lucide-react';
+import { CheckCircle2, XCircle, Clock, CalendarDays, Building2, User, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
-import { assignmentKeys, useAssignments } from '@/queries/assignmentQueries';
+import { useAssignments } from '@/queries/assignmentQueries';
+import {
+  useApproveTimeReportDate,
+  useBulkTimeReportStatus,
+  usePendingTimeReports,
+  useTimeReportsByDate,
+} from '@/queries/timeReportQueries';
 import { useLogisticsByWorkplace } from '@/hooks/assignments/useLogisticsByWorkplace';
 import UnitsQuantityInput from '@/components/timeReports/UnitsQuantityInput';
 
@@ -33,7 +36,7 @@ function calcDuration(start, end) {
   return Math.round(diff / 60 * 100) / 100;
 }
 
-function ActionButtons({ report, onStatus }) {
+function ActionButtons({ report, onStatus, pending, pendingStatus }) {
   return (
     <div className="flex gap-1 justify-end">
       <Button
@@ -41,18 +44,18 @@ function ActionButtons({ report, onStatus }) {
         variant="outline"
         className="h-7 text-xs gap-1 text-green-600 border-green-300 hover:bg-green-50"
         onClick={() => onStatus(report, 'אושר')}
-        disabled={report.status === 'אושר'}
+        disabled={pending || report.status === 'אושר'}
       >
-        <CheckCircle2 size={13} /> אשר
+        {pendingStatus === 'אושר' ? <Loader2 size={13} className="animate-spin" /> : <CheckCircle2 size={13} />} אשר
       </Button>
       <Button
         size="sm"
         variant="outline"
         className="h-7 text-xs gap-1 text-red-500 border-red-300 hover:bg-red-50"
         onClick={() => onStatus(report, 'נדחה')}
-        disabled={report.status === 'נדחה'}
+        disabled={pending || report.status === 'נדחה'}
       >
-        <XCircle size={13} /> דחה
+        {pendingStatus === 'נדחה' ? <Loader2 size={13} className="animate-spin" /> : <XCircle size={13} />} דחה
       </Button>
     </div>
   );
@@ -66,7 +69,7 @@ function StatusBadge({ status }) {
   );
 }
 
-function ReportRow({ report, onStatus, isIndividual, readOnly }) {
+function ReportRow({ report, onStatus, isIndividual, readOnly, pending, pendingStatus }) {
   const duration = calcDuration(report.start_time, report.end_time);
   return (
     <tr className={`hover:bg-secondary/20 transition-colors ${isIndividual ? 'bg-yellow-50/40' : ''}`}>
@@ -84,7 +87,7 @@ function ReportRow({ report, onStatus, isIndividual, readOnly }) {
         {duration !== null ? duration.toFixed(2) : '—'}
       </td>
       <td className="px-4 py-3"><StatusBadge status={report.status} /></td>
-      <td className="px-4 py-3">{!readOnly && <ActionButtons report={report} onStatus={onStatus} />}</td>
+      <td className="px-4 py-3">{!readOnly && <ActionButtons report={report} onStatus={onStatus} pending={pending} pendingStatus={pendingStatus} />}</td>
     </tr>
   );
 }
@@ -92,25 +95,18 @@ function ReportRow({ report, onStatus, isIndividual, readOnly }) {
 export default function TimeReportsAdmin() {
   const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [activeTab, setActiveTab] = useState('ממתין');
-  const [approvingDate, setApprovingDate] = useState(false);
-  const queryClient = useQueryClient();
 
   const { user: currentUser, isLoadingAuth: loadingUser } = useAuth();
   const readOnly = !canApproveTimeReports(currentUser);
 
-  const { data: reports = [], isLoading } = useQuery({
-    queryKey: ['time-reports', selectedDate],
-    queryFn: () => base44.entities.TimeReport.filter({ date: selectedDate }, 'student_name', 500),
-  });
+  const { data: reports = [], isLoading } = useTimeReportsByDate(selectedDate);
   const { logisticsMap } = useLogisticsByWorkplace(selectedDate);
   const { data: assignments = [] } = useAssignments(selectedDate);
+  const statusMutation = useBulkTimeReportStatus();
+  const approveDateMutation = useApproveTimeReportDate();
 
   // Fetch all pending reports to show which dates have unreviewed items
-  const { data: allPending = [] } = useQuery({
-    queryKey: ['time-reports-all-pending'],
-    queryFn: () => base44.entities.TimeReport.filter({ status: 'ממתין' }, 'date', 2000),
-    refetchInterval: 60000,
-  });
+  const { data: allPending = [] } = usePendingTimeReports({ sort: 'date', limit: 2000 });
 
   const pendingDates = useMemo(() => {
     const dates = new Set(allPending.map(r => r.date));
@@ -210,27 +206,28 @@ export default function TimeReportsAdmin() {
     (g) => logisticsMap[g.workplace_id]?.is_piecework,
   );
 
-  const invalidateAfterStatusChange = () => {
-    queryClient.invalidateQueries({ queryKey: ['time-reports', selectedDate] });
-    queryClient.invalidateQueries({ queryKey: ['time-reports-all-pending'] });
-    queryClient.invalidateQueries({ queryKey: ['time-reports-pending'] });
-    queryClient.invalidateQueries({ queryKey: assignmentKeys.byDate(selectedDate) });
-  };
-
-  const handleStatus = async (report, status) => {
-    await timeReportApi.bulkStatus({ ids: [report.id], status });
-    invalidateAfterStatusChange();
+  const handleStatus = (report, status) => {
+    statusMutation.mutate({
+      ids: [report.id],
+      status,
+      reportId: report.id,
+      date: selectedDate,
+    });
   };
 
   // Approve/reject all students in a workplace group
-  const handleWorkplaceStatus = async (wpId, status) => {
+  const handleWorkplaceStatus = (wpId, status) => {
     const ids = tabReports.filter(r => r.workplace_id === wpId).map(r => r.id);
     if (ids.length === 0) return;
-    await timeReportApi.bulkStatus({ ids, status });
-    invalidateAfterStatusChange();
+    statusMutation.mutate({
+      ids,
+      status,
+      workplaceId: wpId,
+      date: selectedDate,
+    });
   };
 
-  const handleApproveDate = async () => {
+  const handleApproveDate = () => {
     const pendingCustomIds = new Set([
       ...reports.filter(r => r.status === 'ממתין' && isCustomHours(r)).map(r => r.id),
       ...allPending.filter(r => r.date === selectedDate && isCustomHours(r)).map(r => r.id),
@@ -242,13 +239,7 @@ export default function TimeReportsAdmin() {
       if (!confirmed) return;
     }
 
-    setApprovingDate(true);
-    try {
-      await timeReportApi.approveDate(selectedDate);
-      invalidateAfterStatusChange();
-    } finally {
-      setApprovingDate(false);
-    }
+    approveDateMutation.mutate(selectedDate);
   };
 
   const tabs = [
@@ -298,10 +289,10 @@ export default function TimeReportsAdmin() {
                 size="sm"
                 className="h-9 gap-1.5 bg-green-600 hover:bg-green-700 text-white"
                 onClick={handleApproveDate}
-                disabled={approvingDate}
+                disabled={approveDateMutation.isPending}
               >
                 <CheckCircle2 size={15} />
-                {approvingDate ? 'מאשר...' : 'אשר את כל התאריך'}
+                {approveDateMutation.isPending ? 'מאשר...' : 'אשר את כל התאריך'}
               </Button>
             )}
           </div>
@@ -395,6 +386,8 @@ export default function TimeReportsAdmin() {
                       const duration = calcDuration(representative.start_time, representative.end_time);
                       const logistics = logisticsMap[workplace_id];
                       const isPiecework = Boolean(logistics?.is_piecework);
+                      const workplacePending = statusMutation.isPending && statusMutation.variables?.workplaceId === workplace_id;
+                      const workplacePendingStatus = workplacePending ? statusMutation.variables?.status : null;
                       return (
                         <tr key={workplace_id} className="hover:bg-secondary/20 transition-colors">
                           <td className="px-4 py-3 font-semibold text-base">{workplace_name}</td>
@@ -441,18 +434,18 @@ export default function TimeReportsAdmin() {
                                  variant="outline"
                                  className="h-7 text-xs gap-1 text-green-600 border-green-300 hover:bg-green-50"
                                  onClick={() => handleWorkplaceStatus(workplace_id, 'אושר')}
-                                 disabled={tabReports.filter(r => r.workplace_id === workplace_id).every(r => r.status === 'אושר')}
+                                 disabled={workplacePending || tabReports.filter(r => r.workplace_id === workplace_id).every(r => r.status === 'אושר')}
                                >
-                                 <CheckCircle2 size={13} /> אשר הכל
+                                 {workplacePendingStatus === 'אושר' ? <Loader2 size={13} className="animate-spin" /> : <CheckCircle2 size={13} />} אשר הכל
                                </Button>
                                <Button
                                  size="sm"
                                  variant="outline"
                                  className="h-7 text-xs gap-1 text-red-500 border-red-300 hover:bg-red-50"
                                  onClick={() => handleWorkplaceStatus(workplace_id, 'נדחה')}
-                                 disabled={tabReports.filter(r => r.workplace_id === workplace_id).every(r => r.status === 'נדחה')}
+                                 disabled={workplacePending || tabReports.filter(r => r.workplace_id === workplace_id).every(r => r.status === 'נדחה')}
                                >
-                                 <XCircle size={13} /> דחה הכל
+                                 {workplacePendingStatus === 'נדחה' ? <Loader2 size={13} className="animate-spin" /> : <XCircle size={13} />} דחה הכל
                                </Button>
                              </div>
                            )}
@@ -480,9 +473,20 @@ export default function TimeReportsAdmin() {
                     {tableHeaders}
                   </thead>
                   <tbody className="divide-y divide-border">
-                    {individualRows.map(r => (
-                      <ReportRow key={r.id} report={r} onStatus={handleStatus} isIndividual={true} readOnly={readOnly} />
-                    ))}
+                    {individualRows.map(r => {
+                      const rowPending = statusMutation.isPending && statusMutation.variables?.reportId === r.id;
+                      return (
+                        <ReportRow
+                          key={r.id}
+                          report={r}
+                          onStatus={handleStatus}
+                          isIndividual={true}
+                          readOnly={readOnly}
+                          pending={rowPending}
+                          pendingStatus={rowPending ? statusMutation.variables?.status : null}
+                        />
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>

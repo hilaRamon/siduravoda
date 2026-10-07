@@ -16,10 +16,69 @@ function invalidateWorkplaceLogisticsQueries(queryClient, date) {
   }
 }
 
+function readPiecework(variables) {
+  if (
+    variables?.data &&
+    Object.prototype.hasOwnProperty.call(variables.data, "is_piecework")
+  ) {
+    return Boolean(variables.data.is_piecework);
+  }
+  if (
+    variables &&
+    Object.prototype.hasOwnProperty.call(variables, "is_piecework")
+  ) {
+    return Boolean(variables.is_piecework);
+  }
+  return undefined;
+}
+
+function patchLogisticsPiecework(current, { id, workplaceId, date, isPiecework }) {
+  const list = Array.isArray(current) ? current : [];
+  let found = false;
+  const next = list.map((item) => {
+    const matches =
+      (id && item.id === id) ||
+      (!id && workplaceId && item.workplace_id === workplaceId);
+    if (!matches) return item;
+    found = true;
+    return { ...item, is_piecework: isPiecework };
+  });
+  if (!found && workplaceId) {
+    next.push({
+      date,
+      workplace_id: workplaceId,
+      is_piecework: isPiecework,
+    });
+  }
+  return next;
+}
+
+async function optimisticPiecework(queryClient, variables) {
+  const isPiecework = readPiecework(variables);
+  const date = variables?.date;
+  if (!date || isPiecework === undefined) return {};
+  const queryKey = workplaceLogisticsKeys.byDate(date);
+  await queryClient.cancelQueries({ queryKey });
+  const previous = queryClient.getQueryData(queryKey);
+  const id = variables.id;
+  const workplaceId = variables.workplace_id || variables.data?.workplace_id;
+  queryClient.setQueryData(queryKey, (current) =>
+    patchLogisticsPiecework(current, { id, workplaceId, date, isPiecework }),
+  );
+  return { queryKey, previous };
+}
+
+function rollbackPiecework(queryClient, context) {
+  if (!context?.queryKey || !Object.prototype.hasOwnProperty.call(context, "previous")) {
+    return;
+  }
+  queryClient.setQueryData(context.queryKey, context.previous);
+}
+
 export function useWorkplaceLogisticsByDate(date, options = {}) {
   return useQuery({
     queryKey: workplaceLogisticsKeys.byDate(date),
-    queryFn: () => workplaceLogisticsApi.list({ date }),
+    queryFn: ({ signal }) => workplaceLogisticsApi.list({ date }, { signal }),
     enabled: !!date,
     ...options,
   });
@@ -32,6 +91,10 @@ export function useCreateWorkplaceLogistics() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (data) => workplaceLogisticsApi.create(data),
+    onMutate: (variables) => optimisticPiecework(queryClient, variables),
+    onError: (_error, _variables, context) => {
+      rollbackPiecework(queryClient, context);
+    },
     onSuccess: (_result, variables) => {
       invalidateWorkplaceLogisticsQueries(queryClient, variables?.date);
     },
@@ -53,6 +116,10 @@ export function useUpdateWorkplaceLogistics() {
   return useMutation({
     mutationFn: (/** @type {WorkplaceLogisticsUpdateInput} */ vars) =>
       workplaceLogisticsApi.update(vars.id, vars.data),
+    onMutate: (variables) => optimisticPiecework(queryClient, variables),
+    onError: (_error, _variables, context) => {
+      rollbackPiecework(queryClient, context);
+    },
     onSuccess: (_result, variables) => {
       invalidateWorkplaceLogisticsQueries(queryClient, variables?.date);
     },
