@@ -13,9 +13,8 @@ import {
   Wrench,
   LogOut,
 } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
-import { base44 } from "@/api/base44Client";
 import { usePendingAbsenceCount } from "@/queries/absenceQueries";
+import { usePendingTimeReports } from "@/queries/timeReportQueries";
 import { useAuth } from "@/lib/AuthContext";
 import { getVisibleNavItems, isWorkplaceManagerOnly } from "@/lib/permissions";
 import EditProfileModal from "@/components/EditProfileModal";
@@ -44,15 +43,9 @@ export default function Layout() {
     enabled: !workplaceManagerOnly,
   });
 
-  const { data: pendingTimeReports = [] } = useQuery({
-    queryKey: ["time-reports-pending"],
-    queryFn: () =>
-      base44.entities.TimeReport.filter(
-        { status: "ממתין" },
-        "-created_date",
-        100,
-      ),
-    refetchInterval: 60000,
+  const { data: pendingTimeReports = [] } = usePendingTimeReports({
+    sort: "-created_date",
+    limit: 100,
     enabled: !workplaceManagerOnly && navItems.some((n) => n.to === "/time-reports"),
   });
   const pendingTimeReportsCount = pendingTimeReports.length;
