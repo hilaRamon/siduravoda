@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { base44 } from "@/api/base44Client";
+import { reportApi } from "@/api/reportApi";
 import { reportKeys } from "./keys";
 
 /**
@@ -19,7 +19,7 @@ export function useArzenuReport({
 } = {}) {
   return useQuery({
     queryKey: reportKeys.arzenu({ startDate, endDate }),
-    queryFn: () => base44.reports.arzenu({ startDate, endDate }),
+    queryFn: () => reportApi.arzenu({ startDate, endDate }),
     enabled: enabled && !!startDate && !!endDate,
   });
 }

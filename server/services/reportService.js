@@ -1,6 +1,7 @@
 import { getModel } from "../models/index.js";
 import Assignment from "../models/Assignment.js";
-import { SKIP_WORKPLACES } from "../lib/reportConstants.js";
+import { SKIP_FARMS, SKIP_WORKPLACES } from "../lib/reportConstants.js";
+import { primaryWorkNumberMatch } from "../lib/assignmentWorkNumber.js";
 import {
   calcAvgDailyUnits,
   calcTotalPrice,
@@ -11,6 +12,7 @@ import {
   PRICING_METHODS,
   round2,
 } from "../lib/pricing.js";
+import * as studentRepository from "../repositories/studentRepository.js";
 import * as workplaceLogisticsRepository from "../repositories/workplaceLogisticsRepository.js";
 import {
   logisticsKey,
@@ -25,7 +27,7 @@ async function getAppSettings() {
   return normalizeAppSettings(settings);
 }
 
-async function getWorkplaceMaps() {
+async function getWorkByWorkplaceMaps() {
   const Workplace = getModel("Workplace");
   const workplaces = await Workplace.find().select("name farm_name").lean();
   const byId = {};
@@ -46,8 +48,74 @@ async function getWorkplaceMaps() {
   return { byId, skipIds };
 }
 
-function resolveWorkplaceName(workplaceId, assignmentName, byId) {
+async function getStudentWorkWorkplaceMaps() {
+  const Workplace = getModel("Workplace");
+  const workplaces = await Workplace.find().select("name").lean();
+  const byId = {};
+  const skipIds = [];
+
+  for (const workplace of workplaces) {
+    const id = workplace._id.toString();
+    const name = workplace.name || "";
+    byId[id] = name;
+    if (SKIP_WORKPLACES.includes(name)) {
+      skipIds.push(id);
+    }
+  }
+
+  return { byId, skipIds };
+}
+
+async function getArzenuWorkplaceMaps() {
+  const Workplace = getModel("Workplace");
+  const workplaces = await Workplace.find().select("name farm_name").lean();
+  const byId = {};
+  const skipIds = [];
+
+  for (const workplace of workplaces) {
+    const id = workplace._id.toString();
+    const name = workplace.name || "";
+    const farmName = workplace.farm_name || "";
+    byId[id] = { name, farmName };
+    if (SKIP_WORKPLACES.includes(name) || SKIP_FARMS.includes(farmName)) {
+      skipIds.push(id);
+    }
+  }
+
+  return { byId, skipIds };
+}
+
+function resolveWorkByWorkplaceName(workplaceId, assignmentName, byId) {
   const canonical = byId[workplaceId]?.name;
+  if (canonical) return canonical;
+  return assignmentName || "";
+}
+
+function resolveStudentWorkWorkplaceName(workplaceId, assignmentName, byId) {
+  const canonical = byId[workplaceId];
+  if (canonical) return canonical;
+  return assignmentName || "";
+}
+
+function resolveArzenuWorkplaceName(workplaceId, assignmentName, byId) {
+  const canonical = byId[workplaceId]?.name;
+  if (canonical) return canonical;
+  return assignmentName || "";
+}
+
+async function getStudentMap() {
+  const students = await studentRepository.find({});
+  const byId = {};
+
+  for (const student of students) {
+    byId[student.id] = student.full_name || "";
+  }
+
+  return byId;
+}
+
+function resolveStudentName(studentId, assignmentName, byId) {
+  const canonical = byId[studentId];
   if (canonical) return canonical;
   return assignmentName || "";
 }
@@ -152,6 +220,17 @@ function toFarmGroups(rowBuckets) {
     .sort((a, b) => a.farmName.localeCompare(b.farmName, "he"));
 }
 
+function shouldSkipArzenuAssignment(workplaceId, workplaceName, byId) {
+  const info = byId[workplaceId];
+  if (info) {
+    return (
+      SKIP_WORKPLACES.includes(info.name) ||
+      SKIP_FARMS.includes(info.farmName)
+    );
+  }
+  return SKIP_WORKPLACES.includes(workplaceName);
+}
+
 /**
  * @param {{ startDate: string, endDate: string, workplaces?: string[], farms?: string[], groupBy?: 'workplace' | 'farm' }} params
  */
@@ -164,7 +243,7 @@ export async function getWorkByWorkplaceReport({
 }) {
   const [appSettings, { byId, skipIds }] = await Promise.all([
     getAppSettings(),
-    getWorkplaceMaps(),
+    getWorkByWorkplaceMaps(),
   ]);
   const assignmentDefaults = getAssignmentDefaults(appSettings);
 
@@ -238,7 +317,7 @@ export async function getWorkByWorkplaceReport({
 
   for (const item of aggregated) {
     const workplaceId = item._id.workplace_id;
-    const workplaceName = resolveWorkplaceName(
+    const workplaceName = resolveWorkByWorkplaceName(
       workplaceId,
       item.assignmentWorkplaceName,
       byId,
@@ -343,4 +422,164 @@ export async function getWorkByWorkplaceReport({
     workplaceOptions,
     pricingMethod: appSettings.pricing_method,
   };
+}
+
+/**
+ * @param {{ startDate: string, endDate: string, students?: string[] }} params
+ */
+export async function getStudentWorkReport({
+  startDate,
+  endDate,
+  students = [],
+}) {
+  const [{ byId: workplaceById, skipIds }, studentById] = await Promise.all([
+    getStudentWorkWorkplaceMaps(),
+    getStudentMap(),
+  ]);
+
+  const match = {
+    date: { $gte: startDate, $lte: endDate },
+    workplace_name: { $nin: SKIP_WORKPLACES, $exists: true, $ne: "" },
+    student_id: { $exists: true, $ne: "" },
+    ...primaryWorkNumberMatch(),
+  };
+
+  if (skipIds.length > 0) {
+    match.workplace_id = { $nin: skipIds };
+  }
+  if (students.length > 0) {
+    match.student_id = { $in: students };
+  }
+
+  const aggregated = await Assignment.aggregate([
+    { $match: match },
+    { $sort: { updated_date: -1, created_date: -1 } },
+    {
+      $group: {
+        _id: { student_id: "$student_id", date: "$date" },
+        workplace_id: { $first: "$workplace_id" },
+        student_name: { $first: "$student_name" },
+        workplace_name: { $first: "$workplace_name" },
+      },
+    },
+    {
+      $group: {
+        _id: {
+          student_id: "$_id.student_id",
+          workplace_id: "$workplace_id",
+        },
+        days: { $sum: 1 },
+        student_name: { $first: "$student_name" },
+        workplace_name: { $first: "$workplace_name" },
+      },
+    },
+  ]);
+
+  const studentBuckets = {};
+
+  for (const item of aggregated) {
+    const studentId = item._id.student_id;
+    const workplaceId = item._id.workplace_id;
+    const workplaceName = resolveStudentWorkWorkplaceName(
+      workplaceId,
+      item.workplace_name,
+      workplaceById,
+    );
+
+    if (!workplaceName || SKIP_WORKPLACES.includes(workplaceName)) {
+      continue;
+    }
+
+    const name = resolveStudentName(studentId, item.student_name, studentById);
+    if (!studentBuckets[studentId]) {
+      studentBuckets[studentId] = {
+        studentId,
+        name,
+        workplaces: {},
+      };
+    }
+
+    studentBuckets[studentId].workplaces[workplaceName] =
+      (studentBuckets[studentId].workplaces[workplaceName] || 0) + item.days;
+  }
+
+  const result = Object.values(studentBuckets)
+    .map((student) => {
+      const workplaces = Object.entries(student.workplaces)
+        .map(([workplaceName, days]) => ({ workplaceName, days }))
+        .sort((a, b) => a.workplaceName.localeCompare(b.workplaceName, "he"));
+      const totalDays = workplaces.reduce((sum, wp) => sum + wp.days, 0);
+      return {
+        studentId: student.studentId,
+        name: student.name,
+        workplaces,
+        totalDays,
+      };
+    })
+    .sort((a, b) => a.name.localeCompare(b.name, "he"));
+
+  return { students: result };
+}
+
+/**
+ * @param {{ startDate: string, endDate: string }} params
+ */
+export async function getArzenuReport({ startDate, endDate }) {
+  const [{ byId: workplaceById, skipIds }, studentById] = await Promise.all([
+    getArzenuWorkplaceMaps(),
+    getStudentMap(),
+  ]);
+
+  const match = {
+    date: { $gte: startDate, $lte: endDate },
+    workplace_name: { $nin: SKIP_WORKPLACES, $exists: true, $ne: "" },
+    ...primaryWorkNumberMatch(),
+  };
+
+  if (skipIds.length > 0) {
+    match.workplace_id = { $nin: skipIds };
+  }
+
+  const assignments = await Assignment.find(match)
+    .select("date student_id student_name workplace_name workplace_id")
+    .lean();
+
+  const rows = [];
+
+  for (const assignment of assignments) {
+    const workplace = resolveArzenuWorkplaceName(
+      assignment.workplace_id,
+      assignment.workplace_name,
+      workplaceById,
+    );
+
+    if (
+      !workplace ||
+      shouldSkipArzenuAssignment(
+        assignment.workplace_id,
+        assignment.workplace_name,
+        workplaceById,
+      )
+    ) {
+      continue;
+    }
+
+    rows.push({
+      date: assignment.date,
+      name: resolveStudentName(
+        assignment.student_id,
+        assignment.student_name,
+        studentById,
+      ),
+      workplace,
+    });
+  }
+
+  rows.sort((a, b) => {
+    const byDate = a.date.localeCompare(b.date);
+    if (byDate !== 0) return byDate;
+    return a.name.localeCompare(b.name, "he");
+  });
+
+  return { rows, totalRows: rows.length };
 }

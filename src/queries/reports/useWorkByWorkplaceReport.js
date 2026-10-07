@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { base44 } from "@/api/base44Client";
+import { reportApi } from "@/api/reportApi";
 import { reportKeys } from "./keys";
 
 /**
@@ -32,7 +32,7 @@ export function useWorkByWorkplaceReport({
       groupBy,
     }),
     queryFn: () =>
-      base44.reports.workByWorkplace({
+      reportApi.workByWorkplace({
         startDate,
         endDate,
         workplaces,
