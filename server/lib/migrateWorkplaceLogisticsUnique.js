@@ -24,6 +24,12 @@ function mergeDocs(winner, loser) {
       ? fieldIfMissing(winner, loser, "units_name") || ""
       : "",
     units: isPiecework ? fieldIfMissing(winner, loser, "units") : null,
+    reported_units: isPiecework
+      ? fieldIfMissing(winner, loser, "reported_units")
+      : null,
+    units_status: isPiecework
+      ? fieldIfMissing(winner, loser, "units_status")
+      : null,
     rate: isPiecework ? fieldIfMissing(winner, loser, "rate") : null,
   };
 }
@@ -69,6 +75,8 @@ export async function migrateWorkplaceLogisticsUnique() {
           is_piecework: merged.is_piecework,
           units_name: merged.units_name,
           units: merged.units,
+          reported_units: merged.reported_units,
+          units_status: merged.units_status,
           rate: merged.rate,
         },
       },

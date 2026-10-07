@@ -1,5 +1,6 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { base44 } from '@/api/base44Client';
+import { showAlert } from '@/components/AppAlert';
 import { useAuth } from '@/lib/AuthContext';
 import { canReportTime } from '@/lib/permissions';
 import { Button } from '@/components/ui/button';
@@ -24,13 +25,19 @@ function calcDuration(start, end) {
   return Math.round(diff / 60 * 100) / 100;
 }
 
-function TimeInput({ value, onChange }) {
+function TimeInput({ value, onChange, dirtyKey, onDirtyChange }) {
   const [local, setLocal] = useState(value);
 
   // Sync if parent changes (e.g. group reset)
   useEffect(() => { setLocal(value); }, [value]);
 
   const dirty = local !== value;
+
+  useEffect(() => {
+    if (!dirtyKey || !onDirtyChange) return undefined;
+    onDirtyChange(dirtyKey, dirty);
+    return () => onDirtyChange(dirtyKey, false);
+  }, [dirty, dirtyKey, onDirtyChange]);
 
   const handleChange = (e) => {
     setLocal(e.target.value);
@@ -61,7 +68,7 @@ function TimeInput({ value, onChange }) {
   );
 }
 
-function WorkplaceGroup({ workplace, students, times, overrides, onGroupTimeChange, onOverrideChange, logistics, date }) {
+function WorkplaceGroup({ workplace, students, times, overrides, onGroupTimeChange, onOverrideChange, onDirtyChange, logistics, date }) {
   const [collapsed, setCollapsed] = useState(true);
   const groupStart = times[workplace.id]?.start ?? DEFAULT_START;
   const groupEnd = times[workplace.id]?.end ?? DEFAULT_END;
@@ -90,13 +97,25 @@ function WorkplaceGroup({ workplace, students, times, overrides, onGroupTimeChan
                 workplaceId={workplace.id}
                 logistics={logistics}
                 unitsName={logistics?.units_name || ""}
+                dirtyKey={`qty:${workplace.id}`}
+                onDirtyChange={onDirtyChange}
               />
             </>
           )}
           <span className="text-xs text-muted-foreground">כניסה:</span>
-          <TimeInput value={groupStart} onChange={v => onGroupTimeChange(workplace.id, 'start', v)} />
+          <TimeInput
+            value={groupStart}
+            dirtyKey={`group:${workplace.id}:start`}
+            onDirtyChange={onDirtyChange}
+            onChange={v => onGroupTimeChange(workplace.id, 'start', v)}
+          />
           <span className="text-xs text-muted-foreground">יציאה:</span>
-          <TimeInput value={groupEnd} onChange={v => onGroupTimeChange(workplace.id, 'end', v)} />
+          <TimeInput
+            value={groupEnd}
+            dirtyKey={`group:${workplace.id}:end`}
+            onDirtyChange={onDirtyChange}
+            onChange={v => onGroupTimeChange(workplace.id, 'end', v)}
+          />
           {duration !== null && (
             <span className="text-xs font-mono font-semibold text-foreground bg-secondary px-2 py-1 rounded-md">
               {duration.toFixed(2)} שע'
@@ -105,8 +124,8 @@ function WorkplaceGroup({ workplace, students, times, overrides, onGroupTimeChan
         </div>
       </div>
 
-      {/* Student rows */}
-      {!collapsed && (
+      {/* Student rows stay mounted while collapsed so an unconfirmed time still blocks submit */}
+      <div className={collapsed ? 'hidden' : undefined}>
         <table className="w-full text-sm">
           <tbody className="divide-y divide-border">
             {students.map(a => {
@@ -123,11 +142,15 @@ function WorkplaceGroup({ workplace, students, times, overrides, onGroupTimeChan
                     <div className="flex items-center gap-2 flex-wrap">
                       <TimeInput
                         value={effectiveStart}
+                        dirtyKey={`student:${a.id}:start`}
+                        onDirtyChange={onDirtyChange}
                         onChange={v => onOverrideChange(a.id, 'start', v, groupStart, groupEnd)}
                       />
                       <span className="text-xs text-muted-foreground">—</span>
                       <TimeInput
                         value={effectiveEnd}
+                        dirtyKey={`student:${a.id}:end`}
+                        onDirtyChange={onDirtyChange}
                         onChange={v => onOverrideChange(a.id, 'end', v, groupStart, groupEnd)}
                       />
                       {dur !== null && (
@@ -153,7 +176,7 @@ function WorkplaceGroup({ workplace, students, times, overrides, onGroupTimeChan
             })}
           </tbody>
         </table>
-      )}
+      </div>
     </div>
   );
 }
@@ -177,6 +200,12 @@ export default function TimeReporting() {
   const [progress, setProgress] = useState(0);
   const [progressLabel, setProgressLabel] = useState('');
   const [timeError, setTimeError] = useState('');
+  const dirtyKeysRef = useRef(new Set());
+  const handleDirtyChange = useCallback((key, dirty) => {
+    const keys = dirtyKeysRef.current;
+    if (dirty) keys.add(key);
+    else keys.delete(key);
+  }, []);
 
   const submitted = !!localStorage.getItem(SUBMITTED_KEY(selectedDate));
 
@@ -270,6 +299,11 @@ export default function TimeReporting() {
   };
 
   const handleSubmit = async () => {
+    if (dirtyKeysRef.current.size > 0) {
+      await showAlert('לא ניתן לשלוח את הדיווח כי יש שינויים שלא אושרו.');
+      return;
+    }
+
     setSaving(true);
     setProgress(0);
     setProgressLabel('טוען נתונים קיימים...');
@@ -298,6 +332,18 @@ export default function TimeReporting() {
         const { a, groupStart, groupEnd, ov } = ops[i];
         const start_time = ov?.start ?? groupStart;
         const end_time = ov?.end ?? groupEnd;
+        const existingKey = `${a.student_id}|${a.workplace_id}`;
+        const existingReport = existingByStudentWorkplace[existingKey];
+        const isDefault = start_time === DEFAULT_START && end_time === DEFAULT_END;
+        const unchanged = existingReport
+          && existingReport.start_time === start_time
+          && existingReport.end_time === end_time;
+
+        if ((!existingReport && isDefault) || unchanged) {
+          setProgress(Math.round(((i + 1) / total) * 100));
+          continue;
+        }
+
         const data = {
           date: selectedDate,
           student_id: a.student_id,
@@ -309,9 +355,8 @@ export default function TimeReporting() {
           status: 'ממתין',
         };
 
-        const existingKey = `${a.student_id}|${a.workplace_id}`;
-        if (existingByStudentWorkplace[existingKey]) {
-          await base44.entities.TimeReport.update(existingByStudentWorkplace[existingKey].id, data);
+        if (existingReport) {
+          await base44.entities.TimeReport.update(existingReport.id, data);
         } else {
           await base44.entities.TimeReport.create(data);
         }
@@ -497,9 +542,19 @@ export default function TimeReporting() {
                       <div className="text-xs text-muted-foreground">{a.workplace_name}</div>
                     </div>
                     <div className="flex items-center gap-2 flex-wrap">
-                      <TimeInput value={effectiveStart} onChange={v => handleOverrideChange(a.id, 'start', v, groupStart, groupEnd)} />
+                      <TimeInput
+                        value={effectiveStart}
+                        dirtyKey={`search:${a.id}:start`}
+                        onDirtyChange={handleDirtyChange}
+                        onChange={v => handleOverrideChange(a.id, 'start', v, groupStart, groupEnd)}
+                      />
                       <span className="text-xs">—</span>
-                      <TimeInput value={effectiveEnd} onChange={v => handleOverrideChange(a.id, 'end', v, groupStart, groupEnd)} />
+                      <TimeInput
+                        value={effectiveEnd}
+                        dirtyKey={`search:${a.id}:end`}
+                        onDirtyChange={handleDirtyChange}
+                        onChange={v => handleOverrideChange(a.id, 'end', v, groupStart, groupEnd)}
+                      />
                       {dur !== null && <span className="text-xs font-mono text-muted-foreground">{dur.toFixed(2)} שע'</span>}
                       {ov && (
                         <button onClick={() => handleOverrideChange(a.id, null, null, null, null)}
@@ -548,6 +603,7 @@ export default function TimeReporting() {
                 overrides={overrides}
                 onGroupTimeChange={handleGroupTimeChange}
                 onOverrideChange={handleOverrideChange}
+                onDirtyChange={handleDirtyChange}
                 logistics={logisticsMap[wpId]}
                 date={selectedDate}
               />

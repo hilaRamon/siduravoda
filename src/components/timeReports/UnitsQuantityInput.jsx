@@ -11,28 +11,50 @@ export default function UnitsQuantityInput({
   logistics,
   unitsName = "",
   compact = false,
+  dirtyKey,
+  onDirtyChange,
+  showSave = true,
+  disabled = false,
+  onValueChange,
 }) {
   const [value, setValue] = useState(
-    logistics?.units != null ? String(logistics.units) : "",
+    logistics?.reported_units != null ? String(logistics.reported_units) : "",
   );
   const createLogistics = useCreateWorkplaceLogistics();
   const updateLogistics = useUpdateWorkplaceLogistics();
 
   useEffect(() => {
-    setValue(logistics?.units != null ? String(logistics.units) : "");
-  }, [logistics?.units, logistics?.id]);
+    setValue(
+      logistics?.reported_units != null ? String(logistics.reported_units) : "",
+    );
+  }, [logistics?.reported_units, logistics?.id]);
 
   const dirty =
-    String(value) !== String(logistics?.units ?? "");
+    String(value) !== String(logistics?.reported_units ?? "");
   const saving = createLogistics.isPending || updateLogistics.isPending;
+  const locked = disabled || saving;
+
+  useEffect(() => {
+    if (!onValueChange) return undefined;
+    const parsed = value === "" ? null : Number(value);
+    onValueChange(parsed == null || !Number.isFinite(parsed) ? null : parsed);
+    return undefined;
+  }, [value, onValueChange]);
+
+  useEffect(() => {
+    if (!dirtyKey || !onDirtyChange) return undefined;
+    onDirtyChange(dirtyKey, dirty);
+    return () => onDirtyChange(dirtyKey, false);
+  }, [dirty, dirtyKey, onDirtyChange]);
 
   const handleSave = async () => {
     const parsed = value === "" ? null : Number(value);
-    const units = parsed == null || !Number.isFinite(parsed) ? null : parsed;
+    const reported_units =
+      parsed == null || !Number.isFinite(parsed) ? null : parsed;
     if (logistics?.id) {
       await updateLogistics.mutateAsync({
         id: logistics.id,
-        data: { units },
+        data: { reported_units, units_status: "ממתין" },
         date,
       });
       return;
@@ -41,7 +63,8 @@ export default function UnitsQuantityInput({
       date,
       workplace_id: workplaceId,
       is_piecework: true,
-      units,
+      reported_units,
+      units_status: "ממתין",
     });
   };
 
@@ -52,7 +75,7 @@ export default function UnitsQuantityInput({
         value={value}
         onChange={(e) => setValue(e.target.value)}
         placeholder={unitsName || "כמות"}
-        disabled={saving}
+        disabled={locked}
         className={`border rounded-md px-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary bg-card ${
           compact ? "h-7 w-24 text-xs" : "h-9 w-28"
         } ${dirty ? "border-primary ring-1 ring-primary/40" : "border-border"}`}
@@ -64,9 +87,10 @@ export default function UnitsQuantityInput({
           {unitsName}
         </span>
       ) : null}
+      {showSave ? (
       <button
         onClick={handleSave}
-        disabled={saving}
+        disabled={locked}
         className={`flex items-center justify-center rounded-md transition-colors shrink-0 ${
           compact ? "h-7 w-7" : "h-9 w-9"
         } ${dirty ? "bg-primary text-white hover:bg-primary/90" : "bg-secondary text-muted-foreground hover:bg-secondary/80"} disabled:opacity-70`}
@@ -79,6 +103,7 @@ export default function UnitsQuantityInput({
           <Check size={compact ? 13 : 15} />
         )}
       </button>
+      ) : null}
     </div>
   );
 }

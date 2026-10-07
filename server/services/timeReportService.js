@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
 import Assignment from "../models/Assignment.js";
 import { getModel } from "../models/index.js";
-import { calcDuration, isCustomHours } from "../lib/timeReportHours.js";
+import { calcDuration } from "../lib/timeReportHours.js";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const STATUSES = new Set(["אושר", "נדחה"]);
@@ -22,10 +22,9 @@ function hoursKey(date, studentId, workplaceId) {
   return `${date}|${studentId}|${workplaceId}`;
 }
 
-async function applyCustomHours(reports) {
+async function applyReportHours(reports) {
   const hoursByKey = new Map();
   for (const report of reports) {
-    if (!isCustomHours(report)) continue;
     const duration = calcDuration(report.start_time, report.end_time);
     if (duration === null) continue;
     hoursByKey.set(
@@ -105,7 +104,7 @@ export async function bulkUpdateTimeReportStatus({ ids, status } = {}) {
   }
 
   if (status === "אושר") {
-    await applyCustomHours(reports);
+    await applyReportHours(reports);
   }
 
   const updated = await setReportStatus(
@@ -127,7 +126,7 @@ export async function approveTimeReportsForDate(date) {
     return { updated: 0 };
   }
 
-  await applyCustomHours(reports);
+  await applyReportHours(reports);
   const updated = await setReportStatus(
     reports.map((report) => report._id),
     "אושר",

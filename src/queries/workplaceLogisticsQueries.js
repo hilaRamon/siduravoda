@@ -4,9 +4,11 @@ import { workplaceLogisticsApi } from "@/api/workplaceLogisticsApi";
 export const workplaceLogisticsKeys = {
   all: ["workplace-logistics"],
   byDate: (date) => [...workplaceLogisticsKeys.all, date],
+  pendingUnits: () => [...workplaceLogisticsKeys.all, "pending-units"],
 };
 
 function invalidateWorkplaceLogisticsQueries(queryClient, date) {
+  queryClient.invalidateQueries({ queryKey: workplaceLogisticsKeys.pendingUnits() });
   if (date) {
     queryClient.invalidateQueries({ queryKey: workplaceLogisticsKeys.byDate(date) });
     queryClient.invalidateQueries({ queryKey: ["assignments", date] });
@@ -80,6 +82,15 @@ export function useWorkplaceLogisticsByDate(date, options = {}) {
     queryKey: workplaceLogisticsKeys.byDate(date),
     queryFn: ({ signal }) => workplaceLogisticsApi.list({ date }, { signal }),
     enabled: !!date,
+    ...options,
+  });
+}
+
+export function usePendingPieceworkQuantities(options = {}) {
+  return useQuery({
+    queryKey: workplaceLogisticsKeys.pendingUnits(),
+    queryFn: ({ signal }) =>
+      workplaceLogisticsApi.list({ units_status: "ממתין" }, { signal }),
     ...options,
   });
 }

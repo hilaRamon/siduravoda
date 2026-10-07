@@ -14,6 +14,11 @@ const workplaceLogisticsSchema = new mongoose.Schema(
     is_piecework: { type: Boolean, default: false },
     units_name: { type: String },
     units: { type: Number },
+    reported_units: { type: Number },
+    units_status: {
+      type: String,
+      enum: ["ממתין", "אושר", "נדחה", null],
+    },
     rate: { type: Number },
   },
   baseSchemaOptions,
