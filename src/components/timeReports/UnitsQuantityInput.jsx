@@ -5,6 +5,16 @@ import {
   useUpdateWorkplaceLogistics,
 } from "@/queries/workplaceLogisticsQueries";
 
+function parseQuantity(raw) {
+  if (raw === "" || raw == null) return null;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function quantityToInput(quantity) {
+  return quantity != null ? String(quantity) : "";
+}
+
 export default function UnitsQuantityInput({
   date,
   workplaceId,
@@ -16,28 +26,30 @@ export default function UnitsQuantityInput({
   showSave = true,
   disabled = false,
   onValueChange = undefined,
+  committedValue = undefined,
+  onCommit = undefined,
 }) {
-  const [value, setValue] = useState(
-    logistics?.reported_units != null ? String(logistics.reported_units) : "",
-  );
+  const localCommit = typeof onCommit === "function";
+  const baseline = localCommit
+    ? (committedValue ?? null)
+    : (logistics?.reported_units ?? null);
+  const [value, setValue] = useState(quantityToInput(baseline));
   const createLogistics = useCreateWorkplaceLogistics();
   const updateLogistics = useUpdateWorkplaceLogistics();
 
   useEffect(() => {
-    setValue(
-      logistics?.reported_units != null ? String(logistics.reported_units) : "",
-    );
-  }, [logistics?.reported_units, logistics?.id]);
+    setValue(quantityToInput(baseline));
+  }, [baseline, logistics?.id]);
 
-  const dirty =
-    String(value) !== String(logistics?.reported_units ?? "");
-  const saving = createLogistics.isPending || updateLogistics.isPending;
+  const dirty = parseQuantity(value) !== baseline;
+  const saving = localCommit
+    ? false
+    : createLogistics.isPending || updateLogistics.isPending;
   const locked = disabled || saving;
 
   useEffect(() => {
     if (!onValueChange) return undefined;
-    const parsed = value === "" ? null : Number(value);
-    onValueChange(parsed == null || !Number.isFinite(parsed) ? null : parsed);
+    onValueChange(parseQuantity(value));
     return undefined;
   }, [value, onValueChange]);
 
@@ -48,9 +60,11 @@ export default function UnitsQuantityInput({
   }, [dirty, dirtyKey, onDirtyChange]);
 
   const handleSave = async () => {
-    const parsed = value === "" ? null : Number(value);
-    const reported_units =
-      parsed == null || !Number.isFinite(parsed) ? null : parsed;
+    const reported_units = parseQuantity(value);
+    if (localCommit) {
+      onCommit(reported_units);
+      return;
+    }
     if (logistics?.id) {
       await updateLogistics.mutateAsync({
         id: logistics.id,

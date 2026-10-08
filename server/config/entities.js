@@ -44,25 +44,6 @@ export const entityDefinitions = {
       last_backup_filename: { type: String },
     },
   },
-  TimeReport: {
-    required: ["date", "student_id", "workplace_id"],
-    schema: {
-      date: { type: String, required: true },
-      student_id: { type: String, required: true },
-      student_name: { type: String },
-      workplace_id: { type: String, required: true },
-      workplace_name: { type: String },
-      start_time: { type: String },
-      end_time: { type: String },
-      status: {
-        type: String,
-        enum: ["ממתין", "אושר", "נדחה"],
-        default: "ממתין",
-      },
-      notes: { type: String },
-    },
-    indexes: [{ fields: { date: 1, student_id: 1 } }],
-  },
   AppSettings: {
     required: [],
     schema: {

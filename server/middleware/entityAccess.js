@@ -36,12 +36,6 @@ export function checkEntityAccess(req, res, next) {
 
   // Reporter-only users get limited access
   if (isReporterOnly(req.user)) {
-    if (entityName === "TimeReport") {
-      if (method === "DELETE") {
-        return res.status(403).json({ message: "Forbidden" });
-      }
-      return next();
-    }
     if (REPORTER_READ_ENTITIES.has(entityName) && isReadMethod(method)) {
       return next();
     }
