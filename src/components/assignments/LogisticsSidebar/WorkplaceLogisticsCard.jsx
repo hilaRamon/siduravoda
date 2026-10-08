@@ -14,6 +14,7 @@ export default function WorkplaceLogisticsCard({
   logistics,
   allLogistics,
   onSave,
+  saving = false,
 }) {
   const [expanded, setExpanded] = useState(false);
 
@@ -151,7 +152,11 @@ export default function WorkplaceLogisticsCard({
               />
             </div>
             {isPiecework && (
-              <PieceworkFields localData={localData} onPersist={persist} />
+              <PieceworkFields
+                localData={localData}
+                onPersist={persist}
+                saving={saving}
+              />
             )}
           </div>
 

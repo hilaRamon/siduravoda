@@ -12,6 +12,7 @@ export default function LogisticsSidebar({ date, assignments }) {
   const createLogistics = useCreateWorkplaceLogistics();
   const updateLogistics = useUpdateWorkplaceLogistics();
 
+  const saving = createLogistics.isPending || updateLogistics.isPending;
   const { logisticsList, logisticsMap } = useLogisticsByWorkplace(date);
   const { workplaces } = useLogisticsWorkplaces(date, assignments);
 
@@ -24,6 +25,7 @@ export default function LogisticsSidebar({ date, assignments }) {
       notes: data.notes,
       is_piecework: Boolean(data.is_piecework),
       units_name: data.is_piecework ? data.units_name || "" : "",
+      units: data.is_piecework ? (data.units ?? null) : null,
       rate: data.is_piecework ? (data.rate ?? null) : null,
     };
     const existing = logisticsMap[workplaceId];
@@ -72,6 +74,7 @@ export default function LogisticsSidebar({ date, assignments }) {
             logistics={logisticsMap[wp.id]}
             allLogistics={logisticsList}
             onSave={handleSave}
+            saving={saving}
           />
         ))}
       </div>
