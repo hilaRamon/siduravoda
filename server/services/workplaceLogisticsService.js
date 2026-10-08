@@ -3,6 +3,7 @@ import { syncAssignmentsPieceworkForWorkplace } from "./assignmentService.js";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const DEFAULT_EXIT_TIME = "06:35";
+const UNITS_STATUSES = new Set(["ממתין", "אושר", "נדחה"]);
 
 const OPTIONAL_ID_FIELDS = [
   "driver_student_id",
@@ -41,6 +42,15 @@ function optionalNumber(value, key) {
     throw new WorkplaceLogisticsError(`${key} must be a number`);
   }
   return num;
+}
+
+function optionalUnitsStatus(value) {
+  if (value === undefined) return undefined;
+  if (value === null || value === "") return null;
+  if (!UNITS_STATUSES.has(value)) {
+    throw new WorkplaceLogisticsError("units_status is invalid");
+  }
+  return value;
 }
 
 function parseBoolean(value) {
@@ -89,6 +99,12 @@ function normalizeInput(body = {}, { partial = false } = {}) {
   const units = optionalNumber(body.units, "units");
   if (units !== undefined) data.units = units;
 
+  const reportedUnits = optionalNumber(body.reported_units, "reported_units");
+  if (reportedUnits !== undefined) data.reported_units = reportedUnits;
+
+  const unitsStatus = optionalUnitsStatus(body.units_status);
+  if (unitsStatus !== undefined) data.units_status = unitsStatus;
+
   const rate = optionalNumber(body.rate, "rate");
   if (rate !== undefined) data.rate = rate;
 
@@ -103,6 +119,8 @@ function normalizeInput(body = {}, { partial = false } = {}) {
     data.units_name = "";
     data.units = null;
     data.rate = null;
+    data.reported_units = null;
+    data.units_status = null;
   }
 
   if (!partial && data.exit_time == null) {
@@ -118,17 +136,22 @@ async function syncPieceworkAssignments(doc) {
 }
 
 export async function listWorkplaceLogistics(query = {}) {
+  const filter = {};
   if (query.date) {
     assertDate(query.date);
-    return workplaceLogisticsRepository.find(
-      { date: query.date },
-      { sort: { created_date: -1 }, limit: 1000 },
-    );
+    filter.date = query.date;
   }
-  return workplaceLogisticsRepository.find(
-    {},
-    { sort: { date: 1, created_date: -1 }, limit: 10000 },
-  );
+  if (query.units_status) {
+    if (!UNITS_STATUSES.has(query.units_status)) {
+      throw new WorkplaceLogisticsError("units_status is invalid");
+    }
+    filter.units_status = query.units_status;
+  }
+  const datedOnly = Boolean(filter.date) && !filter.units_status;
+  return workplaceLogisticsRepository.find(filter, {
+    sort: datedOnly ? { created_date: -1 } : { date: 1, created_date: -1 },
+    limit: datedOnly ? 1000 : 10000,
+  });
 }
 
 export async function getWorkplaceLogistics(id) {
@@ -145,6 +168,9 @@ function mergeCreateIntoExisting(existing, incoming) {
   if (isPiecework) {
     merged.units_name = incoming.units_name || existing.units_name || "";
     merged.units = incoming.units ?? existing.units ?? null;
+    merged.reported_units =
+      incoming.reported_units ?? existing.reported_units ?? null;
+    merged.units_status = incoming.units_status ?? existing.units_status ?? null;
     merged.rate = incoming.rate ?? existing.rate ?? null;
   }
   if (!incoming.exit_time && existing.exit_time) {

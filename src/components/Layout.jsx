@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { usePendingAbsenceCount } from "@/queries/absenceQueries";
 import { usePendingTimeReports } from "@/queries/timeReportQueries";
+import { usePendingPieceworkQuantities } from "@/queries/workplaceLogisticsQueries";
 import { useAuth } from "@/lib/AuthContext";
 import { getVisibleNavItems, isWorkplaceManagerOnly } from "@/lib/permissions";
 import EditProfileModal from "@/components/EditProfileModal";
@@ -43,12 +44,18 @@ export default function Layout() {
     enabled: !workplaceManagerOnly,
   });
 
+  const showTimeReportsNav =
+    !workplaceManagerOnly && navItems.some((n) => n.to === "/time-reports");
   const { data: pendingTimeReports = [] } = usePendingTimeReports({
     sort: "-created_date",
     limit: 100,
-    enabled: !workplaceManagerOnly && navItems.some((n) => n.to === "/time-reports"),
+    enabled: showTimeReportsNav,
   });
-  const pendingTimeReportsCount = pendingTimeReports.length;
+  const { data: pendingQuantities = [] } = usePendingPieceworkQuantities({
+    enabled: showTimeReportsNav,
+  });
+  const pendingTimeReportsCount =
+    pendingTimeReports.length + pendingQuantities.length;
 
   const handleLogout = () => {
     logout().then(() => {

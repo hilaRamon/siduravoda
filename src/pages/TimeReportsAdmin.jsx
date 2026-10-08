@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '@/lib/AuthContext';
 import { canApproveTimeReports } from '@/lib/permissions';
 import { Button } from '@/components/ui/button';
@@ -6,26 +6,25 @@ import { CheckCircle2, XCircle, Clock, CalendarDays, Building2, User, Loader2 } 
 import { format } from 'date-fns';
 import { useAssignments } from '@/queries/assignmentQueries';
 import {
-  useApproveTimeReportDate,
   useBulkTimeReportStatus,
   usePendingTimeReports,
   useTimeReportsByDate,
 } from '@/queries/timeReportQueries';
+import {
+  usePendingPieceworkQuantities,
+  useUpdateWorkplaceLogistics,
+} from '@/queries/workplaceLogisticsQueries';
 import { useLogisticsByWorkplace } from '@/hooks/assignments/useLogisticsByWorkplace';
 import UnitsQuantityInput from '@/components/timeReports/UnitsQuantityInput';
+
+const DEFAULT_START = '07:00';
+const DEFAULT_END = '11:45';
 
 const STATUS_STYLES = {
   'ממתין': 'bg-yellow-100 text-yellow-700',
   'אושר': 'bg-green-100 text-green-700',
   'נדחה': 'bg-red-100 text-red-700',
 };
-
-const DEFAULT_START = '07:00';
-const DEFAULT_END = '11:45';
-
-function isCustomHours(report) {
-  return report.start_time !== DEFAULT_START || report.end_time !== DEFAULT_END;
-}
 
 function calcDuration(start, end) {
   if (!start || !end) return null;
@@ -57,6 +56,67 @@ function ActionButtons({ report, onStatus, pending, pendingStatus }) {
       >
         {pendingStatus === 'נדחה' ? <Loader2 size={13} className="animate-spin" /> : <XCircle size={13} />} דחה
       </Button>
+    </div>
+  );
+}
+
+function QuantityActions({ onApprove, onReject, pending, pendingStatus, reportedUnits }) {
+  const approveDisabled = pending || reportedUnits == null;
+  return (
+    <div className="flex gap-1">
+      <Button
+        size="sm"
+        variant="outline"
+        className="h-7 text-xs gap-1 text-green-600 border-green-300 hover:bg-green-50"
+        onClick={onApprove}
+        disabled={approveDisabled}
+      >
+        {pendingStatus === 'אושר' ? <Loader2 size={13} className="animate-spin" /> : <CheckCircle2 size={13} />} אשר כמות
+      </Button>
+      <Button
+        size="sm"
+        variant="outline"
+        className="h-7 text-xs gap-1 text-red-500 border-red-300 hover:bg-red-50"
+        onClick={onReject}
+        disabled={pending}
+      >
+        {pendingStatus === 'נדחה' ? <Loader2 size={13} className="animate-spin" /> : <XCircle size={13} />} דחה כמות
+      </Button>
+    </div>
+  );
+}
+
+function PendingQuantityReview({ logistics, date, workplaceId, onStatus, pending, pendingStatus }) {
+  const saved = logistics?.reported_units ?? null;
+  const [draft, setDraft] = useState(saved);
+
+  useEffect(() => {
+    setDraft(saved);
+  }, [saved, logistics?.id]);
+
+  const showActions = Boolean(logistics?.id && logistics.units_status === 'ממתין');
+
+  return (
+    <div className="flex items-center gap-1 flex-wrap">
+      <UnitsQuantityInput
+        date={date}
+        workplaceId={workplaceId}
+        logistics={logistics}
+        unitsName={logistics?.units_name || ""}
+        compact
+        showSave={!showActions}
+        disabled={pending}
+        onValueChange={showActions ? setDraft : undefined}
+      />
+      {showActions && (
+        <QuantityActions
+          reportedUnits={draft}
+          pending={pending}
+          pendingStatus={pendingStatus}
+          onApprove={() => onStatus(logistics, 'אושר', draft)}
+          onReject={() => onStatus(logistics, 'נדחה', draft)}
+        />
+      )}
     </div>
   );
 }
@@ -100,32 +160,50 @@ export default function TimeReportsAdmin() {
   const readOnly = !canApproveTimeReports(currentUser);
 
   const { data: reports = [], isLoading } = useTimeReportsByDate(selectedDate);
+  const { data: assignments = [], isLoading: assignmentsLoading } = useAssignments(selectedDate);
   const { logisticsMap } = useLogisticsByWorkplace(selectedDate);
-  const { data: assignments = [] } = useAssignments(selectedDate);
   const statusMutation = useBulkTimeReportStatus();
-  const approveDateMutation = useApproveTimeReportDate();
+  const quantityMutation = useUpdateWorkplaceLogistics();
 
   // Fetch all pending reports to show which dates have unreviewed items
   const { data: allPending = [] } = usePendingTimeReports({ sort: 'date', limit: 2000 });
+  const { data: pendingQuantities = [] } = usePendingPieceworkQuantities();
 
   const pendingDates = useMemo(() => {
-    const dates = new Set(allPending.map(r => r.date));
-    return [...dates].sort();
-  }, [allPending]);
+    const dates = new Set([
+      ...allPending.map(r => r.date),
+      ...pendingQuantities.map(l => l.date),
+    ]);
+    return [...dates].filter(Boolean).sort();
+  }, [allPending, pendingQuantities]);
 
-  const isPieceworkWorkplace = (workplaceId) =>
-    Boolean(logisticsMap[workplaceId]?.is_piecework);
+  const assignmentByWorkplace = useMemo(() => {
+    const map = {};
+    assignments.forEach((assignment) => {
+      if (!assignment?.workplace_id) return;
+      if (!map[assignment.workplace_id]) {
+        map[assignment.workplace_id] = {
+          workplace_name: assignment.workplace_name || '',
+          studentIds: new Set(),
+        };
+      }
+      if (assignment.workplace_name) {
+        map[assignment.workplace_id].workplace_name = assignment.workplace_name;
+      }
+      if (assignment.student_id) {
+        map[assignment.workplace_id].studentIds.add(assignment.student_id);
+      }
+    });
+    return map;
+  }, [assignments]);
 
-  const changedReports = reports
-    .filter((r) => isCustomHours(r) || isPieceworkWorkplace(r.workplace_id))
-    .sort((a, b) => (a.workplace_name || '').localeCompare(b.workplace_name || '', 'he'));
+  const datedReports = [...reports].sort((a, b) =>
+    (a.workplace_name || '').localeCompare(b.workplace_name || '', 'he'),
+  );
 
-  const hasPendingForDate = reports.some(r => r.status === 'ממתין')
-    || allPending.some(r => r.date === selectedDate);
-
-  const pending = changedReports.filter(r => r.status === 'ממתין');
-  const approved = changedReports.filter(r => r.status === 'אושר');
-  const rejected = changedReports.filter(r => r.status === 'נדחה');
+  const pending = datedReports.filter(r => r.status === 'ממתין');
+  const approved = datedReports.filter(r => r.status === 'אושר');
+  const rejected = datedReports.filter(r => r.status === 'נדחה');
   const tabReports = activeTab === 'ממתין' ? pending : activeTab === 'אושר' ? approved : rejected;
   const { workplaceGroups, individualRows } = useMemo(() => {
     // Group by workplace
@@ -170,28 +248,24 @@ export default function TimeReportsAdmin() {
     });
 
     if (activeTab === 'ממתין') {
-      const groupedIds = new Set(workplaceGroups.map((g) => g.workplace_id));
-      const reportedWpIds = new Set(reports.map((r) => r.workplace_id));
-      const assignmentsByWp = {};
-      assignments.forEach((a) => {
-        if (!assignmentsByWp[a.workplace_id]) assignmentsByWp[a.workplace_id] = [];
-        assignmentsByWp[a.workplace_id].push(a);
-      });
-      Object.entries(logisticsMap).forEach(([wpId, logistics]) => {
-        if (!logistics?.is_piecework || groupedIds.has(wpId) || reportedWpIds.has(wpId)) return;
-        if (logistics.units == null) return;
-        const wpAssignments = assignmentsByWp[wpId] || [];
-        if (wpAssignments.length === 0) return;
+      const groupedIds = new Set(workplaceGroups.map((group) => group.workplace_id));
+      Object.values(logisticsMap).forEach((logistics) => {
+        if (logistics?.units_status !== 'ממתין') return;
+        const workplaceId = logistics.workplace_id;
+        if (!workplaceId || groupedIds.has(workplaceId)) return;
+        const assignment = assignmentByWorkplace[workplaceId];
+        if (!assignment || assignment.studentIds.size === 0) return;
         workplaceGroups.push({
-          workplace_id: wpId,
-          workplace_name: wpAssignments[0]?.workplace_name || '',
+          workplace_id: workplaceId,
+          workplace_name: assignment.workplace_name || 'מקום עבודה',
           representative: {
             start_time: DEFAULT_START,
             end_time: DEFAULT_END,
             status: 'ממתין',
           },
-          studentCount: wpAssignments.length,
+          studentCount: assignment.studentIds.size,
           isUniform: true,
+          quantityOnly: true,
         });
       });
     }
@@ -200,11 +274,21 @@ export default function TimeReportsAdmin() {
     individualRows.sort((a, b) => (a.workplace_name || '').localeCompare(b.workplace_name || '', 'he'));
 
     return { workplaceGroups, individualRows };
-  }, [tabReports, activeTab, assignments, logisticsMap, reports]);
+  }, [tabReports, activeTab, logisticsMap, assignmentByWorkplace]);
 
   const showUnitsColumn = workplaceGroups.some(
-    (g) => logisticsMap[g.workplace_id]?.is_piecework,
+    (g) => g.quantityOnly || logisticsMap[g.workplace_id]?.is_piecework,
   );
+
+  const pendingQuantityOnlyCount = useMemo(() => {
+    const pendingWorkplaces = new Set(pending.map((report) => report.workplace_id));
+    return Object.values(logisticsMap).filter((logistics) => {
+      if (logistics?.units_status !== 'ממתין') return false;
+      if (pendingWorkplaces.has(logistics.workplace_id)) return false;
+      const assignment = assignmentByWorkplace[logistics.workplace_id];
+      return Boolean(assignment && assignment.studentIds.size > 0);
+    }).length;
+  }, [logisticsMap, pending, assignmentByWorkplace]);
 
   const handleStatus = (report, status) => {
     statusMutation.mutate({
@@ -227,23 +311,21 @@ export default function TimeReportsAdmin() {
     });
   };
 
-  const handleApproveDate = () => {
-    const pendingCustomIds = new Set([
-      ...reports.filter(r => r.status === 'ממתין' && isCustomHours(r)).map(r => r.id),
-      ...allPending.filter(r => r.date === selectedDate && isCustomHours(r)).map(r => r.id),
-    ]);
-    if (pendingCustomIds.size > 0) {
-      const confirmed = confirm(
-        `יש ${pendingCustomIds.size} דיווחים עם שעות חריגות שעדיין לא אושרו. אישור התאריך יאשר גם אותם. להמשיך?`,
-      );
-      if (!confirmed) return;
-    }
-
-    approveDateMutation.mutate(selectedDate);
+  const handleQuantityStatus = (logistics, status, reportedUnits) => {
+    if (!logistics?.id) return;
+    const data = status === 'אושר'
+      ? { units: reportedUnits, reported_units: reportedUnits, units_status: 'אושר' }
+      : { units_status: 'נדחה' };
+    quantityMutation.mutate({
+      id: logistics.id,
+      date: selectedDate,
+      data,
+      workplaceId: logistics.workplace_id,
+    });
   };
 
   const tabs = [
-    { key: 'ממתין', label: 'ממתינים', count: pending.length, color: 'text-yellow-600', icon: Clock },
+    { key: 'ממתין', label: 'ממתינים', count: pending.length + pendingQuantityOnlyCount, color: 'text-yellow-600', icon: Clock },
     { key: 'אושר', label: 'אושרו', count: approved.length, color: 'text-green-600', icon: CheckCircle2 },
     { key: 'נדחה', label: 'נדחו', count: rejected.length, color: 'text-red-500', icon: XCircle },
   ];
@@ -284,17 +366,6 @@ export default function TimeReportsAdmin() {
               onChange={e => setSelectedDate(e.target.value)}
               className="border border-border rounded-lg px-3 py-2 text-sm bg-card focus:outline-none focus:ring-2 focus:ring-primary/30"
             />
-            {!readOnly && hasPendingForDate && (
-              <Button
-                size="sm"
-                className="h-9 gap-1.5 bg-green-600 hover:bg-green-700 text-white"
-                onClick={handleApproveDate}
-                disabled={approveDateMutation.isPending}
-              >
-                <CheckCircle2 size={15} />
-                {approveDateMutation.isPending ? 'מאשר...' : 'אשר את כל התאריך'}
-              </Button>
-            )}
           </div>
           {pendingDates.length > 0 && (
             <div className="flex items-center gap-2 flex-wrap justify-end">
@@ -340,7 +411,7 @@ export default function TimeReportsAdmin() {
         ))}
       </div>
 
-      {isLoading ? (
+      {isLoading || assignmentsLoading ? (
         <div className="space-y-3">
           {[1,2,3,4].map(i => <div key={i} className="h-16 bg-secondary rounded-xl animate-pulse" />)}
         </div>
@@ -348,8 +419,8 @@ export default function TimeReportsAdmin() {
         <div className="text-center py-16 text-muted-foreground">
           <Clock size={48} className="mx-auto mb-3 opacity-30" />
           <p>
-            {changedReports.length === 0
-              ? (reports.length > 0 ? 'אין שינויים מהברירת מחדל לתאריך זה' : 'אין דיווחים לתאריך זה')
+            {reports.length === 0
+              ? 'אין דיווחים לתאריך זה'
               : `אין רשומות ב"${activeTab === 'ממתין' ? 'ממתינים' : activeTab === 'אושר' ? 'אושרו' : 'נדחו'}"`
             }
           </p>
@@ -382,12 +453,15 @@ export default function TimeReportsAdmin() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
-                    {workplaceGroups.map(({ workplace_id, workplace_name, representative, studentCount, isUniform }) => {
+                    {workplaceGroups.map(({ workplace_id, workplace_name, representative, studentCount, isUniform, quantityOnly }) => {
                       const duration = calcDuration(representative.start_time, representative.end_time);
                       const logistics = logisticsMap[workplace_id];
-                      const isPiecework = Boolean(logistics?.is_piecework);
+                      const isPiecework = Boolean(logistics?.is_piecework) || quantityOnly;
+                      const canEditQuantity = !readOnly && activeTab === 'ממתין' && isPiecework;
                       const workplacePending = statusMutation.isPending && statusMutation.variables?.workplaceId === workplace_id;
                       const workplacePendingStatus = workplacePending ? statusMutation.variables?.status : null;
+                      const quantityPending = quantityMutation.isPending && quantityMutation.variables?.workplaceId === workplace_id;
+                      const quantityPendingStatus = quantityPending ? quantityMutation.variables?.data?.units_status : null;
                       return (
                         <tr key={workplace_id} className="hover:bg-secondary/20 transition-colors">
                           <td className="px-4 py-3 font-semibold text-base">{workplace_name}</td>
@@ -406,20 +480,23 @@ export default function TimeReportsAdmin() {
                           </td>
                           {showUnitsColumn && (
                           <td className="px-4 py-3">
-                            {isPiecework && activeTab === 'ממתין' && !readOnly ? (
-                              <UnitsQuantityInput
-                                date={selectedDate}
-                                workplaceId={workplace_id}
-                                logistics={logistics}
-                                unitsName={logistics?.units_name || ""}
-                                compact
-                              />
-                            ) : isPiecework ? (
-                              <span className="font-mono text-sm">
-                                {logistics?.units != null
-                                  ? `${logistics.units}${logistics.units_name ? ` ${logistics.units_name}` : ""}`
-                                  : "—"}
-                              </span>
+                            {isPiecework ? (
+                              canEditQuantity ? (
+                                <PendingQuantityReview
+                                  logistics={logistics}
+                                  date={selectedDate}
+                                  workplaceId={workplace_id}
+                                  onStatus={handleQuantityStatus}
+                                  pending={quantityPending}
+                                  pendingStatus={quantityPendingStatus}
+                                />
+                              ) : (
+                                <span className="font-mono text-sm">
+                                  {logistics?.units != null
+                                    ? `${logistics.units}${logistics.units_name ? ` ${logistics.units_name}` : ""}`
+                                    : "—"}
+                                </span>
+                              )
                             ) : (
                               <span className="text-muted-foreground">—</span>
                             )}
@@ -427,7 +504,7 @@ export default function TimeReportsAdmin() {
                           )}
                           <td className="px-4 py-3"><StatusBadge status={representative.status} /></td>
                           <td className="px-4 py-3">
-                           {!readOnly && (
+                           {!readOnly && !quantityOnly && (
                              <div className="flex gap-1 justify-end">
                                <Button
                                  size="sm"

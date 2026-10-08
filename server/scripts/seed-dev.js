@@ -16,6 +16,7 @@ import PublishedSchedule from "../models/PublishedSchedule.js";
 import AbsenceRequest from "../models/AbsenceRequest.js";
 import FarmerRequest from "../models/FarmerRequest.js";
 import WorkplaceLogistics from "../models/WorkplaceLogistics.js";
+import TimeReport from "../models/TimeReport.js";
 import Vehicle from "../models/Vehicle.js";
 import { hashPassword } from "../lib/password.js";
 import { ROLES } from "../config/permissions.js";
@@ -380,7 +381,7 @@ async function resetOperationalData() {
     FarmerRequest.deleteMany({}),
     getModel("Workplace").deleteMany({}),
     WorkplaceLogistics.deleteMany({}),
-    getModel("TimeReport").deleteMany({}),
+    TimeReport.deleteMany({}),
     getModel("AppSettings").deleteMany({}),
     getModel("Role").deleteMany({}),
     Vehicle.deleteMany({}),
@@ -693,7 +694,6 @@ async function main() {
     );
   }
 
-  const TimeReport = getModel("TimeReport");
   const reportDate = lastWorkDayOnOrBefore(today);
   const reportAssignments = await Assignment.find({
     date: reportDate,

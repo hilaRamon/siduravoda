@@ -1,13 +1,17 @@
-import { useState, useEffect, useMemo } from 'react';
-import { base44 } from '@/api/base44Client';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { showAlert } from '@/components/AppAlert';
 import { useAuth } from '@/lib/AuthContext';
 import { canReportTime } from '@/lib/permissions';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { format } from 'date-fns';
 import { Send, Clock, CheckCircle2, ChevronDown, ChevronUp, Search, CalendarDays, Check, ChevronRight, ChevronLeft, ShieldOff, LogOut } from 'lucide-react';
+import { timeReportApi } from '@/api/timeReportApi';
 import { useAssignments } from '@/queries/assignmentQueries';
+import { timeReportKeys } from '@/queries/timeReportQueries';
 import { useLogisticsByWorkplace } from '@/hooks/assignments/useLogisticsByWorkplace';
+import { useUpdateWorkplaceLogistics } from '@/queries/workplaceLogisticsQueries';
 import UnitsQuantityInput from '@/components/timeReports/UnitsQuantityInput';
 
 const DEFAULT_START = '07:00';
@@ -24,13 +28,19 @@ function calcDuration(start, end) {
   return Math.round(diff / 60 * 100) / 100;
 }
 
-function TimeInput({ value, onChange }) {
+function TimeInput({ value, onChange, dirtyKey, onDirtyChange }) {
   const [local, setLocal] = useState(value);
 
   // Sync if parent changes (e.g. group reset)
   useEffect(() => { setLocal(value); }, [value]);
 
   const dirty = local !== value;
+
+  useEffect(() => {
+    if (!dirtyKey || !onDirtyChange) return undefined;
+    onDirtyChange(dirtyKey, dirty);
+    return () => onDirtyChange(dirtyKey, false);
+  }, [dirty, dirtyKey, onDirtyChange]);
 
   const handleChange = (e) => {
     setLocal(e.target.value);
@@ -61,12 +71,25 @@ function TimeInput({ value, onChange }) {
   );
 }
 
-function WorkplaceGroup({ workplace, students, times, overrides, onGroupTimeChange, onOverrideChange, logistics, date }) {
+function sameQuantity(saved, committed) {
+  if (saved == null && committed == null) return true;
+  if (saved == null || committed == null) return false;
+  return Number(saved) === Number(committed);
+}
+
+function WorkplaceGroup({ workplace, students, times, overrides, quantityByWorkplace, onGroupTimeChange, onOverrideChange, onQuantityCommit, onDirtyChange, logistics, date }) {
   const [collapsed, setCollapsed] = useState(true);
   const groupStart = times[workplace.id]?.start ?? DEFAULT_START;
   const groupEnd = times[workplace.id]?.end ?? DEFAULT_END;
   const duration = calcDuration(groupStart, groupEnd);
   const isPiecework = Boolean(logistics?.is_piecework || students.some((s) => s.is_piecework));
+  const hasLocalQuantity = Object.prototype.hasOwnProperty.call(
+    quantityByWorkplace,
+    workplace.id,
+  );
+  const committedQuantity = hasLocalQuantity
+    ? quantityByWorkplace[workplace.id]
+    : (logistics?.reported_units ?? null);
 
   return (
     <div className="bg-card border border-border rounded-2xl overflow-hidden mb-3 shadow-sm">
@@ -90,13 +113,27 @@ function WorkplaceGroup({ workplace, students, times, overrides, onGroupTimeChan
                 workplaceId={workplace.id}
                 logistics={logistics}
                 unitsName={logistics?.units_name || ""}
+                dirtyKey={`qty:${workplace.id}`}
+                onDirtyChange={onDirtyChange}
+                committedValue={committedQuantity}
+                onCommit={(value) => onQuantityCommit(workplace.id, value)}
               />
             </>
           )}
           <span className="text-xs text-muted-foreground">כניסה:</span>
-          <TimeInput value={groupStart} onChange={v => onGroupTimeChange(workplace.id, 'start', v)} />
+          <TimeInput
+            value={groupStart}
+            dirtyKey={`group:${workplace.id}:start`}
+            onDirtyChange={onDirtyChange}
+            onChange={v => onGroupTimeChange(workplace.id, 'start', v)}
+          />
           <span className="text-xs text-muted-foreground">יציאה:</span>
-          <TimeInput value={groupEnd} onChange={v => onGroupTimeChange(workplace.id, 'end', v)} />
+          <TimeInput
+            value={groupEnd}
+            dirtyKey={`group:${workplace.id}:end`}
+            onDirtyChange={onDirtyChange}
+            onChange={v => onGroupTimeChange(workplace.id, 'end', v)}
+          />
           {duration !== null && (
             <span className="text-xs font-mono font-semibold text-foreground bg-secondary px-2 py-1 rounded-md">
               {duration.toFixed(2)} שע'
@@ -105,8 +142,8 @@ function WorkplaceGroup({ workplace, students, times, overrides, onGroupTimeChan
         </div>
       </div>
 
-      {/* Student rows */}
-      {!collapsed && (
+      {/* Student rows stay mounted while collapsed so an unconfirmed time still blocks submit */}
+      <div className={collapsed ? 'hidden' : undefined}>
         <table className="w-full text-sm">
           <tbody className="divide-y divide-border">
             {students.map(a => {
@@ -123,11 +160,15 @@ function WorkplaceGroup({ workplace, students, times, overrides, onGroupTimeChan
                     <div className="flex items-center gap-2 flex-wrap">
                       <TimeInput
                         value={effectiveStart}
+                        dirtyKey={`student:${a.id}:start`}
+                        onDirtyChange={onDirtyChange}
                         onChange={v => onOverrideChange(a.id, 'start', v, groupStart, groupEnd)}
                       />
                       <span className="text-xs text-muted-foreground">—</span>
                       <TimeInput
                         value={effectiveEnd}
+                        dirtyKey={`student:${a.id}:end`}
+                        onDirtyChange={onDirtyChange}
                         onChange={v => onOverrideChange(a.id, 'end', v, groupStart, groupEnd)}
                       />
                       {dur !== null && (
@@ -153,7 +194,7 @@ function WorkplaceGroup({ workplace, students, times, overrides, onGroupTimeChan
             })}
           </tbody>
         </table>
-      )}
+      </div>
     </div>
   );
 }
@@ -167,23 +208,33 @@ function changeDate(dateStr, delta) {
 export default function TimeReporting() {
   const today = format(new Date(), 'yyyy-MM-dd');
 
+  const queryClient = useQueryClient();
   const { user: currentUser, isLoadingAuth: loadingUser, logout } = useAuth();
   const hasAccess = canReportTime(currentUser);
   const [selectedDate, setSelectedDate] = useState(today);
   const [groupTimes, setGroupTimes] = useState({}); // { workplaceId: { start, end } }
   const [overrides, setOverrides] = useState({});   // { studentId: { start, end } }
+  const [quantityByWorkplace, setQuantityByWorkplace] = useState({}); // { workplaceId: number | null }
   const [search, setSearch] = useState('');
   const [saving, setSaving] = useState(false);
   const [progress, setProgress] = useState(0);
   const [progressLabel, setProgressLabel] = useState('');
   const [timeError, setTimeError] = useState('');
+  const dirtyKeysRef = useRef(new Set());
+  const handleDirtyChange = useCallback((key, dirty) => {
+    const keys = dirtyKeysRef.current;
+    if (dirty) keys.add(key);
+    else keys.delete(key);
+  }, []);
 
+  const updateLogistics = useUpdateWorkplaceLogistics();
   const submitted = !!localStorage.getItem(SUBMITTED_KEY(selectedDate));
 
   // Reset state when date changes
   useEffect(() => {
     setGroupTimes({});
     setOverrides({});
+    setQuantityByWorkplace({});
     setSearch('');
   }, [selectedDate]);
 
@@ -269,12 +320,32 @@ export default function TimeReporting() {
     });
   };
 
+  const handleQuantityCommit = (workplaceId, value) => {
+    setQuantityByWorkplace((prev) => ({ ...prev, [workplaceId]: value }));
+  };
+
   const handleSubmit = async () => {
+    if (dirtyKeysRef.current.size > 0) {
+      await showAlert('לא ניתן לשלוח את הדיווח כי יש שינויים שלא אושרו.');
+      return;
+    }
+
     setSaving(true);
     setProgress(0);
     setProgressLabel('טוען נתונים קיימים...');
     try {
-      const existing = await base44.entities.TimeReport.filter({ date: selectedDate });
+      for (const [workplaceId, reportedUnits] of Object.entries(quantityByWorkplace)) {
+        const logistics = logisticsMap[workplaceId];
+        if (!logistics?.id) continue;
+        if (sameQuantity(logistics.reported_units, reportedUnits)) continue;
+        await updateLogistics.mutateAsync({
+          id: logistics.id,
+          date: selectedDate,
+          data: { reported_units: reportedUnits, units_status: 'ממתין' },
+        });
+      }
+
+      const existing = await timeReportApi.list({ date: selectedDate, limit: 2000 });
       const existingByStudentWorkplace = {};
       existing.forEach((r) => {
         existingByStudentWorkplace[`${r.student_id}|${r.workplace_id}`] = r;
@@ -298,6 +369,18 @@ export default function TimeReporting() {
         const { a, groupStart, groupEnd, ov } = ops[i];
         const start_time = ov?.start ?? groupStart;
         const end_time = ov?.end ?? groupEnd;
+        const existingKey = `${a.student_id}|${a.workplace_id}`;
+        const existingReport = existingByStudentWorkplace[existingKey];
+        const isDefault = start_time === DEFAULT_START && end_time === DEFAULT_END;
+        const unchanged = existingReport
+          && existingReport.start_time === start_time
+          && existingReport.end_time === end_time;
+
+        if ((!existingReport && isDefault) || unchanged) {
+          setProgress(Math.round(((i + 1) / total) * 100));
+          continue;
+        }
+
         const data = {
           date: selectedDate,
           student_id: a.student_id,
@@ -309,17 +392,18 @@ export default function TimeReporting() {
           status: 'ממתין',
         };
 
-        const existingKey = `${a.student_id}|${a.workplace_id}`;
-        if (existingByStudentWorkplace[existingKey]) {
-          await base44.entities.TimeReport.update(existingByStudentWorkplace[existingKey].id, data);
+        if (existingReport) {
+          await timeReportApi.update(existingReport.id, data);
         } else {
-          await base44.entities.TimeReport.create(data);
+          await timeReportApi.create(data);
         }
 
         const pct = Math.round(((i + 1) / total) * 100);
         setProgress(pct);
         setProgressLabel(`מעדכן תלמיד ${i + 1} מתוך ${total}...`);
       }
+
+      await queryClient.invalidateQueries({ queryKey: timeReportKeys.all });
 
       setProgress(100);
       setProgressLabel('הושלם!');
@@ -497,9 +581,19 @@ export default function TimeReporting() {
                       <div className="text-xs text-muted-foreground">{a.workplace_name}</div>
                     </div>
                     <div className="flex items-center gap-2 flex-wrap">
-                      <TimeInput value={effectiveStart} onChange={v => handleOverrideChange(a.id, 'start', v, groupStart, groupEnd)} />
+                      <TimeInput
+                        value={effectiveStart}
+                        dirtyKey={`search:${a.id}:start`}
+                        onDirtyChange={handleDirtyChange}
+                        onChange={v => handleOverrideChange(a.id, 'start', v, groupStart, groupEnd)}
+                      />
                       <span className="text-xs">—</span>
-                      <TimeInput value={effectiveEnd} onChange={v => handleOverrideChange(a.id, 'end', v, groupStart, groupEnd)} />
+                      <TimeInput
+                        value={effectiveEnd}
+                        dirtyKey={`search:${a.id}:end`}
+                        onDirtyChange={handleDirtyChange}
+                        onChange={v => handleOverrideChange(a.id, 'end', v, groupStart, groupEnd)}
+                      />
                       {dur !== null && <span className="text-xs font-mono text-muted-foreground">{dur.toFixed(2)} שע'</span>}
                       {ov && (
                         <button onClick={() => handleOverrideChange(a.id, null, null, null, null)}
@@ -546,8 +640,11 @@ export default function TimeReporting() {
                 students={students}
                 times={groupTimes}
                 overrides={overrides}
+                quantityByWorkplace={quantityByWorkplace}
                 onGroupTimeChange={handleGroupTimeChange}
                 onOverrideChange={handleOverrideChange}
+                onQuantityCommit={handleQuantityCommit}
+                onDirtyChange={handleDirtyChange}
                 logistics={logisticsMap[wpId]}
                 date={selectedDate}
               />

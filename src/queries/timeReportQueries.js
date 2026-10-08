@@ -1,5 +1,4 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { base44 } from "@/api/base44Client";
 import { timeReportApi } from "@/api/timeReportApi";
 import { assignmentKeys } from "@/queries/assignmentQueries";
 
@@ -20,7 +19,7 @@ export function useTimeReportsByDate(date, options = {}) {
   return useQuery({
     queryKey: timeReportKeys.byDate(date),
     queryFn: () =>
-      base44.entities.TimeReport.filter({ date }, "student_name", 500),
+      timeReportApi.list({ date, sort: "student_name", limit: 500 }),
     enabled: !!date,
     ...options,
   });
@@ -33,10 +32,42 @@ export function usePendingTimeReports({
 } = {}) {
   return useQuery({
     queryKey: timeReportKeys.pending({ sort, limit }),
-    queryFn: () =>
-      base44.entities.TimeReport.filter({ status: "ממתין" }, sort, limit),
+    queryFn: () => timeReportApi.list({ status: "ממתין", sort, limit }),
     refetchInterval: 60000,
     ...options,
+  });
+}
+
+/**
+ * @typedef {{ date?: string } & Record<string, unknown>} CreateTimeReportInput
+ */
+
+export function useCreateTimeReport() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    /** @param {CreateTimeReportInput} data */
+    mutationFn: (data) => timeReportApi.create(data),
+    onSuccess: (_result, variables) => {
+      invalidateTimeReportQueries(queryClient, variables?.date);
+    },
+  });
+}
+
+/**
+ * @typedef {object} UpdateTimeReportInput
+ * @property {string} id
+ * @property {Record<string, unknown>} data
+ * @property {string} [date]
+ */
+
+export function useUpdateTimeReport() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    /** @param {UpdateTimeReportInput} variables */
+    mutationFn: ({ id, data }) => timeReportApi.update(id, data),
+    onSuccess: (_result, variables) => {
+      invalidateTimeReportQueries(queryClient, variables?.date ?? variables?.data?.date);
+    },
   });
 }
 

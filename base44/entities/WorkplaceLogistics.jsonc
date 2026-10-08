@@ -46,7 +46,16 @@
     },
     "units": {
       "type": "number",
-      "description": "כמות יחידות לקבוצה"
+      "description": "כמות יחידות מאושרת"
+    },
+    "reported_units": {
+      "type": "number",
+      "description": "כמות יחידות שממתינה לאישור"
+    },
+    "units_status": {
+      "type": "string",
+      "enum": ["ממתין", "אושר", "נדחה"],
+      "description": "סטטוס אישור הכמות"
     },
     "rate": {
       "type": "number",

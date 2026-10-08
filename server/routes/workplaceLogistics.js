@@ -36,7 +36,10 @@ function restrictReporterPayload(req, res, next) {
   if (req.body?.workplace_id !== undefined) {
     nextBody.workplace_id = req.body.workplace_id;
   }
-  if (req.body?.units !== undefined) nextBody.units = req.body.units;
+  if (req.body?.reported_units !== undefined) {
+    nextBody.reported_units = req.body.reported_units;
+    nextBody.units_status = "ממתין";
+  }
   if (req.body?.is_piecework !== undefined) {
     nextBody.is_piecework = req.body.is_piecework;
   }

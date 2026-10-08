@@ -47,6 +47,8 @@ function toJson(doc) {
     is_piecework: Boolean(raw.is_piecework),
     units_name: raw.units_name ?? "",
     units: raw.units ?? null,
+    reported_units: raw.reported_units ?? null,
+    units_status: raw.units_status ?? null,
     rate: raw.rate ?? null,
     created_date: raw.created_date,
     updated_date: raw.updated_date,
