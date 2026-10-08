@@ -1,17 +1,11 @@
 import { useState, useEffect } from "react";
-import { Truck, Clock, ChevronDown, ChevronUp } from "lucide-react";
+import { Clock, ChevronDown, ChevronUp } from "lucide-react";
 import VehicleSlot from "./VehicleSlot";
+import PieceworkFields from "./PieceworkFields";
 import { Switch } from "@/components/ui/switch";
-import { useLogisticsByWorkplace } from "@/hooks/assignments/useLogisticsByWorkplace";
-import { useLogisticsWorkplaces } from "@/hooks/assignments/useLogisticsWorkplaces";
 import { useVehicles } from "@/queries/vehicleQueries";
-import {
-  useCreateWorkplaceLogistics,
-  useUpdateWorkplaceLogistics,
-} from "@/queries/workplaceLogisticsQueries";
-import { formatPieceworkUnits } from "@/lib/assignmentHelpers";
 
-function WorkplaceLogisticsCard({
+export default function WorkplaceLogisticsCard({
   date,
   workplaceId,
   workplaceName,
@@ -77,7 +71,6 @@ function WorkplaceLogisticsCard({
   };
 
   const isPiecework = Boolean(logistics?.is_piecework);
-  const unitsLabel = formatPieceworkUnits(localData);
 
   return (
     <div className="bg-card border border-border rounded-xl overflow-hidden">
@@ -158,48 +151,7 @@ function WorkplaceLogisticsCard({
               />
             </div>
             {isPiecework && (
-              <div className="space-y-2">
-                <div className="space-y-1">
-                  <label className="text-xs text-muted-foreground">
-                    שם יחידה
-                  </label>
-                  <input
-                    type="text"
-                    defaultValue={localData.units_name || ""}
-                    key={`units-name-${localData.units_name || "empty"}`}
-                    onBlur={(e) => persist({ units_name: e.target.value })}
-                    placeholder="ארגז, ק״ג..."
-                    className="w-full h-8 text-xs border border-border rounded-md px-2 bg-background focus:outline-none focus:ring-1 focus:ring-primary/40"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs text-muted-foreground">
-                    תעריף ליחידה
-                  </label>
-                  <input
-                    type="number"
-                    defaultValue={localData.rate ?? ""}
-                    key={`rate-${localData.rate ?? "empty"}`}
-                    onBlur={(e) => {
-                      const val =
-                        e.target.value === "" ? null : Number(e.target.value);
-                      persist({ rate: Number.isFinite(val) ? val : null });
-                    }}
-                    placeholder="0"
-                    className="w-full h-8 text-xs border border-border rounded-md px-2 bg-background focus:outline-none focus:ring-1 focus:ring-primary/40"
-                    step="0.5"
-                  />
-                </div>
-                {unitsLabel ? (
-                  <p className="text-xs text-muted-foreground bg-secondary/60 rounded-md px-2 py-1.5">
-                    כמות: {unitsLabel}
-                  </p>
-                ) : (
-                  <p className="text-xs text-muted-foreground">
-                    הכמות תדווח בדיווח הזמנים
-                  </p>
-                )}
-              </div>
+              <PieceworkFields localData={localData} onPersist={persist} />
             )}
           </div>
 
@@ -229,78 +181,6 @@ function WorkplaceLogisticsCard({
           />
         </div>
       )}
-    </div>
-  );
-}
-
-export default function LogisticsSidebar({ date, assignments }) {
-  /** @type {import('@tanstack/react-query').UseMutationResult<any, Error, any>} */
-  const createLogistics = useCreateWorkplaceLogistics();
-  const updateLogistics = useUpdateWorkplaceLogistics();
-
-  const { logisticsList, logisticsMap } = useLogisticsByWorkplace(date);
-  const { workplaces } = useLogisticsWorkplaces(date, assignments);
-
-  const handleSave = async (workplaceId, data) => {
-    const payload = {
-      vehicle_id: data.vehicle_id || null,
-      vehicle_id_2: data.vehicle_id_2 || null,
-      vehicle_id_3: data.vehicle_id_3 || null,
-      exit_time: data.exit_time,
-      notes: data.notes,
-      is_piecework: Boolean(data.is_piecework),
-      units_name: data.is_piecework ? data.units_name || "" : "",
-      rate: data.is_piecework ? (data.rate ?? null) : null,
-    };
-    const existing = logisticsMap[workplaceId];
-    if (existing?.id) {
-      await updateLogistics.mutateAsync({
-        id: existing.id,
-        data: payload,
-        date,
-      });
-    } else {
-      await createLogistics.mutateAsync({
-        date,
-        workplace_id: workplaceId,
-        ...payload,
-      });
-    }
-  };
-
-  if (workplaces.length === 0) {
-    return (
-      <div className="w-64 shrink-0">
-        <div className="fixed top-8 bg-card border border-border rounded-2xl p-4 w-64 z-10 flex flex-col gap-2">
-          <h3 className="font-semibold text-sm flex items-center gap-2">
-            <Truck size={15} className="text-primary" /> לוגיסטיקה
-          </h3>
-          <p className="text-xs text-muted-foreground">אין שיבוצים להיום</p>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="w-64 shrink-0">
-      <div className="fixed top-8 bg-secondary/30 border border-border rounded-2xl p-3 space-y-2 w-64 max-h-[calc(100vh-5rem)] overflow-y-auto z-10">
-        <h3 className="font-semibold text-sm flex items-center gap-2 px-1">
-          <Truck size={15} className="text-primary" /> לוגיסטיקה יומית
-        </h3>
-        {workplaces.map((wp) => (
-          <WorkplaceLogisticsCard
-            key={wp.id}
-            date={date}
-            workplaceId={wp.id}
-            workplaceName={wp.name}
-            studentCount={wp.count}
-            requestedVolunteers={wp.requestedVolunteers}
-            logistics={logisticsMap[wp.id]}
-            allLogistics={logisticsList}
-            onSave={handleSave}
-          />
-        ))}
-      </div>
     </div>
   );
 }
