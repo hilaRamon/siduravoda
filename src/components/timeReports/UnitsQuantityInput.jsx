@@ -11,11 +11,11 @@ export default function UnitsQuantityInput({
   logistics,
   unitsName = "",
   compact = false,
-  dirtyKey,
-  onDirtyChange,
+  dirtyKey = undefined,
+  onDirtyChange = undefined,
   showSave = true,
   disabled = false,
-  onValueChange,
+  onValueChange = undefined,
 }) {
   const [value, setValue] = useState(
     logistics?.reported_units != null ? String(logistics.reported_units) : "",

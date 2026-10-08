@@ -117,6 +117,7 @@ export function useCreateWorkplaceLogistics() {
  * @property {string} id
  * @property {Record<string, unknown>} data
  * @property {string} [date]
+ * @property {string} [workplaceId]
  */
 
 /**
