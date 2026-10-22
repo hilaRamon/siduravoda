@@ -4,13 +4,13 @@ import {
   PRICING_METHODS,
   calcAvgDailyUnits,
   calcTotalPrice,
-  calcTotalPriceDaily,
   dailyToHourlyRate,
   getAssignmentDefaults,
   getDisplayRate,
   hourlyToDailyRate,
   mapAssignmentExportRow,
   normalizeAppSettings,
+  round2,
   parseDisplayRateInput,
   parseImportedAssignmentRate,
 } from "./pricing.js";
@@ -74,31 +74,21 @@ test("hourly report totalPrice stays hours × rate + bonus", () => {
   assert.equal(totalPrice, 480);
 });
 
-test("daily report totalPrice equals students × avg × dailyRate + bonus", () => {
+test("daily report totalPrice equals shown total units × dailyRate + bonus", () => {
   const totalHours = 13.5;
-  const studentCount = 3;
   const hoursPerDailyUnit = 4.75;
   const hourlyRate = dailyToHourlyRate(235, hoursPerDailyUnit);
   const dailyRate = hourlyToDailyRate(hourlyRate, hoursPerDailyUnit);
   const bonus = 10;
-  const avgDailyUnits = calcAvgDailyUnits(
-    totalHours,
-    studentCount,
-    hoursPerDailyUnit,
-  );
-  const totalPrice = calcTotalPriceDaily(
-    studentCount,
-    avgDailyUnits,
-    dailyRate,
-    bonus,
-  );
+  const shownTotalUnits = round2(totalHours / hoursPerDailyUnit);
+  const totalPrice = calcTotalPrice(shownTotalUnits, dailyRate, bonus);
 
-  assert.equal(avgDailyUnits, 0.95);
+  assert.equal(shownTotalUnits, 2.84);
   assert.equal(dailyRate, 235);
-  assert.equal(totalPrice, 679.75);
+  assert.equal(totalPrice, 677.4);
   assert.equal(
     totalPrice,
-    Math.round((studentCount * avgDailyUnits * dailyRate + bonus) * 100) / 100,
+    Math.round((shownTotalUnits * dailyRate + bonus) * 100) / 100,
   );
 });
 
