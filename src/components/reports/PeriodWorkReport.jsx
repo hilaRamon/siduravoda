@@ -8,6 +8,7 @@ import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import * as XLSX from 'xlsx';
 import { useWorkByWorkplaceReport } from '@/queries/reports/useWorkByWorkplaceReport';
+import { markWorkbookRtl } from '@/lib/excel';
 
 function displayValue(value) {
   if (value == null || value === '') return '—';
@@ -85,9 +86,7 @@ export default function PeriodWorkReport() {
         'תאריך': formatDate(r.date),
         'תעריף': displayValue(r.rate),
         'יחידה': r.unitName || '',
-        'כמות תלמידים': r.studentCount,
         'סה״כ יחידות': displayValue(r.totalUnits),
-        'ממוצע יחידות לתלמיד': displayValue(r.avgUnitsPerStudent),
         'מחיר': r.totalPrice,
       }));
       rows.push({
@@ -95,9 +94,7 @@ export default function PeriodWorkReport() {
         'תאריך': 'סה"כ',
         'תעריף': '',
         'יחידה': '',
-        'כמות תלמידים': '',
         'סה״כ יחידות': '',
-        'ממוצע יחידות לתלמיד': '',
         'מחיר': group.totals.totalPrice,
       });
       rows.push({});
@@ -105,6 +102,7 @@ export default function PeriodWorkReport() {
     const ws = XLSX.utils.json_to_sheet(rows);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'דוח לתקופה');
+    markWorkbookRtl(wb);
     XLSX.writeFile(wb, `דוח_עבודה_לתקופה_${startDate}_${endDate}.xlsx`);
     setExportingXlsx(false);
   };

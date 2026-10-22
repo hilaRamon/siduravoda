@@ -12,6 +12,7 @@ import {
   normalizeAppSettings,
 } from "../lib/pricing.js";
 import * as studentRepository from "../repositories/studentRepository.js";
+import { markWorkbookRtl } from "../lib/excel.js";
 
 const BACKUP_DIR = path.resolve(process.cwd(), "uploads", "backups");
 const ISRAEL_TZ = "Asia/Jerusalem";
@@ -25,6 +26,7 @@ function zipFilenameForDate(exportDateStr) {
 }
 
 function workbookToBuffer(wb) {
+  markWorkbookRtl(wb);
   return XLSX.write(wb, { bookType: "xlsx", type: "buffer" });
 }
 

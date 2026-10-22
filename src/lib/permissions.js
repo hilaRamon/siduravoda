@@ -66,13 +66,13 @@ const EXTRA_PAGE_TITLES = {
   '/dashboard': 'לוח בקרה',
 };
 
-/** Browser tab title: "סידור עבודה - {page}" */
+/** Browser tab title: "סידור עבודה רגבים בעמק - {page}" */
 export function getDocumentTitle(pathname) {
   const path = pathname.replace(/\/$/, '') || '/';
   const page =
     NAV_ITEMS.find((n) => n.to === path)?.label ||
     EXTRA_PAGE_TITLES[path];
-  return page ? `סידור עבודה - ${page}` : 'סידור עבודה';
+  return page ? `סידור עבודה רגבים בעמק - ${page}` : 'סידור עבודה רגבים בעמק';
 }
 
 /** Nav items visible per user */

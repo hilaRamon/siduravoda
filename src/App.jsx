@@ -9,6 +9,7 @@ import { AuthProvider } from '@/lib/AuthContext';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import RequirePermission, { RequireMainApp } from '@/components/RequirePermission';
 import { canAccessAdminTools, canViewTimeReports, canReportTime, getDocumentTitle } from '@/lib/permissions';
+import { removeScheduleHead, syncScheduleHead } from '@/lib/syncScheduleHead';
 import Layout from './components/Layout';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
@@ -29,6 +30,8 @@ function DocumentTitle() {
   const { pathname } = useLocation();
   useEffect(() => {
     document.title = getDocumentTitle(pathname);
+    syncScheduleHead(pathname);
+    return removeScheduleHead;
   }, [pathname]);
   return null;
 }

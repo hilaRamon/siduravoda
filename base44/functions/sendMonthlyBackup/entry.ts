@@ -12,6 +12,9 @@ function buildSheet(data, columns) {
   const ws = XLSX.utils.json_to_sheet(data.map(columns));
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'גיליון1');
+  const views = wb.Workbook?.Views ?? [{}];
+  views[0] = { ...views[0], RTL: true };
+  wb.Workbook = { ...(wb.Workbook || {}), Views: views };
   return wb;
 }
 

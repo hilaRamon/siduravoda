@@ -34,6 +34,7 @@ import * as XLSX from "xlsx";
 import { format, subMonths } from "date-fns";
 import { useWorkByWorkplaceReport } from "@/queries/reports/useWorkByWorkplaceReport";
 import { useWorkplaces } from "@/queries/reports/useWorkplaces";
+import { markWorkbookRtl } from "@/lib/excel";
 
 function displayValue(value) {
   if (value == null || value === "") return "—";
@@ -193,9 +194,7 @@ export default function PeriodicWorkReport() {
           "מקום עבודה": r.workplaceName,
           תעריף: displayValue(r.rate),
           יחידה: r.unitName || "",
-          "כמות תלמידים": r.studentCount,
           "סה״כ יחידות": displayValue(r.totalUnits),
-          "ממוצע יחידות לתלמיד": displayValue(r.avgUnitsPerStudent),
           מחיר: r.totalPrice,
         }),
       );
@@ -205,9 +204,7 @@ export default function PeriodicWorkReport() {
         "מקום עבודה": 'סה"כ',
         תעריף: "",
         יחידה: "",
-        "כמות תלמידים": "",
         "סה״כ יחידות": "",
-        "ממוצע יחידות לתלמיד": "",
         מחיר: group.totals.totalPrice,
       });
       rows.push({});
@@ -215,6 +212,7 @@ export default function PeriodicWorkReport() {
     const ws = XLSX.utils.json_to_sheet(rows);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "דוח חודשי");
+    markWorkbookRtl(wb);
     XLSX.writeFile(wb, `דוח_עבודה_חודשי_${month}_${year}.xlsx`);
     setExportingXlsx(false);
   };

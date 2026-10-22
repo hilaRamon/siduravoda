@@ -5,7 +5,6 @@ import { primaryWorkNumberMatch } from "../lib/assignmentWorkNumber.js";
 import {
   calcAvgDailyUnits,
   calcTotalPrice,
-  calcTotalPriceDaily,
   getAssignmentDefaults,
   hourlyToDailyRate,
   normalizeAppSettings,
@@ -373,11 +372,11 @@ export async function getWorkByWorkplaceReport({
       reportedUnits,
       unitsName,
     });
-    const totalPrice = isPiecework
-      ? calcTotalPrice(priceUnits, pieceRate ?? 0, bonus)
-      : isDaily
-        ? calcTotalPriceDaily(studentCount, avgDailyUnits, dailyRate, bonus)
-        : calcTotalPrice(totalHours, hourlyRate, bonus);
+    const totalPrice = calcTotalPrice(
+      display.totalUnits ?? 0,
+      display.rate ?? 0,
+      bonus,
+    );
 
     const row = {
       date: item._id.date,
