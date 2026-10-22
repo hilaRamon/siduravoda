@@ -9,6 +9,7 @@ import * as XLSX from 'xlsx';
 import { format } from 'date-fns';
 import JSZip from 'jszip';
 import { mapAssignmentExportRow, normalizeAppSettings } from '@/lib/pricing';
+import { markWorkbookRtl } from '@/lib/excel';
 import { workplaceLogisticsApi } from '@/api/workplaceLogisticsApi';
 
 function mapLogisticsExportRow(row) {
@@ -26,10 +27,12 @@ function mapLogisticsExportRow(row) {
 }
 
 function downloadWorkbook(wb, filename) {
+  markWorkbookRtl(wb);
   XLSX.writeFile(wb, filename);
 }
 
 function workbookToBuffer(wb) {
+  markWorkbookRtl(wb);
   return XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
 }
 
