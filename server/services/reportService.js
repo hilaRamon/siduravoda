@@ -31,16 +31,23 @@ async function getAppSettings() {
 async function listWorkplacesWithFarmName() {
   const [workplaces, farms] = await Promise.all([
     Workplace.find().select("name farm_id").lean(),
-    Farm.find().select("name").lean(),
+    Farm.find().select("name company_id").lean(),
   ]);
-  const farmNameById = new Map(
-    farms.map((farm) => [farm._id.toString(), farm.name || ""]),
+  const farmById = new Map(
+    farms.map((farm) => [
+      farm._id.toString(),
+      { name: farm.name || "", companyId: farm.company_id || "" },
+    ]),
   );
-  return workplaces.map((workplace) => ({
-    id: workplace._id.toString(),
-    name: workplace.name || "",
-    farmName: farmNameById.get(workplace.farm_id) || "",
-  }));
+  return workplaces.map((workplace) => {
+    const farm = farmById.get(workplace.farm_id);
+    return {
+      id: workplace._id.toString(),
+      name: workplace.name || "",
+      farmName: farm?.name || "",
+      companyId: farm?.companyId || "",
+    };
+  });
 }
 
 async function getWorkByWorkplaceMaps() {
@@ -52,6 +59,7 @@ async function getWorkByWorkplaceMaps() {
     byId[workplace.id] = {
       name: workplace.name,
       farmName: workplace.farmName,
+      companyId: workplace.companyId,
     };
     if (SKIP_WORKPLACES.includes(workplace.name)) {
       skipIds.push(workplace.id);
@@ -210,7 +218,13 @@ function toFarmGroups(rowBuckets) {
   for (const wpGroup of Object.values(rowBuckets)) {
     const farmName = wpGroup.farmName || wpGroup.workplaceName;
     if (!farmBuckets[farmName]) {
-      farmBuckets[farmName] = { farmName, rows: [] };
+      farmBuckets[farmName] = {
+        farmName,
+        companyId: wpGroup.companyId || "",
+        rows: [],
+      };
+    } else if (!farmBuckets[farmName].companyId && wpGroup.companyId) {
+      farmBuckets[farmName].companyId = wpGroup.companyId;
     }
     farmBuckets[farmName].rows.push(...wpGroup.rows);
   }
@@ -227,6 +241,7 @@ function toFarmGroups(rowBuckets) {
       });
       return {
         farmName: group.farmName,
+        companyId: group.companyId || "",
         rows,
         totals: buildTotals(rows),
       };
@@ -416,6 +431,7 @@ export async function getWorkByWorkplaceReport({
       rowBuckets[workplaceId] = {
         workplaceName,
         farmName: byId[workplaceId]?.farmName || "",
+        companyId: byId[workplaceId]?.companyId || "",
         rows: [],
       };
     }
