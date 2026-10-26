@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
+import { useWorkplaces } from '@/queries/workplaceQueries';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -125,10 +126,7 @@ export default function Workplaces() {
   const [editWp, setEditWp] = useState(null);
   const queryClient = useQueryClient();
 
-  const { data: workplaces = [], isLoading } = useQuery({
-    queryKey: ['workplaces'],
-    queryFn: () => base44.entities.Workplace.list('-created_date'),
-  });
+  const { data: workplaces = [], isLoading } = useWorkplaces();
 
   const updateWorkplaceItem = useOptimisticListItemUpdate({
     queryKey: ['workplaces'],

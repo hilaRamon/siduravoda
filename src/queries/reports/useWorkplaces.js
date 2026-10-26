@@ -1,12 +1,12 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { base44 } from "@/api/base44Client";
+import { workplaceApi } from "@/api/workplaceApi";
 import { reportKeys } from "./keys";
 
 export function useWorkplaces() {
   const query = useQuery({
     queryKey: reportKeys.workplaces(),
-    queryFn: () => base44.entities.Workplace.list(),
+    queryFn: () => workplaceApi.list({ sort: "name", limit: 1000 }),
   });
 
   const farmNames = useMemo(() => {

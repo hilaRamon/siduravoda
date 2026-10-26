@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Upload, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
+import { workplaceApi } from '@/api/workplaceApi';
 import * as XLSX from 'xlsx';
 
 const SYSTEM_FIELDS = [
@@ -90,7 +91,7 @@ export default function ImportWorkplacesModal({ open, onClose, onImported }) {
 
   const handleImport = async () => {
     setImporting(true);
-    const existing = await base44.entities.Workplace.list();
+    const existing = await workplaceApi.list();
     const existingByName = {};
     existing.forEach(w => { existingByName[w.name?.trim()] = w; });
 

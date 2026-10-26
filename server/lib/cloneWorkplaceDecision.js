@@ -1,5 +1,6 @@
 export const NOT_WORKING_WORKPLACE_NAME = "תתת - לא עובד";
 export const PRE_ASSIGNMENT_WORKPLACE_NAME = "אאא- לפני שיבוץ";
+export const MILUIM_WORKPLACE_NAME = "תתח - מילואים";
 export const DISTANCE_WORKPLACE_NAMES = [
   "קרוב",
   "רחוק",
@@ -45,6 +46,10 @@ export function decideCloneWorkplace({
   preAssignmentWp,
 }) {
   if (student?.is_active === false) return null;
+
+  if (src.workplace_name === MILUIM_WORKPLACE_NAME) {
+    return workplaceFromSource(src, preAssignmentWp);
+  }
 
   const isCrew = student?.cohort?.includes("צוות");
 

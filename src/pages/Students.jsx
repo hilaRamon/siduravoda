@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { base44 } from "@/api/base44Client";
+import { useQueryClient } from "@tanstack/react-query";
+import { useWorkplaces } from "@/queries/workplaceQueries";
 import { studentApi } from "@/api/studentApi";
 import {
   studentKeys,
@@ -72,14 +72,7 @@ export default function Students() {
     updateFn: (id, patch) => studentApi.update(id, patch),
   });
 
-  const { data: workplaces = [] } = useQuery({
-    queryKey: ["workplaces"],
-    queryFn: () => base44.entities.Workplace.list(),
-    select: (data) =>
-      [...data].sort((a, b) =>
-        (a.name || "").localeCompare(b.name || "", "he"),
-      ),
-  });
+  const { data: workplaces = [] } = useWorkplaces();
 
   const cohorts = useMemo(
     () => [...new Set(students.map((s) => s.cohort).filter(Boolean))],

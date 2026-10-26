@@ -1,6 +1,5 @@
 import { useState, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { base44 } from '@/api/base44Client';
+import { useWorkplaces } from '@/queries/workplaceQueries';
 import { useAbsenceRequests, useDeleteAbsence } from '@/queries/absenceQueries';
 import {
   useFarmerRequests,
@@ -150,11 +149,7 @@ export default function Calendar() {
     return map;
   }, [students]);
 
-  const { data: workplaces = [] } = useQuery({
-    queryKey: ['workplaces'],
-    queryFn: () => base44.entities.Workplace.list('name', 1000),
-    select: (data) => [...data].sort((a, b) => (a.name || '').localeCompare(b.name || '', 'he')),
-  });
+  const { data: workplaces = [] } = useWorkplaces();
 
   const weekLabel = `${days[0].toLocaleDateString('he-IL', { day: 'numeric', month: 'long' })} – ${days[4].toLocaleDateString('he-IL', { day: 'numeric', month: 'long', year: 'numeric' })}`;
 
