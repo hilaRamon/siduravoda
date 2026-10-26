@@ -1,0 +1,34 @@
+{
+  "name": "Farm",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "שם משק"
+    },
+    "company_id": {
+      "type": "string",
+      "description": "ח.פ"
+    },
+    "address": {
+      "type": "string",
+      "description": "כתובת"
+    },
+    "accounting_phone": {
+      "type": "string",
+      "description": "טלפון הנה\"ח"
+    },
+    "accounting_email": {
+      "type": "string",
+      "description": "מייל הנה\"ח"
+    },
+    "has_agreement": {
+      "type": "boolean",
+      "description": "הסכם",
+      "default": false
+    }
+  },
+  "required": [
+    "name"
+  ]
+}

@@ -7,8 +7,8 @@
  */
 import dotenv from "dotenv";
 import mongoose from "mongoose";
-import { getModel } from "../models/index.js";
 import Assignment from "../models/Assignment.js";
+import Workplace from "../models/Workplace.js";
 import TimeReport from "../models/TimeReport.js";
 import { migrateAssignmentWorkNumber } from "../lib/migrateAssignmentWorkNumber.js";
 import { PRICING_DEFAULTS, dailyToHourlyRate } from "../lib/pricing.js";
@@ -89,7 +89,6 @@ async function main() {
   await mongoose.connect(mongoUri);
   await migrateAssignmentWorkNumber();
 
-  const Workplace = getModel("Workplace");
   const farmWorkplaces = (await Workplace.find().lean()).filter(
     (w) => w.name && !SKIP_WORKPLACE_NAMES.has(w.name.trim()),
   );

@@ -71,7 +71,7 @@ export default function Layout() {
       >
         <header className="w-full h-14 flex-shrink-0 border-b border-border bg-card flex items-center justify-between px-6 shadow-sm">
           <div>
-            <h1 className="text-lg font-bold">מקומות עבודה</h1>
+            <h1 className="text-lg font-bold">משקים</h1>
             {user && (
               <p className="text-xs text-muted-foreground truncate">
                 {user.full_name || user.email}

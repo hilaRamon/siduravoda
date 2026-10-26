@@ -18,6 +18,8 @@ import FarmerRequest from "../models/FarmerRequest.js";
 import WorkplaceLogistics from "../models/WorkplaceLogistics.js";
 import TimeReport from "../models/TimeReport.js";
 import Vehicle from "../models/Vehicle.js";
+import Farm from "../models/Farm.js";
+import Workplace from "../models/Workplace.js";
 import { hashPassword } from "../lib/password.js";
 import { ROLES } from "../config/permissions.js";
 import { ensurePermissionRulesSeeded } from "../services/permissionRuleService.js";
@@ -63,75 +65,70 @@ const SPECIAL_WORKPLACE_NAMES = [
   "תתת - לא עובד",
 ];
 
-const FARM_WORKPLACES = [
+const FARMS = [
   {
     name: "משק הכהן",
-    farm_name: "משק הכהן",
     address: "מושב נהלל",
     company_id: "514123456",
-    contact_phone: "04-6411122",
     accounting_phone: "04-6411133",
     accounting_email: "cohen-farm@example.com",
     has_agreement: true,
   },
   {
     name: "מטעי הגליל",
-    farm_name: "מטעי הגליל",
     address: "כפר תבור",
     company_id: "514234567",
-    contact_phone: "04-6767788",
     accounting_email: "galil-orchards@example.com",
     has_agreement: true,
   },
   {
     name: "חממות השרון",
-    farm_name: "חממות השרון",
     address: "קדימה-צורן",
     company_id: "514345678",
-    contact_phone: "09-8912233",
     has_agreement: true,
   },
   {
     name: "כרמי רגבים",
-    farm_name: "כרמי רגבים",
     address: "רגבים",
     company_id: "514456789",
-    contact_phone: "04-9893344",
     accounting_email: "regavim-vines@example.com",
     has_agreement: true,
   },
   {
     name: "לול הנגב",
-    farm_name: "לול הנגב",
     address: "אופקים",
     company_id: "514567890",
-    contact_phone: "08-9924455",
     has_agreement: false,
   },
   {
     name: "פרדס הזהב",
-    farm_name: "פרדס הזהב",
     address: "חדרה",
     company_id: "514678901",
-    contact_phone: "04-6245566",
     has_agreement: true,
   },
   {
     name: "משק דגן",
-    farm_name: "משק דגן",
     address: "בית שאן",
     company_id: "514789012",
-    contact_phone: "04-6066677",
     has_agreement: true,
   },
   {
     name: "גינת הירק",
-    farm_name: "גינת הירק",
     address: "עמק חפר",
     company_id: "514890123",
-    contact_phone: "09-8987788",
     has_agreement: false,
   },
+];
+
+const FARM_WORKPLACES = [
+  { name: "משק הכהן", contact_phone: "04-6411122" },
+  { name: "מטעי הגליל", contact_phone: "04-6767788" },
+  { name: "חממות השרון", contact_phone: "09-8912233" },
+  { name: "כרמי רגבים", contact_phone: "04-9893344" },
+  { name: "לול הנגב", contact_phone: "08-9924455" },
+  { name: "פרדס הזהב", contact_phone: "04-6245566" },
+  { name: "משק דגן", contact_phone: "04-6066677" },
+  { name: "גינת הירק", contact_phone: "09-8987788" },
 ];
 
 const ROLE_DEFS = [
@@ -379,7 +376,8 @@ async function resetOperationalData() {
     PublishedSchedule.deleteMany({}),
     AbsenceRequest.deleteMany({}),
     FarmerRequest.deleteMany({}),
-    getModel("Workplace").deleteMany({}),
+    Farm.deleteMany({}),
+    Workplace.deleteMany({}),
     WorkplaceLogistics.deleteMany({}),
     TimeReport.deleteMany({}),
     getModel("AppSettings").deleteMany({}),
@@ -482,11 +480,20 @@ async function main() {
     default_end_time: "11:45",
   });
 
-  const Workplace = getModel("Workplace");
+  const farmRecords = await Farm.insertMany(FARMS);
+  const farmIdByName = Object.fromEntries(
+    farmRecords.map((farm) => [farm.name, farm._id.toString()]),
+  );
   const specialDocs = await Workplace.insertMany(
     SPECIAL_WORKPLACE_NAMES.map((name) => ({ name })),
   );
-  const farmDocs = await Workplace.insertMany(FARM_WORKPLACES);
+  const farmDocs = await Workplace.insertMany(
+    FARM_WORKPLACES.map((workplace) => ({
+      name: workplace.name,
+      contact_phone: workplace.contact_phone,
+      farm_id: farmIdByName[workplace.name],
+    })),
+  );
   const specials = byName(specialDocs);
   const allWorkplaces = [...specialDocs, ...farmDocs];
 

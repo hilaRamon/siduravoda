@@ -1,5 +1,7 @@
 import { getModel } from "../models/index.js";
 import Assignment from "../models/Assignment.js";
+import Farm from "../models/Farm.js";
+import Workplace from "../models/Workplace.js";
 import { SKIP_FARMS, SKIP_WORKPLACES } from "../lib/reportConstants.js";
 import { primaryWorkNumberMatch } from "../lib/assignmentWorkNumber.js";
 import {
@@ -26,21 +28,33 @@ async function getAppSettings() {
   return normalizeAppSettings(settings);
 }
 
+async function listWorkplacesWithFarmName() {
+  const [workplaces, farms] = await Promise.all([
+    Workplace.find().select("name farm_id").lean(),
+    Farm.find().select("name").lean(),
+  ]);
+  const farmNameById = new Map(
+    farms.map((farm) => [farm._id.toString(), farm.name || ""]),
+  );
+  return workplaces.map((workplace) => ({
+    id: workplace._id.toString(),
+    name: workplace.name || "",
+    farmName: farmNameById.get(workplace.farm_id) || "",
+  }));
+}
+
 async function getWorkByWorkplaceMaps() {
-  const Workplace = getModel("Workplace");
-  const workplaces = await Workplace.find().select("name farm_name").lean();
+  const workplaces = await listWorkplacesWithFarmName();
   const byId = {};
   const skipIds = [];
 
   for (const workplace of workplaces) {
-    const id = workplace._id.toString();
-    const name = workplace.name || "";
-    byId[id] = {
-      name,
-      farmName: workplace.farm_name || "",
+    byId[workplace.id] = {
+      name: workplace.name,
+      farmName: workplace.farmName,
     };
-    if (SKIP_WORKPLACES.includes(name)) {
-      skipIds.push(id);
+    if (SKIP_WORKPLACES.includes(workplace.name)) {
+      skipIds.push(workplace.id);
     }
   }
 
@@ -48,7 +62,6 @@ async function getWorkByWorkplaceMaps() {
 }
 
 async function getStudentWorkWorkplaceMaps() {
-  const Workplace = getModel("Workplace");
   const workplaces = await Workplace.find().select("name").lean();
   const byId = {};
   const skipIds = [];
@@ -66,18 +79,20 @@ async function getStudentWorkWorkplaceMaps() {
 }
 
 async function getArzenuWorkplaceMaps() {
-  const Workplace = getModel("Workplace");
-  const workplaces = await Workplace.find().select("name farm_name").lean();
+  const workplaces = await listWorkplacesWithFarmName();
   const byId = {};
   const skipIds = [];
 
   for (const workplace of workplaces) {
-    const id = workplace._id.toString();
-    const name = workplace.name || "";
-    const farmName = workplace.farm_name || "";
-    byId[id] = { name, farmName };
-    if (SKIP_WORKPLACES.includes(name) || SKIP_FARMS.includes(farmName)) {
-      skipIds.push(id);
+    byId[workplace.id] = {
+      name: workplace.name,
+      farmName: workplace.farmName,
+    };
+    if (
+      SKIP_WORKPLACES.includes(workplace.name) ||
+      SKIP_FARMS.includes(workplace.farmName)
+    ) {
+      skipIds.push(workplace.id);
     }
   }
 

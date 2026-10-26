@@ -4,7 +4,9 @@ import * as XLSX from "xlsx";
 import JSZip from "jszip";
 import { getModel } from "../models/index.js";
 import Assignment from "../models/Assignment.js";
+import Farm from "../models/Farm.js";
 import Vehicle from "../models/Vehicle.js";
+import Workplace from "../models/Workplace.js";
 import WorkplaceLogistics from "../models/WorkplaceLogistics.js";
 import { sendVerificationToRecipients, sendWeeklyBackupToRecipients } from "../lib/email.js";
 import {
@@ -31,17 +33,32 @@ function workbookToBuffer(wb) {
 }
 
 async function loadBackupData() {
-  const Workplace = getModel("Workplace");
   const AppSettings = getModel("AppSettings");
 
-  const [students, workplaces, vehicles, assignments, logistics, settingsDoc] = await Promise.all([
+  const [students, workplaceDocs, farmDocs, vehicles, assignments, logistics, settingsDoc] = await Promise.all([
     studentRepository.find({}, { sort: { full_name: 1 }, limit: 1000 }),
     Workplace.find().sort({ name: 1 }).limit(1000).lean(),
+    Farm.find().sort({ name: 1 }).limit(1000).lean(),
     Vehicle.find().sort({ name: 1 }).limit(1000).lean(),
     Assignment.find().sort({ date: 1 }).lean(),
     WorkplaceLogistics.find().sort({ date: 1 }).lean(),
     AppSettings.findOne().sort({ updated_date: -1, created_date: -1 }).lean(),
   ]);
+
+  const farmById = Object.fromEntries(
+    farmDocs.map((farm) => [farm._id.toString(), farm]),
+  );
+  const workplaces = workplaceDocs.map((workplace) => {
+    const farm = farmById[workplace.farm_id] || {};
+    return {
+      ...workplace,
+      farm_name: farm.name || "",
+      address: farm.address || "",
+      company_id: farm.company_id || "",
+      accounting_phone: farm.accounting_phone || "",
+      accounting_email: farm.accounting_email || "",
+    };
+  });
 
   return {
     students,
@@ -79,9 +96,11 @@ function buildWorkbookFiles(data, exportDateStr) {
       "שם משק": w.farm_name || "",
       כתובת: w.address || "",
       "ח.פ": w.company_id || "",
+      "איש קשר": w.contact_person || "",
       "טלפון איש קשר": w.contact_phone || "",
       'טלפון הנה"ח': w.accounting_phone || "",
       'מייל הנה"ח': w.accounting_email || "",
+      הערות: w.notes || "",
     })),
   );
   const wbWorkplaces = XLSX.utils.book_new();
