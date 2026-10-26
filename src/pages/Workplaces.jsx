@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { farmApi } from '@/api/farmApi';
 import { Button } from '@/components/ui/button';
@@ -7,7 +7,14 @@ import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { ChevronDown, ChevronLeft, Plus, Search, Pencil, Trash2, Building2, Upload } from 'lucide-react';
+import {
+  Command,
+  CommandGroup,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command';
+import { Popover, PopoverAnchor, PopoverContent } from '@/components/ui/popover';
+import { ChevronDown, ChevronLeft, ChevronsUpDown, Plus, Search, Pencil, Trash2, Building2, Upload } from 'lucide-react';
 import ImportWorkplacesModal from '@/components/workplaces/ImportWorkplacesModal';
 import { confirmAlert, showAlert } from '@/components/AppAlert';
 import { useOptimisticListItemUpdate } from '@/hooks/useOptimisticListItemUpdate';
@@ -42,6 +49,139 @@ const EMPTY_WORKPLACE = {
 };
 
 const UNASSIGNED_KEY = '';
+
+function addToSetMap(map, key, value) {
+  if (!map.has(key)) map.set(key, new Set());
+  if (value) map.get(key).add(value);
+}
+
+function buildFarmContacts(siblings) {
+  const phonesByPerson = new Map();
+  const personsByPhone = new Map();
+
+  for (const workplace of siblings) {
+    const person = workplace.contact_person?.trim() || '';
+    const phone = workplace.contact_phone?.trim() || '';
+    if (person) addToSetMap(phonesByPerson, person, phone);
+    if (phone) addToSetMap(personsByPhone, phone, person);
+  }
+
+  const sort = (values) => [...values].sort((a, b) => a.localeCompare(b, 'he'));
+  return {
+    persons: sort(phonesByPerson.keys()),
+    phones: sort(personsByPhone.keys()),
+    phonesByPerson,
+    personsByPhone,
+  };
+}
+
+function soleMatch(map, key) {
+  const matches = [...(map.get(key) || [])];
+  return matches.length === 1 ? matches[0] : '';
+}
+
+function FarmContactInput({ value, onChange, onPick, suggestions, placeholder }) {
+  const [open, setOpen] = useState(false);
+  const anchorRef = useRef(null);
+  const closedAtRef = useRef(0);
+
+  const openList = () => {
+    if (Date.now() - closedAtRef.current < 300) return;
+    setOpen(true);
+  };
+
+  const pickItem = (item) => {
+    closedAtRef.current = Date.now();
+    onPick(item);
+    setOpen(false);
+  };
+
+  if (suggestions.length === 0) {
+    return (
+      <Input
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="mt-1"
+        placeholder={placeholder}
+      />
+    );
+  }
+
+  return (
+    <Popover
+      open={open}
+      onOpenChange={(next) => {
+        if (next && Date.now() - closedAtRef.current < 300) return;
+        if (!next) closedAtRef.current = Date.now();
+        setOpen(next);
+      }}
+    >
+      <PopoverAnchor asChild>
+        <div ref={anchorRef} className="relative mt-1">
+          <Input
+            value={value}
+            placeholder={placeholder}
+            className="pl-8"
+            onChange={(event) => {
+              onChange(event.target.value);
+              openList();
+            }}
+            onFocus={openList}
+            onKeyDown={(event) => {
+              if (event.key === 'Escape') {
+                closedAtRef.current = Date.now();
+                setOpen(false);
+              }
+            }}
+          />
+          <button
+            type="button"
+            className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground"
+            aria-label="הצג אפשרויות"
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={() => setOpen((current) => !current)}
+          >
+            <ChevronsUpDown size={14} />
+          </button>
+        </div>
+      </PopoverAnchor>
+      <PopoverContent
+        className="z-[60] overflow-hidden p-0"
+        style={{ width: anchorRef.current?.offsetWidth }}
+        align="start"
+        side="bottom"
+        avoidCollisions={false}
+        dir="rtl"
+        onOpenAutoFocus={(event) => event.preventDefault()}
+        onCloseAutoFocus={(event) => event.preventDefault()}
+        onPointerDown={(event) => event.preventDefault()}
+        onInteractOutside={(event) => {
+          if (anchorRef.current?.contains(event.target)) event.preventDefault();
+        }}
+        onFocusOutside={(event) => {
+          if (anchorRef.current?.contains(event.target)) event.preventDefault();
+        }}
+      >
+        <Command shouldFilter={false}>
+          <CommandList>
+            <CommandGroup>
+              {suggestions.map((item) => (
+                <CommandItem
+                  key={item}
+                  value={item}
+                  onSelect={() => pickItem(item)}
+                  className="cursor-pointer text-xs"
+                >
+                  {item}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
 
 function FarmFormModal({ open, onClose, onSave, farm }) {
   const [form, setForm] = useState(farm || EMPTY_FARM);
@@ -105,8 +245,9 @@ function FarmFormModal({ open, onClose, onSave, farm }) {
   );
 }
 
-function WorkplaceFormModal({ open, onClose, onSave, workplace }) {
+function WorkplaceFormModal({ open, onClose, onSave, workplace, siblings = [] }) {
   const [form, setForm] = useState(workplace || EMPTY_WORKPLACE);
+  const contacts = useMemo(() => buildFarmContacts(siblings), [siblings]);
 
   useEffect(() => {
     setForm(workplace
@@ -120,6 +261,24 @@ function WorkplaceFormModal({ open, onClose, onSave, workplace }) {
   }, [open, workplace]);
 
   const set = (field) => (event) => setForm((prev) => ({ ...prev, [field]: event.target.value }));
+
+  const pickPerson = (person) => {
+    const phone = soleMatch(contacts.phonesByPerson, person);
+    setForm((prev) => ({
+      ...prev,
+      contact_person: person,
+      ...(phone ? { contact_phone: phone } : {}),
+    }));
+  };
+
+  const pickPhone = (phone) => {
+    const person = soleMatch(contacts.personsByPhone, phone);
+    setForm((prev) => ({
+      ...prev,
+      contact_phone: phone,
+      ...(person ? { contact_person: person } : {}),
+    }));
+  };
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
@@ -141,11 +300,22 @@ function WorkplaceFormModal({ open, onClose, onSave, workplace }) {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label>איש קשר</Label>
-              <Input value={form.contact_person} onChange={set('contact_person')} className="mt-1" />
+              <FarmContactInput
+                value={form.contact_person}
+                onChange={(contact_person) => setForm((prev) => ({ ...prev, contact_person }))}
+                onPick={pickPerson}
+                suggestions={contacts.persons}
+              />
             </div>
             <div>
               <Label>טלפון איש קשר</Label>
-              <Input value={form.contact_phone} onChange={set('contact_phone')} className="mt-1" placeholder="05X-XXXXXXX" />
+              <FarmContactInput
+                value={form.contact_phone}
+                onChange={(contact_phone) => setForm((prev) => ({ ...prev, contact_phone }))}
+                onPick={pickPhone}
+                suggestions={contacts.phones}
+                placeholder="05X-XXXXXXX"
+              />
             </div>
           </div>
           <div>
@@ -470,6 +640,13 @@ export default function Workplaces() {
         onClose={() => setWorkplaceForm(null)}
         onSave={handleSaveWorkplace}
         workplace={workplaceForm?.workplace}
+        siblings={
+          workplaceForm?.farmId
+            ? (workplacesByFarm.get(workplaceForm.farmId) || []).filter(
+                (item) => item.id !== workplaceForm.workplace?.id,
+              )
+            : []
+        }
       />
       <ImportWorkplacesModal
         open={showImport}
