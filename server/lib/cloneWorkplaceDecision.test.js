@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   CloneWorkplaceError,
+  MILUIM_WORKPLACE_NAME,
   NOT_WORKING_WORKPLACE_NAME,
   PRE_ASSIGNMENT_WORKPLACE_NAME,
   decideCloneWorkplace,
@@ -11,6 +12,7 @@ const notWorkingWp = { id: "nw-1", name: NOT_WORKING_WORKPLACE_NAME };
 const preAssignmentWp = { id: "pa-1", name: PRE_ASSIGNMENT_WORKPLACE_NAME };
 const nearWp = { id: "near-1", name: "קרוב" };
 const farmWp = { id: "farm-1", name: "משק א" };
+const miluimWp = { id: "miluim-1", name: MILUIM_WORKPLACE_NAME };
 
 const distanceWorkplaceMap = {
   קרוב: nearWp,
@@ -84,6 +86,49 @@ test("regular weekday remaps לא עובד to לפני שיבוץ", () => {
 test("regular weekday copies source workplace", () => {
   const result = decide();
   assert.deepEqual(result, { id: farmWp.id, name: farmWp.name });
+});
+
+test("crew free day copies מילואים", () => {
+  const result = decide({
+    src: { workplace_id: miluimWp.id, workplace_name: miluimWp.name },
+    student: { is_active: true, cohort: "צוות א", free_day: ["ב"] },
+    targetDayHeb: "ב",
+  });
+  assert.deepEqual(result, miluimWp);
+});
+
+test("crew non-free weekday copies מילואים", () => {
+  const result = decide({
+    src: { workplace_id: miluimWp.id, workplace_name: miluimWp.name },
+    student: { is_active: true, cohort: "צוות א", free_day: ["ד"] },
+    targetDayHeb: "ב",
+  });
+  assert.deepEqual(result, miluimWp);
+});
+
+test("approved absence still copies מילואים", () => {
+  const result = decide({
+    isAbsent: true,
+    src: { workplace_id: miluimWp.id, workplace_name: miluimWp.name },
+  });
+  assert.deepEqual(result, miluimWp);
+});
+
+test("Sunday copies מילואים instead of distance status", () => {
+  const result = decide({
+    isSunday: true,
+    src: { workplace_id: miluimWp.id, workplace_name: miluimWp.name },
+    student: { is_active: true, cohort: "צוות א", distance_status: "קרוב" },
+  });
+  assert.deepEqual(result, miluimWp);
+});
+
+test("inactive student with מילואים is skipped", () => {
+  const result = decide({
+    src: { workplace_id: miluimWp.id, workplace_name: miluimWp.name },
+    student: { is_active: false, cohort: "צוות א" },
+  });
+  assert.equal(result, null);
 });
 
 test("inactive student is skipped", () => {

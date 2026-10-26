@@ -177,6 +177,10 @@ export function CloneDialog({
             onChange={(e) => onCloneTargetDateChange(e.target.value)}
             className="w-full border border-border rounded-lg px-3 py-2 text-sm bg-card focus:outline-none focus:ring-2 focus:ring-primary/30"
           />
+          <p className="text-xs text-muted-foreground">
+            שיבוץ ל<strong>תתח - מילואים</strong> מועתק כמו שהוא — גם ביום
+            ראשון, גם ביום חופשי של צוות, וגם כשיש היעדרות מאושרת.
+          </p>
           {cloneTargetDate &&
             new Date(cloneTargetDate + "T12:00:00").getDay() === 0 && (
               <div className="bg-primary/10 border border-primary/30 rounded-lg px-3 py-2 text-xs text-primary">
