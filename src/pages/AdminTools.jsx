@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { assignmentApi } from '@/api/assignmentApi';
+import { workplaceApi } from '@/api/workplaceApi';
 import { studentApi } from '@/api/studentApi';
 import { useAuth } from '@/lib/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -45,7 +46,7 @@ export default function AdminTools() {
       { id: '69e5bf05a5a0b60e073731ae', name: 'לימודים' },
     ];
 
-    const allWorkplaces = await base44.entities.Workplace.list('created_date', 100);
+    const allWorkplaces = await workplaceApi.list({ sort: 'created_date', limit: 100 });
     const regularWp = allWorkplaces
       .filter(w => !['69e5bf0070786e7ad489a574', '69e5bf05a5a0b60e073731ae'].includes(w.id))
       .slice(0, 8)

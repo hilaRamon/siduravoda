@@ -10,6 +10,7 @@ import { format } from 'date-fns';
 import JSZip from 'jszip';
 import { mapAssignmentExportRow, normalizeAppSettings } from '@/lib/pricing';
 import { markWorkbookRtl } from '@/lib/excel';
+import { workplaceApi } from '@/api/workplaceApi';
 import { workplaceLogisticsApi } from '@/api/workplaceLogisticsApi';
 
 function mapLogisticsExportRow(row) {
@@ -39,7 +40,7 @@ function workbookToBuffer(wb) {
 async function buildAllWorkbooks() {
   const [students, workplaces, vehicles, assignments, logistics, settingsList] = await Promise.all([
     studentApi.list({ sort: 'full_name', limit: 1000 }),
-    base44.entities.Workplace.list('name', 1000),
+    workplaceApi.list({ sort: 'name', limit: 1000 }),
     vehicleApi.list({ sort: 'name', limit: 1000 }),
     assignmentApi.list({ sort: 'date', limit: 10000 }),
     workplaceLogisticsApi.list(),
@@ -112,7 +113,7 @@ async function exportStudents() {
 }
 
 async function exportWorkplaces() {
-  const workplaces = await base44.entities.Workplace.list('name', 1000);
+  const workplaces = await workplaceApi.list({ sort: 'name', limit: 1000 });
   const rows = workplaces.map(w => ({
     'שם מקום העבודה': w.name || '',
     'שם משק': w.farm_name || '',
