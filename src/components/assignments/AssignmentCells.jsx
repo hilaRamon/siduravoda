@@ -6,19 +6,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { ChevronsUpDown, Pencil, X } from "lucide-react";
 
 export function WorkplaceCell({
@@ -29,15 +17,8 @@ export function WorkplaceCell({
   onRemove,
 }) {
   const [open, setOpen] = useState(false);
-  const [search, setSearch] = useState("");
 
-  const filteredWorkplaces = workplaces.filter(
-    (w) => !search || w.name.includes(search),
-  );
-
-  const handleSelect = async (workplace) => {
-    setOpen(false);
-    setSearch("");
+  const handleSelect = async (_id, workplace) => {
     if (!workplace) return;
     const canAssign = await onAssign(student, workplace, assignment);
     if (!canAssign) setOpen(true);
@@ -51,15 +32,21 @@ export function WorkplaceCell({
   return (
     <td className="px-3 py-2 border-b border-border">
       <div className="flex items-center gap-1">
-        <Popover
+        <SearchableSelect
+          items={workplaces}
+          value={assignment?.workplace_id || ""}
+          onValueChange={handleSelect}
+          getValue={(w) => w.id}
+          getLabel={(w) => w.name}
+          placeholder="+ שבץ"
+          searchPlaceholder="חיפוש מקום עבודה..."
           open={open}
-          onOpenChange={(v) => {
-            setOpen(v);
-            if (!v) setSearch("");
-          }}
-        >
-          <PopoverTrigger asChild>
+          onOpenChange={setOpen}
+          contentClassName="w-64"
+          chevronSize={12}
+          trigger={() => (
             <button
+              type="button"
               className={`h-8 text-xs w-full border rounded-md px-2 flex items-center justify-between transition-colors ${
                 assignment
                   ? "bg-primary/10 border-primary/30 text-primary font-medium hover:bg-primary/20"
@@ -69,33 +56,8 @@ export function WorkplaceCell({
               <span className="truncate">{selectedName || "+ שבץ"}</span>
               <ChevronsUpDown size={12} className="shrink-0 opacity-50 mr-1" />
             </button>
-          </PopoverTrigger>
-          <PopoverContent className="w-64 p-0" align="start">
-            <Command shouldFilter={false}>
-              <CommandInput
-                placeholder="חיפוש מקום עבודה..."
-                className="h-8 text-xs"
-                value={search}
-                onValueChange={setSearch}
-              />
-              <CommandList>
-                <CommandEmpty>לא נמצא</CommandEmpty>
-                <CommandGroup>
-                  {filteredWorkplaces.map((w) => (
-                    <CommandItem
-                      key={w.id}
-                      value={w.name}
-                      onSelect={() => handleSelect(w)}
-                      className="text-xs cursor-pointer"
-                    >
-                      {w.name}
-                    </CommandItem>
-                  ))}
-                </CommandGroup>
-              </CommandList>
-            </Command>
-          </PopoverContent>
-        </Popover>
+          )}
+        />
         {assignment && (
           <button
             onClick={() => onRemove(assignment.id)}

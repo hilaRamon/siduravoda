@@ -190,6 +190,7 @@ export default function PeriodicWorkReport() {
       farmRows.forEach((r) =>
         rows.push({
           משק: farm,
+          "ח.פ": group.companyId || "",
           תאריך: formatDate(r.date),
           "מקום עבודה": r.workplaceName,
           תעריף: displayValue(r.rate),
@@ -200,6 +201,7 @@ export default function PeriodicWorkReport() {
       );
       rows.push({
         משק: "",
+        "ח.פ": "",
         תאריך: "",
         "מקום עבודה": 'סה"כ',
         תעריף: "",
@@ -396,7 +398,10 @@ export default function PeriodicWorkReport() {
               return (
                 <div key={farm}>
                   <div className="mb-2">
-                    <p className="text-sm font-bold">לכבוד: {farm}</p>
+                    <p className="text-sm font-bold">
+                      לכבוד: {farm}
+                      {group.companyId ? `  ח.פ ${group.companyId}` : ""}
+                    </p>
                     <p className="text-xs text-gray-500">
                       דוח עבודה תקופתי — {monthLabel} {year}
                     </p>

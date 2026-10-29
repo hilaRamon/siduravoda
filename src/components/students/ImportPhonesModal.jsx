@@ -4,8 +4,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button';
 import { Upload, Phone, X } from 'lucide-react';
 import { studentApi } from '@/api/studentApi';
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 
 // Normalize name for fuzzy matching: remove extra spaces, normalize chars
 function normalizeName(name) {
@@ -42,44 +41,26 @@ function findBestMatch(name, students) {
 }
 
 function ManualMatchPopover({ students, onSelect }) {
-  const [open, setOpen] = useState(false);
-  const [search, setSearch] = useState('');
-
-  const filtered = students.filter(s =>
-    !search || s.full_name?.includes(search)
-  ).slice(0, 50);
-
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <button className="text-xs underline text-primary hover:opacity-70">התאם ידנית</button>
-      </PopoverTrigger>
-      <PopoverContent className="w-64 p-0" align="start" dir="rtl">
-        <Command shouldFilter={false}>
-          <CommandInput
-            placeholder="חיפוש תלמיד..."
-            className="h-8 text-xs"
-            value={search}
-            onValueChange={setSearch}
-          />
-          <CommandList>
-            <CommandEmpty>לא נמצא</CommandEmpty>
-            <CommandGroup>
-              {filtered.map(s => (
-                <CommandItem
-                  key={s.id}
-                  value={s.full_name}
-                  onSelect={() => { onSelect(s); setOpen(false); setSearch(''); }}
-                  className="text-xs cursor-pointer"
-                >
-                  {s.full_name}
-                </CommandItem>
-              ))}
-            </CommandGroup>
-          </CommandList>
-        </Command>
-      </PopoverContent>
-    </Popover>
+    <SearchableSelect
+      items={students}
+      value=""
+      onValueChange={(_id, student) => {
+        if (student) onSelect(student);
+      }}
+      getValue={(s) => s.id}
+      getLabel={(s) => s.full_name}
+      placeholder="התאם ידנית"
+      searchPlaceholder="חיפוש תלמיד..."
+      maxItems={50}
+      showChevron={false}
+      contentClassName="w-64"
+      trigger={() => (
+        <button type="button" className="text-xs underline text-primary hover:opacity-70">
+          התאם ידנית
+        </button>
+      )}
+    />
   );
 }
 

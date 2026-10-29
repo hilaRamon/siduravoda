@@ -3,9 +3,9 @@ import { useCreateManualAbsence } from '@/queries/absenceQueries';
 import { useCreateFarmerRequest } from '@/queries/farmerRequestQueries';
 import { Button } from '@/components/ui/button';
 import { Calendar as DayPickerCalendar } from '@/components/ui/calendar';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 import { Plus, X } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
 function isWeekend(day) {
@@ -41,9 +41,7 @@ export function AddMultiDayForm({
   pending = false,
 }) {
   const [open, setOpen] = useState(false);
-  const [popoverOpen, setPopoverOpen] = useState(false);
   const [datePickerOpen, setDatePickerOpen] = useState(false);
-  const [search, setSearch] = useState('');
   const [selectedItem, setSelectedItem] = useState(null);
   const [detail, setDetail] = useState('');
   const [selectedDates, setSelectedDates] = useState([]);
@@ -51,11 +49,6 @@ export function AddMultiDayForm({
   const [submitting, setSubmitting] = useState(false);
 
   const isBusy = submitting || pending;
-
-  const filtered = items.filter((item) => {
-    if (!search) return true;
-    return (getItemLabel(item) || '').includes(search);
-  });
 
   const sortedSelectedDates = useMemo(
     () => [...selectedDates].sort((a, b) => a - b),
@@ -65,7 +58,6 @@ export function AddMultiDayForm({
   const resetForm = () => {
     setSelectedItem(null);
     setDetail('');
-    setSearch('');
     setSelectedDates([]);
     setDatePickerOpen(false);
     setError('');
@@ -114,47 +106,20 @@ export function AddMultiDayForm({
 
   return (
     <div className="mt-1 space-y-1.5 bg-secondary/30 rounded-lg p-2">
-      <Popover open={popoverOpen} onOpenChange={(v) => { setPopoverOpen(v); if (!v) setSearch(''); }}>
-        <PopoverTrigger asChild>
-          <button className="w-full h-7 border border-border rounded-md px-2 text-xs flex items-center justify-between bg-card hover:bg-secondary/40">
-            <span className={selectedItem ? '' : 'text-muted-foreground'}>
-              {selectedItem ? getItemLabel(selectedItem) : selectPlaceholder}
-            </span>
-          </button>
-        </PopoverTrigger>
-        <PopoverContent className="w-56 p-0" align="start" dir="rtl">
-          <Command shouldFilter={false}>
-            <CommandInput
-              placeholder="חיפוש..."
-              className="h-7 text-xs"
-              value={search}
-              onValueChange={setSearch}
-            />
-            <CommandList>
-              <CommandEmpty>לא נמצא</CommandEmpty>
-              <CommandGroup>
-                {filtered.map((item) => {
-                  const label = getItemLabel(item);
-                  return (
-                    <CommandItem
-                      key={item.id}
-                      value={label}
-                      onSelect={() => {
-                        setSelectedItem(item);
-                        setPopoverOpen(false);
-                        setSearch('');
-                      }}
-                      className="text-xs cursor-pointer"
-                    >
-                      {label}
-                    </CommandItem>
-                  );
-                })}
-              </CommandGroup>
-            </CommandList>
-          </Command>
-        </PopoverContent>
-      </Popover>
+      <SearchableSelect
+        items={items}
+        value={selectedItem?.id || ''}
+        onValueChange={(_id, item) => {
+          if (item) setSelectedItem(item);
+        }}
+        getValue={(item) => item.id}
+        getLabel={getItemLabel}
+        placeholder={selectPlaceholder}
+        searchPlaceholder="חיפוש..."
+        triggerClassName="h-7 px-2 text-xs bg-card hover:bg-secondary/40 shadow-none"
+        searchInputClassName="h-7 text-xs"
+        chevronSize={12}
+      />
 
       {detailField && (
         <input

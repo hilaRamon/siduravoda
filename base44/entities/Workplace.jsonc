@@ -4,36 +4,23 @@
   "properties": {
     "name": {
       "type": "string",
-      "description": "\u05e9\u05dd \u05de\u05e7\u05d5\u05dd \u05d4\u05e2\u05d1\u05d5\u05d3\u05d4"
-    },
-    "farm_name": {
-      "type": "string",
-      "description": "\u05e9\u05dd \u05de\u05e9\u05e7"
-    },
-    "address": {
-      "type": "string",
-      "description": "\u05db\u05ea\u05d5\u05d1\u05ea"
-    },
-    "company_id": {
-      "type": "string",
-      "description": "\u05d7.\u05e4"
+      "description": "שם מקום העבודה"
     },
     "contact_phone": {
       "type": "string",
-      "description": "\u05d8\u05dc\u05e4\u05d5\u05df \u05d0\u05d9\u05e9 \u05e7\u05e9\u05e8"
+      "description": "טלפון איש קשר"
     },
-    "accounting_phone": {
+    "contact_person": {
       "type": "string",
-      "description": "\u05d8\u05dc\u05e4\u05d5\u05df \u05d4\u05e0\u05d4\"\u05d7"
+      "description": "איש קשר"
     },
-    "accounting_email": {
+    "farm_id": {
       "type": "string",
-      "description": "\u05de\u05d9\u05d9\u05dc \u05d4\u05e0\u05d4\"\u05d7"
+      "description": "מזהה משק"
     },
-    "has_agreement": {
-      "type": "boolean",
-      "description": "\u05d4\u05e1\u05db\u05dd",
-      "default": false
+    "notes": {
+      "type": "string",
+      "description": "הערות"
     }
   },
   "required": [

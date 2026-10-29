@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Upload, AlertCircle, CheckCircle2 } from 'lucide-react';
-import { base44 } from '@/api/base44Client';
+import { farmApi } from '@/api/farmApi';
 import { workplaceApi } from '@/api/workplaceApi';
 import * as XLSX from 'xlsx';
 
@@ -12,9 +12,11 @@ const SYSTEM_FIELDS = [
   { key: 'farm_name', label: 'שם משק', required: false },
   { key: 'address', label: 'כתובת', required: false },
   { key: 'company_id', label: 'ח.פ', required: false },
+  { key: 'contact_person', label: 'איש קשר', required: false },
   { key: 'contact_phone', label: 'טלפון איש קשר', required: false },
   { key: 'accounting_phone', label: 'טלפון הנה"ח', required: false },
   { key: 'accounting_email', label: 'מייל הנה"ח', required: false },
+  { key: 'notes', label: 'הערות', required: false },
 ];
 
 function parseExcel(buffer) {
@@ -58,7 +60,9 @@ export default function ImportWorkplacesModal({ open, onClose, onImported }) {
           (sf.key === 'name' && (h.includes('שם') || h.includes('name'))) ||
           (sf.key === 'farm_name' && h.includes('משק')) ||
           (sf.key === 'company_id' && (h.includes('ח.פ') || h.includes('עוסק'))) ||
+          (sf.key === 'contact_person' && h.includes('איש קשר') && !h.includes('טלפון')) ||
           (sf.key === 'contact_phone' && (h.includes('קשר') || h.includes('טלפון'))) ||
+          (sf.key === 'notes' && h.includes('הערות')) ||
           (sf.key === 'accounting_phone' && h.includes('הנה')) ||
           (sf.key === 'address' && (h.includes('כתובת') || h.includes('address'))) ||
           (sf.key === 'accounting_email' && (h.includes('מייל') || h.includes('email')))
@@ -91,31 +95,51 @@ export default function ImportWorkplacesModal({ open, onClose, onImported }) {
 
   const handleImport = async () => {
     setImporting(true);
-    const existing = await workplaceApi.list();
+    const [existing, existingFarms] = await Promise.all([
+      workplaceApi.list(),
+      farmApi.list(),
+    ]);
     const existingByName = {};
     existing.forEach(w => { existingByName[w.name?.trim()] = w; });
+    const farmsByName = {};
+    existingFarms.forEach(farm => { farmsByName[farm.name?.trim()] = farm; });
 
-    const toCreate = [];
-    const toUpdate = [];
-
+    let created = 0;
     for (const row of rows) {
       const name = (mapping.name ? row[mapping.name] : '')?.trim();
-      if (!name) continue;
+      if (!name || existingByName[name]) continue;
       const data = { name };
-      ['farm_name', 'address', 'company_id', 'contact_phone', 'accounting_phone', 'accounting_email'].forEach(k => {
+      ['farm_name', 'address', 'company_id', 'contact_person', 'contact_phone', 'accounting_phone', 'accounting_email', 'notes'].forEach(k => {
         if (mapping[k]) { const v = row[mapping[k]]?.trim(); if (v) data[k] = v; }
       });
 
-      if (!existingByName[name]) {
-        toCreate.push(data);
+      let farmId = '';
+      if (data.farm_name) {
+        let farm = farmsByName[data.farm_name];
+        if (!farm) {
+          farm = await farmApi.create({
+            name: data.farm_name,
+            address: data.address,
+            company_id: data.company_id,
+            accounting_phone: data.accounting_phone,
+            accounting_email: data.accounting_email,
+          });
+          farmsByName[data.farm_name] = farm;
+        }
+        farmId = farm.id;
       }
-    }
 
-    const CHUNK = 50;
-    for (let i = 0; i < toCreate.length; i += CHUNK) {
-      await base44.entities.Workplace.bulkCreate(toCreate.slice(i, i + CHUNK));
+      await workplaceApi.create({
+        name,
+        contact_person: data.contact_person,
+        contact_phone: data.contact_phone,
+        notes: data.notes,
+        ...(farmId ? { farm_id: farmId } : {}),
+      });
+      existingByName[name] = true;
+      created += 1;
     }
-    setImportCount(toCreate.length);
+    setImportCount(created);
     setImporting(false);
     setStep('done');
     onImported();

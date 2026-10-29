@@ -10,6 +10,7 @@ import { format } from 'date-fns';
 import JSZip from 'jszip';
 import { mapAssignmentExportRow, normalizeAppSettings } from '@/lib/pricing';
 import { markWorkbookRtl } from '@/lib/excel';
+import { farmApi } from '@/api/farmApi';
 import { workplaceApi } from '@/api/workplaceApi';
 import { workplaceLogisticsApi } from '@/api/workplaceLogisticsApi';
 
@@ -32,15 +33,34 @@ function downloadWorkbook(wb, filename) {
   XLSX.writeFile(wb, filename);
 }
 
+function workplaceExportRows(workplaces, farms) {
+  const farmById = Object.fromEntries((farms || []).map((farm) => [farm.id, farm]));
+  return workplaces.map((workplace) => {
+    const farm = farmById[workplace.farm_id] || {};
+    return {
+      'שם מקום העבודה': workplace.name || '',
+      'שם משק': farm.name || '',
+      'כתובת': farm.address || '',
+      'ח.פ': farm.company_id || '',
+      'איש קשר': workplace.contact_person || '',
+      'טלפון איש קשר': workplace.contact_phone || '',
+      'טלפון הנה"ח': farm.accounting_phone || '',
+      'מייל הנה"ח': farm.accounting_email || '',
+      'הערות': workplace.notes || '',
+    };
+  });
+}
+
 function workbookToBuffer(wb) {
   markWorkbookRtl(wb);
   return XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
 }
 
 async function buildAllWorkbooks() {
-  const [students, workplaces, vehicles, assignments, logistics, settingsList] = await Promise.all([
+  const [students, workplaces, farms, vehicles, assignments, logistics, settingsList] = await Promise.all([
     studentApi.list({ sort: 'full_name', limit: 1000 }),
     workplaceApi.list({ sort: 'name', limit: 1000 }),
+    farmApi.list({ sort: 'name', limit: 1000 }),
     vehicleApi.list({ sort: 'name', limit: 1000 }),
     assignmentApi.list({ sort: 'date', limit: 10000 }),
     workplaceLogisticsApi.list(),
@@ -59,11 +79,7 @@ async function buildAllWorkbooks() {
   XLSX.utils.book_append_sheet(wbStudents, wsStudents, 'תלמידים וצוות');
 
   // Workplaces
-  const wsWorkplaces = XLSX.utils.json_to_sheet(workplaces.map(w => ({
-    'שם מקום העבודה': w.name || '', 'שם משק': w.farm_name || '', 'כתובת': w.address || '',
-    'ח.פ': w.company_id || '', 'טלפון איש קשר': w.contact_phone || '',
-    'טלפון הנה"ח': w.accounting_phone || '', 'מייל הנה"ח': w.accounting_email || '',
-  })));
+  const wsWorkplaces = XLSX.utils.json_to_sheet(workplaceExportRows(workplaces, farms));
   const wbWorkplaces = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wbWorkplaces, wsWorkplaces, 'מקומות עבודה');
 
@@ -113,16 +129,11 @@ async function exportStudents() {
 }
 
 async function exportWorkplaces() {
-  const workplaces = await workplaceApi.list({ sort: 'name', limit: 1000 });
-  const rows = workplaces.map(w => ({
-    'שם מקום העבודה': w.name || '',
-    'שם משק': w.farm_name || '',
-    'כתובת': w.address || '',
-    'ח.פ': w.company_id || '',
-    'טלפון איש קשר': w.contact_phone || '',
-    'טלפון הנה"ח': w.accounting_phone || '',
-    'מייל הנה"ח': w.accounting_email || '',
-  }));
+  const [workplaces, farms] = await Promise.all([
+    workplaceApi.list({ sort: 'name', limit: 1000 }),
+    farmApi.list({ sort: 'name', limit: 1000 }),
+  ]);
+  const rows = workplaceExportRows(workplaces, farms);
   const ws = XLSX.utils.json_to_sheet(rows);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'מקומות עבודה');

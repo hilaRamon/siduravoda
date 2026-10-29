@@ -6,21 +6,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ChevronsUpDown, Copy, UserPlus } from "lucide-react";
+import { Copy, UserPlus } from "lucide-react";
 
 export function CohortSelectDialog({
   open,
@@ -265,63 +253,23 @@ export function BulkEditDialog({
               מקום עבודה
               {splitWork ? " *" : ""}
             </label>
-            <Popover
+            <SearchableSelect
+              items={workplaces}
+              value={bulkWorkplace}
+              onValueChange={onBulkWorkplaceChange}
+              getValue={(w) => w.id}
+              getLabel={(w) => w.name}
+              placeholder={splitWork ? "בחר מקום עבודה" : "— ללא שינוי —"}
+              searchPlaceholder="חיפוש..."
+              extraItem={
+                splitWork
+                  ? undefined
+                  : { value: "", label: "— ללא שינוי —" }
+              }
               open={bulkWorkplaceOpen}
               onOpenChange={onBulkWorkplaceOpenChange}
-            >
-              <PopoverTrigger asChild>
-                <button className="h-9 w-full border border-border rounded-md px-3 text-sm flex items-center justify-between bg-card hover:bg-secondary/40 transition-colors">
-                  <span
-                    className={bulkWorkplace ? "" : "text-muted-foreground"}
-                  >
-                    {bulkWorkplace
-                      ? workplaces.find((w) => w.id === bulkWorkplace)?.name
-                      : splitWork
-                        ? "בחר מקום עבודה"
-                        : "— ללא שינוי —"}
-                  </span>
-                  <ChevronsUpDown size={14} className="opacity-50" />
-                </button>
-              </PopoverTrigger>
-              <PopoverContent className="w-72 p-0" align="start">
-                <Command>
-                  <CommandInput
-                    placeholder="חיפוש..."
-                    className="h-8 text-xs"
-                  />
-                  <CommandList>
-                    <CommandEmpty>לא נמצא</CommandEmpty>
-                    <CommandGroup>
-                      {!splitWork && (
-                        <CommandItem
-                          value="__clear__"
-                          onSelect={() => {
-                            onBulkWorkplaceChange("");
-                            onBulkWorkplaceOpenChange(false);
-                          }}
-                          className="text-xs text-muted-foreground"
-                        >
-                          — ללא שינוי —
-                        </CommandItem>
-                      )}
-                      {workplaces.map((w) => (
-                        <CommandItem
-                          key={w.id}
-                          value={w.name}
-                          onSelect={() => {
-                            onBulkWorkplaceChange(w.id);
-                            onBulkWorkplaceOpenChange(false);
-                          }}
-                          className="text-xs"
-                        >
-                          {w.name}
-                        </CommandItem>
-                      ))}
-                    </CommandGroup>
-                  </CommandList>
-                </Command>
-              </PopoverContent>
-            </Popover>
+              triggerClassName="h-9 bg-card hover:bg-secondary/40 shadow-none"
+            />
           </div>
 
           <div>

@@ -1,5 +1,6 @@
 import { getModel } from "../models/index.js";
 import Assignment from "../models/Assignment.js";
+import Workplace from "../models/Workplace.js";
 import {
   getAssignmentDefaults,
   normalizeAppSettings,
@@ -49,7 +50,6 @@ async function findStudentIdByPhone(phone) {
 }
 
 async function getNotWorkingWorkplace() {
-  const Workplace = getModel("Workplace");
   const workplace = await Workplace.findOne({
     name: NOT_WORKING_WORKPLACE_NAME,
   }).lean();

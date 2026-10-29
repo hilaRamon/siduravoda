@@ -29,6 +29,7 @@ import {
 } from "@/queries/assignmentQueries";
 import { useOptimisticListItemUpdate } from "@/hooks/useOptimisticListItemUpdate";
 import { useStudents } from "@/queries/studentQueries";
+import { useFarms } from "@/queries/farmQueries";
 import { useWorkplaces } from "@/queries/workplaceQueries";
 import { useRoles } from "@/queries/roleQueries";
 import { useFarmerRequestsByDate } from "@/queries/farmerRequestQueries";
@@ -93,7 +94,19 @@ export default function Assignments() {
   const { data: assignments = [] } = useAssignments(date);
   const { logisticsMap } = useLogisticsByWorkplace(date);
   const { students } = useStudents();
-  const { data: workplaces = [] } = useWorkplaces();
+  const { data: workplaceRows = [] } = useWorkplaces();
+  const { data: farms = [] } = useFarms();
+  const workplaces = useMemo(() => {
+    const agreementByFarmId = new Map(
+      farms.map((farm) => [farm.id, farm.has_agreement === true]),
+    );
+    return workplaceRows.map((workplace) => ({
+      ...workplace,
+      has_agreement: workplace.farm_id
+        ? agreementByFarmId.get(workplace.farm_id) === true
+        : false,
+    }));
+  }, [workplaceRows, farms]);
   const { data: roles = [] } = useRoles();
   const { data: farmerRequests = [] } = useFarmerRequestsByDate(date);
   const { data: approvedAbsences = [] } = useAbsenceRequests({

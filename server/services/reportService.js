@@ -1,5 +1,7 @@
 import { getModel } from "../models/index.js";
 import Assignment from "../models/Assignment.js";
+import Farm from "../models/Farm.js";
+import Workplace from "../models/Workplace.js";
 import { SKIP_FARMS, SKIP_WORKPLACES } from "../lib/reportConstants.js";
 import { primaryWorkNumberMatch } from "../lib/assignmentWorkNumber.js";
 import {
@@ -26,21 +28,41 @@ async function getAppSettings() {
   return normalizeAppSettings(settings);
 }
 
+async function listWorkplacesWithFarmName() {
+  const [workplaces, farms] = await Promise.all([
+    Workplace.find().select("name farm_id").lean(),
+    Farm.find().select("name company_id").lean(),
+  ]);
+  const farmById = new Map(
+    farms.map((farm) => [
+      farm._id.toString(),
+      { name: farm.name || "", companyId: farm.company_id || "" },
+    ]),
+  );
+  return workplaces.map((workplace) => {
+    const farm = farmById.get(workplace.farm_id);
+    return {
+      id: workplace._id.toString(),
+      name: workplace.name || "",
+      farmName: farm?.name || "",
+      companyId: farm?.companyId || "",
+    };
+  });
+}
+
 async function getWorkByWorkplaceMaps() {
-  const Workplace = getModel("Workplace");
-  const workplaces = await Workplace.find().select("name farm_name").lean();
+  const workplaces = await listWorkplacesWithFarmName();
   const byId = {};
   const skipIds = [];
 
   for (const workplace of workplaces) {
-    const id = workplace._id.toString();
-    const name = workplace.name || "";
-    byId[id] = {
-      name,
-      farmName: workplace.farm_name || "",
+    byId[workplace.id] = {
+      name: workplace.name,
+      farmName: workplace.farmName,
+      companyId: workplace.companyId,
     };
-    if (SKIP_WORKPLACES.includes(name)) {
-      skipIds.push(id);
+    if (SKIP_WORKPLACES.includes(workplace.name)) {
+      skipIds.push(workplace.id);
     }
   }
 
@@ -48,7 +70,6 @@ async function getWorkByWorkplaceMaps() {
 }
 
 async function getStudentWorkWorkplaceMaps() {
-  const Workplace = getModel("Workplace");
   const workplaces = await Workplace.find().select("name").lean();
   const byId = {};
   const skipIds = [];
@@ -66,18 +87,20 @@ async function getStudentWorkWorkplaceMaps() {
 }
 
 async function getArzenuWorkplaceMaps() {
-  const Workplace = getModel("Workplace");
-  const workplaces = await Workplace.find().select("name farm_name").lean();
+  const workplaces = await listWorkplacesWithFarmName();
   const byId = {};
   const skipIds = [];
 
   for (const workplace of workplaces) {
-    const id = workplace._id.toString();
-    const name = workplace.name || "";
-    const farmName = workplace.farm_name || "";
-    byId[id] = { name, farmName };
-    if (SKIP_WORKPLACES.includes(name) || SKIP_FARMS.includes(farmName)) {
-      skipIds.push(id);
+    byId[workplace.id] = {
+      name: workplace.name,
+      farmName: workplace.farmName,
+    };
+    if (
+      SKIP_WORKPLACES.includes(workplace.name) ||
+      SKIP_FARMS.includes(workplace.farmName)
+    ) {
+      skipIds.push(workplace.id);
     }
   }
 
@@ -195,7 +218,13 @@ function toFarmGroups(rowBuckets) {
   for (const wpGroup of Object.values(rowBuckets)) {
     const farmName = wpGroup.farmName || wpGroup.workplaceName;
     if (!farmBuckets[farmName]) {
-      farmBuckets[farmName] = { farmName, rows: [] };
+      farmBuckets[farmName] = {
+        farmName,
+        companyId: wpGroup.companyId || "",
+        rows: [],
+      };
+    } else if (!farmBuckets[farmName].companyId && wpGroup.companyId) {
+      farmBuckets[farmName].companyId = wpGroup.companyId;
     }
     farmBuckets[farmName].rows.push(...wpGroup.rows);
   }
@@ -212,6 +241,7 @@ function toFarmGroups(rowBuckets) {
       });
       return {
         farmName: group.farmName,
+        companyId: group.companyId || "",
         rows,
         totals: buildTotals(rows),
       };
@@ -401,6 +431,7 @@ export async function getWorkByWorkplaceReport({
       rowBuckets[workplaceId] = {
         workplaceName,
         farmName: byId[workplaceId]?.farmName || "",
+        companyId: byId[workplaceId]?.companyId || "",
         rows: [],
       };
     }

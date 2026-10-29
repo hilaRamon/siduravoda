@@ -23,19 +23,6 @@ export const entityDefinitions = {
       color: { type: String },
     },
   },
-  Workplace: {
-    required: ["name"],
-    schema: {
-      name: { type: String, required: true, trim: true },
-      farm_name: { type: String },
-      address: { type: String },
-      company_id: { type: String },
-      contact_phone: { type: String },
-      accounting_phone: { type: String },
-      accounting_email: { type: String },
-      has_agreement: { type: Boolean, default: false },
-    },
-  },
   BackupSettings: {
     required: [],
     schema: {

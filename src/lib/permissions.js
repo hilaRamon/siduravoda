@@ -50,7 +50,7 @@ export const NAV_ITEMS = [
   { to: '/', label: 'שיבוצים יומיים' },
   { to: '/calendar', label: 'יומן' },
   { to: '/students', label: 'תלמידים וצוות' },
-  { to: '/workplaces', label: 'מקומות עבודה' },
+  { to: '/workplaces', label: 'משקים' },
   { to: '/roles', label: 'תפקידים' },
   { to: '/vehicles', label: 'רכבים' },
   { to: '/reports', label: 'דוחות' },

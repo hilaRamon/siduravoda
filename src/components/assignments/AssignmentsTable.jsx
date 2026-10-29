@@ -6,6 +6,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { UserPlus, X } from "lucide-react";
 import {
@@ -141,26 +142,24 @@ export default function AssignmentsTable({
             <th className="px-3 py-2 text-right font-semibold text-muted-foreground w-56">
               <div className="flex flex-col gap-1">
                 <span className="text-xs">מקום עבודה</span>
-                <Select
-                  value={filterWorkplace}
+                <SearchableSelect
+                  items={workplaces.filter((w) =>
+                    assignments.some((a) => a.workplace_id === w.id),
+                  )}
+                  value={
+                    filterWorkplace && filterWorkplace !== "all"
+                      ? filterWorkplace
+                      : "all"
+                  }
                   onValueChange={onFilterWorkplaceChange}
-                >
-                  <SelectTrigger className="h-7 text-xs w-full">
-                    <SelectValue placeholder="הכל" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">הכל</SelectItem>
-                    {workplaces
-                      .filter((w) =>
-                        assignments.some((a) => a.workplace_id === w.id),
-                      )
-                      .map((w) => (
-                        <SelectItem key={w.id} value={w.id}>
-                          {w.name}
-                        </SelectItem>
-                      ))}
-                  </SelectContent>
-                </Select>
+                  getValue={(w) => w.id}
+                  getLabel={(w) => w.name}
+                  placeholder="הכל"
+                  searchPlaceholder="חיפוש..."
+                  extraItem={{ value: "all", label: "הכל" }}
+                  triggerClassName="h-7 text-xs w-full"
+                  chevronSize={12}
+                />
               </div>
             </th>
             <th className="px-3 py-2 text-right font-semibold text-muted-foreground w-40">

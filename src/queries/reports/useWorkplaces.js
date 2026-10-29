@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { workplaceApi } from "@/api/workplaceApi";
+import { useFarms } from "@/queries/farmQueries";
 import { reportKeys } from "./keys";
 
 export function useWorkplaces() {
@@ -8,13 +9,17 @@ export function useWorkplaces() {
     queryKey: reportKeys.workplaces(),
     queryFn: () => workplaceApi.list({ sort: "name", limit: 1000 }),
   });
+  const farmsQuery = useFarms();
 
   const farmNames = useMemo(() => {
-    const names = new Set(
-      (query.data ?? []).map((w) => w.farm_name).filter(Boolean),
-    );
+    const names = (farmsQuery.data ?? []).map((farm) => farm.name).filter(Boolean);
     return [...names].sort((a, b) => a.localeCompare(b, "he"));
-  }, [query.data]);
+  }, [farmsQuery.data]);
 
-  return { ...query, workplaces: query.data ?? [], farmNames };
+  return {
+    ...query,
+    isLoading: query.isLoading || farmsQuery.isLoading,
+    workplaces: query.data ?? [],
+    farmNames,
+  };
 }

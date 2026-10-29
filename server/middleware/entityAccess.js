@@ -9,9 +9,7 @@ function isReadMethod(method) {
   return method === "GET" || method === "POST"; // POST used for /filter
 }
 
-const REPORTER_READ_ENTITIES = new Set([
-  "Workplace",
-]);
+const REPORTER_READ_ENTITIES = new Set();
 
 export function checkEntityAccess(req, res, next) {
   const entityName = req.entityName || req.params.entityName;
