@@ -1,4 +1,5 @@
 import express from "express";
+import { OAuth2Client } from "google-auth-library";
 import { getModel } from "../models/index.js";
 import { hashPassword, verifyPassword, generateTemporaryPassword } from "../lib/password.js";
 import { signToken } from "../lib/jwt.js";
@@ -13,6 +14,7 @@ import { hydrateUser } from "../services/permissionRuleService.js";
 import {
   createRememberToken,
   findValidRememberToken,
+  findValidRememberTokens,
   readRememberEntries,
   revokeAllRememberTokensForUser,
   setRememberCookie,
@@ -121,6 +123,120 @@ router.post("/auto-login", async (req, res, next) => {
       return res.status(401).json({ message: "Not remembered on this device", code: "not_remembered" });
     }
 
+    await slideRememberToken(match.doc, { force: true });
+    setRememberCookie(res, entries);
+
+    const token = signToken({ sub: user.id, role: user.role });
+    return res.json({ token, user: await toClientUser(user) });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+function getGoogleClientId() {
+  return (process.env.GOOGLE_CLIENT_ID || "").trim();
+}
+
+function googleUserNotFound(res) {
+  return res.status(403).json({
+    message: "No account exists for this Google email",
+    code: "google_user_not_found",
+  });
+}
+
+function userCanSignIn(user, envAdmin) {
+  if (!user || user.is_active === false) return false;
+  if (user.role === "admin" && user.email !== envAdmin.email) return false;
+  return true;
+}
+
+// ─── Google client ID (public) ────────────────────────────────────────────────
+
+router.get("/google-client-id", (_req, res) => {
+  const clientId = getGoogleClientId();
+  res.json({ clientId: clientId || null });
+});
+
+// ─── Google sign-in (existing users only) ─────────────────────────────────────
+
+router.post("/google", async (req, res, next) => {
+  try {
+    const credential = String(req.body.credential || "").trim();
+    const rememberMe = Boolean(req.body.rememberMe);
+    if (!credential) {
+      return res.status(400).json({ message: "Google credential is required" });
+    }
+
+    const clientId = getGoogleClientId();
+    if (!clientId) {
+      return res.status(500).json({ message: "Google sign-in is not configured" });
+    }
+
+    let email = "";
+    try {
+      const client = new OAuth2Client(clientId);
+      const ticket = await client.verifyIdToken({
+        idToken: credential,
+        audience: clientId,
+      });
+      const payload = ticket.getPayload() || {};
+      email = String(payload.email || "").trim().toLowerCase();
+      const verified = payload.email_verified === true || payload.email_verified === "true";
+      if (!email || !verified) {
+        return res.status(401).json({ message: "Google account email is not verified" });
+      }
+    } catch {
+      return res.status(401).json({ message: "Invalid Google credential" });
+    }
+
+    const User = getModel("User");
+    const user = await User.findOne({ email });
+    const envAdmin = getEnvAdmin();
+    if (!userCanSignIn(user, envAdmin)) {
+      return googleUserNotFound(res);
+    }
+
+    if (rememberMe) {
+      await issueRememberCookie(req, res, user.id);
+    }
+
+    const token = signToken({ sub: user.id, role: user.role });
+    return res.json({ token, user: await toClientUser(user) });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+// ─── Resume a single remembered session (no email) ────────────────────────────
+
+router.post("/remembered-session", async (req, res, next) => {
+  try {
+    const entries = readRememberEntries(req);
+    const matches = await findValidRememberTokens(entries);
+    if (!matches.length) {
+      return res.status(401).json({ message: "Not remembered on this device", code: "not_remembered" });
+    }
+
+    const User = getModel("User");
+    const envAdmin = getEnvAdmin();
+    const usersById = new Map();
+
+    for (const match of matches) {
+      const userId = String(match.doc.userId);
+      if (usersById.has(userId)) continue;
+      const user = await User.findById(match.doc.userId);
+      if (!userCanSignIn(user, envAdmin)) continue;
+      usersById.set(userId, { user, match });
+    }
+
+    if (usersById.size === 0) {
+      return res.status(401).json({ message: "Not remembered on this device", code: "not_remembered" });
+    }
+    if (usersById.size > 1) {
+      return res.status(401).json({ message: "Choose an account", code: "choose_account" });
+    }
+
+    const { user, match } = [...usersById.values()][0];
     await slideRememberToken(match.doc, { force: true });
     setRememberCookie(res, entries);
 

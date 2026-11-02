@@ -189,6 +189,25 @@ export const base44 = {
       setAuthToken(result.token);
       return result.user;
     },
+    async loginWithGoogle(credential, rememberMe = false) {
+      const result = await apiRequest("/api/auth/google", {
+        method: "POST",
+        body: JSON.stringify({ credential, rememberMe }),
+      });
+      setAuthToken(result.token);
+      return result.user;
+    },
+    async rememberedSession() {
+      const result = await apiRequest("/api/auth/remembered-session", {
+        method: "POST",
+        body: JSON.stringify({}),
+      });
+      setAuthToken(result.token);
+      return result.user;
+    },
+    googleClientId() {
+      return apiRequest("/api/auth/google-client-id");
+    },
     listLoginEmails() {
       return apiRequest("/api/auth/login-emails");
     },

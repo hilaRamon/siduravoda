@@ -1,6 +1,6 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useNavigate, useLocation, Navigate } from 'react-router-dom';
-import { useAuth } from '@/lib/AuthContext';
+import { useAuth, EXPLICIT_LOGOUT_KEY } from '@/lib/AuthContext';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -29,8 +29,38 @@ function getPostLoginTarget(user, from) {
   return from;
 }
 
+const GOOGLE_USER_NOT_FOUND =
+  'לא נמצא משתמש עם כתובת האימייל הזו. ההתחברות עם Google אפשרית רק למשתמשים קיימים.';
+
+function loadGoogleIdentityScript() {
+  if (window.google?.accounts?.id) return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    const existing = document.querySelector('script[src="https://accounts.google.com/gsi/client"]');
+    if (existing) {
+      existing.addEventListener('load', () => resolve(), { once: true });
+      existing.addEventListener('error', () => reject(new Error('Google script failed')), { once: true });
+      return;
+    }
+    const script = document.createElement('script');
+    script.src = 'https://accounts.google.com/gsi/client';
+    script.async = true;
+    script.defer = true;
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error('Google script failed'));
+    document.head.appendChild(script);
+  });
+}
+
 export default function Login() {
-  const { login, autoLogin, isAuthenticated, user, isLoadingAuth } = useAuth();
+  const {
+    login,
+    autoLogin,
+    loginWithGoogle,
+    resumeRememberedSession,
+    isAuthenticated,
+    user,
+    isLoadingAuth,
+  } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -44,11 +74,113 @@ export default function Login() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [checkingRemember, setCheckingRemember] = useState(false);
-
+  const [resumingSession, setResumingSession] = useState(() => {
+    if (sessionStorage.getItem(EXPLICIT_LOGOUT_KEY) === '1') {
+      sessionStorage.removeItem(EXPLICIT_LOGOUT_KEY);
+      return false;
+    }
+    return true;
+  });
+  const [googleClientId, setGoogleClientId] = useState('');
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const googleBtnRef = useRef(null);
+  const rememberMeRef = useRef(rememberMe);
   const from =
     (typeof location.state?.from === 'string' ? location.state.from : null) ||
     location.state?.from?.pathname ||
     '/';
+  const fromRef = useRef(from);
+  rememberMeRef.current = rememberMe;
+  fromRef.current = from;
+
+  useEffect(() => {
+    if (!resumingSession) return undefined;
+    let cancelled = false;
+    (async () => {
+      try {
+        const loggedIn = await resumeRememberedSession();
+        if (!cancelled) {
+          navigate(getPostLoginTarget(loggedIn, fromRef.current), { replace: true });
+        }
+      } catch {
+        if (!cancelled) setResumingSession(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [resumingSession, resumeRememberedSession, navigate]);
+
+  useEffect(() => {
+    if (resumingSession) return undefined;
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await base44.auth.googleClientId();
+        if (!cancelled) setGoogleClientId(data?.clientId || '');
+      } catch {
+        if (!cancelled) setGoogleClientId('');
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [resumingSession]);
+
+  const handleGoogleCredential = useCallback(async (response) => {
+    const credential = response?.credential;
+    if (!credential) return;
+    setError('');
+    setGoogleLoading(true);
+    try {
+      const loggedIn = await loginWithGoogle(credential, rememberMeRef.current);
+      navigate(getPostLoginTarget(loggedIn, fromRef.current), { replace: true });
+    } catch (err) {
+      if (err?.data?.code === 'google_user_not_found') {
+        setError(GOOGLE_USER_NOT_FOUND);
+      } else {
+        setError(err?.message || 'התחברות עם Google נכשלה');
+      }
+    } finally {
+      setGoogleLoading(false);
+    }
+  }, [loginWithGoogle, navigate]);
+
+  useEffect(() => {
+    if (!googleClientId || resumingSession) return undefined;
+    let cancelled = false;
+
+    (async () => {
+      try {
+        await loadGoogleIdentityScript();
+      } catch {
+        return;
+      }
+      if (cancelled || !googleBtnRef.current || !window.google?.accounts?.id) return;
+      window.google.accounts.id.initialize({
+        client_id: googleClientId,
+        callback: (response) => {
+          handleGoogleCredential(response);
+        },
+        auto_select: false,
+      });
+      googleBtnRef.current.replaceChildren();
+      const width = Math.floor(googleBtnRef.current.offsetWidth) || 360;
+      window.google.accounts.id.renderButton(googleBtnRef.current, {
+        type: 'standard',
+        theme: 'outline',
+        size: 'large',
+        text: 'signin_with',
+        shape: 'rectangular',
+        width,
+        locale: 'he',
+      });
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [googleClientId, resumingSession, handleGoogleCredential]);
 
   useEffect(() => {
     let cancelled = false;
@@ -138,7 +270,7 @@ export default function Login() {
     }
   };
 
-  if (isLoadingAuth) {
+  if (isLoadingAuth || resumingSession) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="w-8 h-8 border-4 border-slate-200 border-t-slate-800 rounded-full animate-spin" />
@@ -174,7 +306,7 @@ export default function Login() {
                   variant="outline"
                   role="combobox"
                   aria-expanded={emailOpen}
-                  disabled={emailsLoading || checkingRemember || loading}
+                  disabled={emailsLoading || checkingRemember || loading || googleLoading}
                   className="w-full justify-between font-normal"
                   dir="ltr"
                 >
@@ -248,31 +380,31 @@ export default function Login() {
           )}
 
           {needsPassword && !checkingRemember && (
-            <>
-              <div>
-                <label className="text-sm font-medium mb-1.5 block">סיסמה</label>
-                <PasswordField
-                  id="login-password"
-                  value={password}
-                  onValueChange={setPassword}
-                  autoComplete="current-password"
-                  required
-                  showLengthValidation
-                  autoFocus
-                />
-              </div>
+            <div>
+              <label className="text-sm font-medium mb-1.5 block">סיסמה</label>
+              <PasswordField
+                id="login-password"
+                value={password}
+                onValueChange={setPassword}
+                autoComplete="current-password"
+                required
+                showLengthValidation
+                autoFocus
+              />
+            </div>
+          )}
 
-              <div className="flex items-center gap-2">
-                <Checkbox
-                  id="remember-me"
-                  checked={rememberMe}
-                  onCheckedChange={(checked) => setRememberMe(checked === true)}
-                />
-                <Label htmlFor="remember-me" className="text-sm font-normal cursor-pointer">
-                  זכור אותי במחשב זה
-                </Label>
-              </div>
-            </>
+          {!checkingRemember && (
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="remember-me"
+                checked={rememberMe}
+                onCheckedChange={(checked) => setRememberMe(checked === true)}
+              />
+              <Label htmlFor="remember-me" className="text-sm font-normal cursor-pointer">
+                זכור אותי במחשב זה
+              </Label>
+            </div>
           )}
 
           {error && (
@@ -282,7 +414,7 @@ export default function Login() {
           )}
 
           {!checkingRemember && (
-            <Button type="submit" className="w-full" disabled={loading || emailsLoading}>
+            <Button type="submit" className="w-full" disabled={loading || emailsLoading || googleLoading}>
               {loading ? (
                 <Loader2 size={18} className="animate-spin ml-2" />
               ) : (
@@ -292,6 +424,27 @@ export default function Login() {
             </Button>
           )}
         </form>
+
+        {googleClientId && (
+          <div className="mt-6">
+            <div className="relative mb-4">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t border-border" />
+              </div>
+              <div className="relative flex justify-center text-xs">
+                <span className="bg-card px-2 text-muted-foreground">או</span>
+              </div>
+            </div>
+            <div className="relative">
+              <div ref={googleBtnRef} className="flex w-full justify-center min-h-10" />
+              {googleLoading && (
+                <div className="absolute inset-0 flex items-center justify-center bg-card/70">
+                  <Loader2 size={18} className="animate-spin" />
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

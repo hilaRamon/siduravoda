@@ -58,9 +58,7 @@ export default function Layout() {
     pendingTimeReports.length + pendingQuantities.length;
 
   const handleLogout = () => {
-    logout().then(() => {
-      window.location.href = "/login";
-    });
+    logout();
   };
 
   if (workplaceManagerOnly) {

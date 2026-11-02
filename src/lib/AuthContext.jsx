@@ -4,6 +4,8 @@ import { isPublicPath } from '@/lib/publicRoutes';
 
 const AuthContext = createContext(null);
 
+export const EXPLICIT_LOGOUT_KEY = 'explicitLogout';
+
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -80,10 +82,31 @@ export const AuthProvider = ({ children }) => {
     return loggedInUser;
   }, []);
 
+  const loginWithGoogle = useCallback(async (credential, rememberMe = false) => {
+    const loggedInUser = await base44.auth.loginWithGoogle(credential, rememberMe);
+    setUser(loggedInUser);
+    setIsAuthenticated(true);
+    setAuthError(null);
+    setIsLoadingAuth(false);
+    setAuthChecked(true);
+    return loggedInUser;
+  }, []);
+
+  const resumeRememberedSession = useCallback(async () => {
+    const loggedInUser = await base44.auth.rememberedSession();
+    setUser(loggedInUser);
+    setIsAuthenticated(true);
+    setAuthError(null);
+    setIsLoadingAuth(false);
+    setAuthChecked(true);
+    return loggedInUser;
+  }, []);
+
   const logout = useCallback(async () => {
     try {
       await base44.auth.logout();
     } finally {
+      sessionStorage.setItem(EXPLICIT_LOGOUT_KEY, '1');
       setUser(null);
       setIsAuthenticated(false);
       setAuthError({ type: 'auth_required' });
@@ -110,6 +133,8 @@ export const AuthProvider = ({ children }) => {
         logout,
         login,
         autoLogin,
+        loginWithGoogle,
+        resumeRememberedSession,
         navigateToLogin,
         checkUserAuth,
       }}
