@@ -1,607 +1,384 @@
-import { useState, useRef } from "react";
-import { Download, Loader2, FileText } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import jsPDF from "jspdf";
+import { useEffect, useMemo, useRef, useState } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import { Download, FileText, Loader2 } from "lucide-react";
 import html2canvas from "html2canvas";
+import jsPDF from "jspdf";
+import { Button } from "@/components/ui/button";
+import userGuideMarkdown from "@/docs/UserGuide_Regivim.md?raw";
+import developerMarkdown from "@/docs/SRS_Regivim_System.md?raw";
+import { markdownToDocxBlob } from "@/lib/srsDocx";
+import { chooseSliceEnds } from "@/lib/srsPdf";
 import {
-  Document,
-  Packer,
-  Paragraph,
-  TextRun,
-  HeadingLevel,
-  AlignmentType,
-  BorderStyle,
-} from "docx";
+  parseSrsVersion,
+  remarkHeadingIds,
+  slugifyHeading,
+  splitMarkdownChapters,
+} from "@/lib/srsMarkdown";
 
-const SECTIONS = [
+const remarkPlugins = [remarkGfm, remarkHeadingIds];
+
+const DOCUMENTS = [
   {
-    title: "1. סקירת מערכת",
-    content: `מערכת **רגבים** מנהלת שיבוצים יומיים לתלמידים בתכנית התנדבות חקלאית.
-
-**מה המערכת עושה:**
-- שיבוץ תלמידים למקומות עבודה (חוות חקלאיות)
-- ניהול לוגיסטיקת הסעות ורכבים
-- דיווח זמנים יומי ואישורו על ידי מנהל
-- קבלה ועיבוד בקשות היעדרות המגיעות ב-SMS
-- יצירת דוחות תקופתיים לחשבונאות
-
-**משתמשי הקצה:**
-- **מנהל (admin)** — גישה מלאה לכל הדפים, ניהול נתונים ואישור דיווחים
-- **מפקד / תלמיד מדווח** — גישה לדף דיווח זמנים בלבד (קישור ציבורי /time-reporting)
-- **חקלאי** — גישה לקישור /schedule לצפייה בסידור העבודה`,
+    id: "user",
+    label: "מדריך למשתמש",
+    markdown: userGuideMarkdown,
+    downloadBase: "מדריך_משתמש_רגבים",
   },
   {
-    title: "2. מבנה מסד הנתונים",
-    subsections: [
-      {
-        title: "2.1 תלמיד (Student)",
-        content: `כל תלמיד מוגדר עם השדות הבאים:
-- **שם מלא** — שם מלא (חובה)
-- **טלפון** — מספר נייד
-- **מחזור** — שם הקבוצה (לדוגמה: "מחזור א'" או "צוות"). מחזורים המכילים את המילה **"צוות"** כפופים ללוגיקת יום חופשי בשכפול.
-- **ימי חופש** — רשימה (בחירה מרובה) של ימים: ראשון / שני / שלישי / רביעי / חמישי. ניתן לבחור מספר ימים.
-- **סטטוס מרחק** — קרוב / רחוק / אאא- לפני שיבוץ / תתת - לא עובד (משמש לשיבוץ אוטומטי ביום ראשון)
-- **פעיל** — האם התלמיד פעיל במערכת (ברירת מחדל: כן)
-- **מקומות עבודה אסורים** — רשימת מקומות שהתלמיד אינו יכול לעבוד בהם
-- **הערות** — טקסט חופשי
-
-תלמיד לא פעיל לא מוצג בטבלת השיבוצים אלא אם כבר יש לו שיבוץ לאותו תאריך.`,
-      },
-      {
-        title: "2.2 מקום עבודה (Workplace)",
-        content: `כל מקום עבודה (חווה) מוגדר עם:
-- **שם** — שם מקום העבודה (חובה)
-- **שם משק** — שם המשק (עשוי להיות שונה מהשם)
-- **כתובת, ח.פ., טלפון ומייל** — לצורכי חשבונאות
-
-**מקומות עבודה מיוחדים** (מסוננים מהדוחות):
-- "לא עובד" — תלמיד לא יצא לעבודה
-- "לימודים" — תלמיד בלימודים
-- "לא יצא" — תלמיד לא יצא ללא ציון סיבה`,
-      },
-      {
-        title: "2.3 שיבוץ (Assignment)",
-        content: `כל שיבוץ מקשר תלמיד למקום עבודה בתאריך מסוים:
-- **תאריך, תלמיד, מקום עבודה** — חובה
-- **תפקיד** — נהג / ראש צוות / אחראי פק"ל
-- **תעריף** — ₪ לשעה (ברירת מחדל: 40)
-- **שעות** — כמות שעות עבודה (ברירת מחדל: 4.75)
-- **תשלום נוסף** — בונוס חד-פעמי
-- **הערות**
-
-**תלמיד יומי (אורח):** student_id מתחיל ב-"guest_" — מופיע ביום בלבד ולא מועתק בשכפול יום.`,
-      },
-      {
-        title: "2.4 לוגיסטיקה יומית (WorkplaceLogistics)",
-        content: `לכל מקום עבודה ביום מסוים ניתן להגדיר:
-- **נהג** — תלמיד שינהג לאותו מקום
-- **עד 3 רכבים** — הרכבים שייצאו
-- **שעת יציאה** — ברירת מחדל 06:35
-- **הערות** — הודעות מיוחדות לאותו יום`,
-      },
-      {
-        title: "2.5 דיווח זמנים (TimeReport)",
-        content: `דיווח זמנים יומי לכל תלמיד:
-- **שעת כניסה** — ברירת מחדל 07:00
-- **שעת יציאה** — ברירת מחדל 11:45
-- **סטטוס** — ממתין / אושר / נדחה
-
-דיווחים עם שעות ברירת מחדל (07:00–11:45) אינם מוצגים בממשק האדמין כ"שינויים" — רק דיווחים ששונו מהברירת מחדל מופיעים לאישור.`,
-      },
-      {
-        title: "2.6 בקשות היעדרות (AbsenceRequest)",
-        content: `בקשות היעדרות נשמרות כישות ייעודית:
-- **מקור** — SMS או הזנה ידנית
-- **תלמיד מקושר** — חובה לאישור ולהצגה ביומן
-- **תאריך וסיבה** — מה-SMS (AI) או ידנית
-- **שדות SMS** — טלפון, תוכן גולמי ותאריך קבלה (כשמקור=SMS)
-- **סטטוס** — ממתין / אושר / נדחה`,
-      },
-    ],
-  },
-  {
-    title: "3. לוגיקה עסקית",
-    subsections: [
-      {
-        title: "3.1 שכפול יום",
-        content: `כפתור "שכפל שיבוצים" מעתיק את כל השיבוצים מיום מקור ליום יעד. השכפול רץ בשרת.
-
-**מצב רגיל:** מועתק מקום העבודה בלבד. תפקיד ובונוס מאופסים.
-אם מקום העבודה ביום המקור הוא "תתת - לא עובד" או "תתת - לא עובד, פנימיה" → ביום היעד הוא הופך ל"אאא- לפני שיבוץ".
-
-**תתח - מילואים:** אם מקום העבודה ביום המקור הוא "תתח - מילואים", הוא מועתק כמו שהוא גם כשיש היעדרות מאושרת, גם ביום ראשון, וגם לתלמיד צוות (כולל יום חופשי). תלמיד לא פעיל עדיין לא מועתק.
-
-**היעדרות מאושרת:** אם לתלמיד יש היעדרות מאושרת ביום היעד → הוא משובץ ל"תתת - לא עובד" (גם אם ביום המקור היה "תתת - לא עובד").
-
-**יום ראשון — כלל מיוחד:** כשיום היעד הוא יום ראשון, השיבוץ נקבע לפי **סטטוס המרחק** של כל תלמיד:
-- קרוב → מקום עבודה "קרוב"
-- רחוק → מקום עבודה "רחוק"
-- תתת - לא עובד → מקום "תתת - לא עובד"
-- אאא- לפני שיבוץ → מקום "אאא- לפני שיבוץ"
-אם אין התאמה לסטטוס מרחק — מועתק מקום העבודה מיום המקור, עם אותו כלל: "תתת - לא עובד" או "תתת - לא עובד, פנימיה" → "אאא- לפני שיבוץ". "תתת - לא עובד, פנימיה" אינו סטטוס מרחק.
-
-**תלמידי צוות — כלל ימי חופש:** תלמידים שמחזורם מכיל את המילה "צוות" כפופים לבדיקה נוספת בכל שכפול (מלבד יום ראשון):
-- אם יום היעד מוגדר כ**יום חופשי** של התלמיד → הוא משובץ אוטומטית למקום "תתת - לא עובד"
-- אם יום היעד **אינו** יום חופשי → השיבוץ נשאר ריק (ממתין לשיבוץ ידני)
-
-תלמידים יומיים (אורחים) **לא** מועתקים בשכפול.
-תלמידים לא פעילים **לא** מועתקים בשכפול.`,
-      },
-      {
-        title: "3.2 מניעת שיבוץ לאתר אסור",
-        content: `אם תלמיד מוגדר עם "מקומות עבודה אסורים" ומנסים לשבץ אותו לאחד מהם — המערכת חוסמת את הפעולה ומציגה הודעת שגיאה.`,
-      },
-      {
-        title: "3.3 אישור דיווחי זמנים",
-        content: `לאחר שהמפקד שולח דיווח זמנים, המנהל רואה בדף "עדכון זמנים" רק את הדיווחים **ששונו** מהשעות הרגילות.
-
-**תצוגה:**
-1. **שינויי מחלקה** — מקום עבודה שלכל התלמידים שלו יש שינוי זהה
-2. **שינויים פרטניים** — תלמידים שסוטים משעות המחלקה שלהם
-
-לאחר אישור — כמות השעות מתעדכנת גם בשיבוץ עצמו.`,
-      },
-    ],
-  },
-  {
-    title: "4. עמודים ומסכים",
-    subsections: [
-      {
-        title: "4.1 שיבוצים יומיים (מסך ראשי)",
-        content: `המסך הראשי מציג טבלה עם כל התלמידים לתאריך הנבחר.
-
-**אפשרויות:**
-- ניווט בין ימים (חצים, בחירת תאריך, כפתור "היום")
-- שיבוץ מקום עבודה לכל תלמיד
-- הגדרת תפקיד, תעריף, שעות ובונוס
-- עריכה מרובה (בחירת מספר תלמידים + שינוי בבת אחת)
-- בחירה לפי מחזור
-- הוספת תלמיד יומי (אורח)
-- שכפול שיבוצים ליום אחר
-- ייצוא סידור עבודה ל-PDF ופרסומו
-
-**סיידבר לוגיסטיקה** — בצד ימין המסך מוצגים כרטיסי לוגיסטיקה לכל מקום עבודה (רכבים, שעת יציאה, הערות).`,
-      },
-      {
-        title: "4.2 דיווח זמנים (ציבורי)",
-        content: `דף ציבורי (ללא התחברות) לדיווח שעות כניסה ויציאה.
-
-**אופן השימוש:**
-1. המפקד בוחר תאריך
-2. רואה את כל מקומות העבודה עם התלמידים
-3. יכול לשנות שעות ברמת מחלקה שלמה או לכל תלמיד בנפרד
-4. לוחץ "שלח דיווח" — המערכת שומרת את כל השעות
-
-שעת יציאה חייבת להיות **מאוחרת** משעת כניסה — אחרת מוצגת הודעת שגיאה.`,
-      },
-      {
-        title: "4.3 בקשות היעדרות",
-        content: `כל SMS שמגיע מתלמיד מנותח אוטומטית ע"י AI ומוצג לאישור.
-
-המנהל יכול:
-- לאשר או לדחות בקשות
-- לקשר ידנית תלמיד לבקשה
-- לוסיף הערות`,
-      },
-    ],
-  },
-  {
-    title: "5. דוחות",
-    subsections: [
-      {
-        title: "5.1 סידור עבודה יומי (PDF)",
-        content: `כפתור "סידור עבודה PDF" בראש מסך השיבוצים מייצר PDF עם:
-- שם כל מקום עבודה
-- רשימת תלמידים
-- שם הנהג, ראש הצוות ואחראי הפק"ל
-- הרכב ושעת היציאה
-
-ניתן גם **לפרסם** את הסידור — הקובץ מועלה לענן והחקלאים יכולים לצפות בו בקישור ציבורי.`,
-      },
-      {
-        title: "5.2 דוח עבודה לתקופה",
-        content: `דוח המסכם את כל ימי העבודה לפי מקום עבודה בטווח תאריכים שנבחר.
-
-מציג לכל מקום עבודה: מספר תלמידים, סך שעות, תעריף ועלות כוללת.
-
-ניתן לייצא ל-PDF או ל-Excel.`,
-      },
-      {
-        title: "5.3 דוח תלמיד",
-        content: `דוח המציג את כל ימי העבודה של תלמיד בודד (או קבוצת תלמידים) בטווח תאריכים.`,
-      },
-    ],
-  },
-  {
-    title: "6. ממשקים חיצוניים",
-    subsections: [
-      {
-        title: "6.1 SMS (019)",
-        content: `כל SMS שנשלח למספר הפרויקט מועבר אוטומטית ל-Webhook.
-המערכת מנתחת אותו עם AI ושומרת את בקשת ההיעדרות לאישור מנהל.`,
-      },
-      {
-        title: "6.2 גיבוי חודשי",
-        content: `בתחילת כל חודש נשלח מייל אוטומטי עם גיבוי הנתונים לכתובות המוגדרות בהגדרות הגיבוי.`,
-      },
-    ],
+    id: "developer",
+    label: "מפרט למפתחים",
+    markdown: developerMarkdown,
+    downloadBase: "מפרט_מערכת_רגבים",
   },
 ];
 
-function Section({ section, isOpen, onToggle }) {
-  return (
-    <div className="border border-border rounded-xl overflow-hidden">
-      <button
-        onClick={onToggle}
-        className="w-full flex items-center justify-between px-5 py-4 bg-secondary/40 hover:bg-secondary/70 transition-colors text-right"
-      >
-        <h2 className="font-bold text-base text-foreground">{section.title}</h2>
-        <span className="text-muted-foreground text-lg">
-          {isOpen ? "▲" : "▼"}
-        </span>
-      </button>
-      {isOpen && (
-        <div className="p-5 space-y-5 bg-card">
-          {section.content && <MarkdownText text={section.content} />}
-          {section.subsections?.map((sub, i) => (
-            <div key={i} className="border-r-4 border-primary/30 pr-4">
-              <h3 className="font-semibold text-sm text-primary mb-2">
-                {sub.title}
-              </h3>
-              <MarkdownText text={sub.content} />
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
+function headingClass(level) {
+  if (level === 1) return "text-2xl font-bold text-foreground mb-3";
+  if (level === 2) return "text-xl font-bold text-foreground mt-8 mb-3 pb-2 border-b border-border scroll-mt-4";
+  if (level === 3) return "text-lg font-semibold text-primary mt-6 mb-2 scroll-mt-4";
+  return "text-base font-semibold text-foreground mt-4 mb-2 scroll-mt-4";
 }
 
-function MarkdownText({ text }) {
-  const lines = text.split("\n");
-  return (
-    <div className="space-y-1.5 text-sm text-foreground leading-relaxed">
-      {lines.map((line, i) => {
-        if (!line.trim()) return <div key={i} className="h-1" />;
-
-        // Bold + regular text (inline)
-        const renderInline = (str) => {
-          const parts = str.split(/(\*\*[^*]+\*\*)/g);
-          return parts.map((part, j) =>
-            part.startsWith("**") && part.endsWith("**") ? (
-              <strong key={j} className="font-semibold">
-                {part.slice(2, -2)}
-              </strong>
-            ) : (
-              part
-            ),
-          );
-        };
-
-        if (line.startsWith("- ")) {
-          return (
-            <div key={i} className="flex gap-2 items-start">
-              <span className="text-primary mt-0.5 shrink-0">•</span>
-              <span>{renderInline(line.slice(2))}</span>
-            </div>
-          );
-        }
-
-        return <p key={i}>{renderInline(line)}</p>;
-      })}
-    </div>
-  );
-}
-
-// Render all sections as HTML for PDF capture
-function SRSPrintContent({ innerRef }) {
-  return (
-    <div
-      ref={innerRef}
-      style={{
-        display: "none",
-        position: "fixed",
-        top: "-9999px",
-        left: 0,
-        width: "794px",
-        background: "white",
-        padding: "32px",
-        fontFamily: "Arial, sans-serif",
-        direction: "rtl",
-      }}
-    >
-      <div
-        style={{
-          marginBottom: "24px",
-          borderBottom: "2px solid #3b4fa8",
-          paddingBottom: "12px",
-        }}
-      >
-        <h1
-          style={{
-            fontSize: "22px",
-            fontWeight: "bold",
-            color: "#1e2864",
-            margin: 0,
-          }}
+function createComponents(withIds, forPrint = false) {
+  const blockProps = forPrint ? { "data-pdf-block": "true" } : {};
+  const heading = (level) =>
+    function MarkdownHeading({ id, children }) {
+      const Tag = `h${level}`;
+      return (
+        <Tag
+          id={withIds ? id : undefined}
+          className={headingClass(level)}
+          {...blockProps}
+          {...(forPrint && level === 2 ? { "data-pdf-chapter": "true" } : {})}
         >
-          מפרט דרישות מערכת — רגבים
-        </h1>
-        <p style={{ fontSize: "12px", color: "#888", marginTop: "4px" }}>
-          גרסה 1.0 | 2026-05-11
-        </p>
+          {children}
+        </Tag>
+      );
+    };
+
+  return {
+    h1: heading(1),
+    h2: heading(2),
+    h3: heading(3),
+    h4: heading(4),
+    h5: heading(5),
+    h6: heading(6),
+    p: ({ children }) => (
+      <p className="my-2 leading-relaxed" {...blockProps}>
+        {children}
+      </p>
+    ),
+    a: ({ href, children }) => (
+      <a href={href} className="text-primary underline underline-offset-2">
+        {children}
+      </a>
+    ),
+    ul: ({ children }) => <ul className="list-disc pr-5 my-2 space-y-1">{children}</ul>,
+    ol: ({ children }) => <ol className="list-decimal pr-5 my-2 space-y-1">{children}</ol>,
+    li: ({ children }) => <li {...blockProps}>{children}</li>,
+    blockquote: ({ children }) => (
+      <blockquote className="border-r-4 border-primary/40 pr-3 my-3 text-muted-foreground" {...blockProps}>
+        {children}
+      </blockquote>
+    ),
+    hr: () => (forPrint ? null : <hr className="my-6 border-border" />),
+    pre: ({ children }) => (
+      <pre className="bg-secondary rounded-lg p-3 overflow-x-auto text-xs my-3" dir="ltr" {...blockProps}>
+        {children}
+      </pre>
+    ),
+    code: ({ className, children }) => {
+      if (className) {
+        return <code className={className}>{children}</code>;
+      }
+      return (
+        <code className="bg-secondary rounded px-1 py-0.5 text-[0.85em]" dir="ltr">
+          {children}
+        </code>
+      );
+    },
+    table: ({ children }) => (
+      <div className="overflow-x-auto my-3">
+        <table className="w-full text-sm border-collapse border border-border">{children}</table>
       </div>
-      {SECTIONS.map((section, si) => (
-        <div key={si} style={{ marginBottom: "24px" }}>
-          <h2
-            style={{
-              fontSize: "15px",
-              fontWeight: "bold",
-              color: "#1e2864",
-              borderBottom: "1px solid #b4bce8",
-              paddingBottom: "4px",
-              marginBottom: "10px",
-            }}
-          >
-            {section.title}
-          </h2>
-          {section.content && <SRSPrintText text={section.content} />}
-          {section.subsections?.map((sub, subi) => (
-            <div
-              key={subi}
-              style={{
-                marginBottom: "12px",
-                paddingRight: "12px",
-                borderRight: "3px solid #3b4fa8",
-              }}
-            >
-              <h3
-                style={{
-                  fontSize: "13px",
-                  fontWeight: "bold",
-                  color: "#3b4fa8",
-                  marginBottom: "6px",
-                }}
-              >
-                {sub.title}
-              </h3>
-              <SRSPrintText text={sub.content} />
-            </div>
-          ))}
-        </div>
-      ))}
-    </div>
+    ),
+    thead: ({ children }) => <thead className="bg-secondary/60">{children}</thead>,
+    tr: ({ children }) => <tr {...blockProps}>{children}</tr>,
+    th: ({ children }) => (
+      <th className="border border-border px-2 py-1.5 text-right font-semibold align-top">
+        {children}
+      </th>
+    ),
+    td: ({ children }) => (
+      <td className="border border-border px-2 py-1.5 text-right align-top">{children}</td>
+    ),
+  };
+}
+
+const screenComponents = createComponents(true);
+const printComponents = createComponents(false, true);
+
+function MarkdownBlock({ markdown, components }) {
+  if (!markdown) return null;
+  return (
+    <ReactMarkdown remarkPlugins={remarkPlugins} components={components}>
+      {markdown}
+    </ReactMarkdown>
   );
 }
 
-function SRSPrintText({ text }) {
-  const lines = text.split("\n");
+const sectionStyle = {
+  width: "794px",
+  boxSizing: "border-box",
+  padding: "24px",
+  background: "#ffffff",
+};
+
+function PrintCopy({ markdown }) {
+  const parsed = useMemo(() => splitMarkdownChapters(markdown), [markdown]);
+  const [first, ...rest] = parsed.chapters;
   return (
-    <div style={{ fontSize: "11px", lineHeight: "1.7", color: "#222" }}>
-      {lines.map((line, i) => {
-        if (!line.trim()) return <div key={i} style={{ height: "6px" }} />;
-        const renderInline = (str) => {
-          const parts = str.split(/(\*\*[^*]+\*\*)/g);
-          return parts.map((part, j) =>
-            part.startsWith("**") && part.endsWith("**") ? (
-              <strong key={j}>{part.slice(2, -2)}</strong>
-            ) : (
-              part
-            ),
-          );
-        };
-        if (line.startsWith("- ")) {
-          return (
-            <div
-              key={i}
-              style={{ display: "flex", gap: "6px", marginBottom: "2px" }}
-            >
-              <span style={{ color: "#3b4fa8", flexShrink: 0 }}>•</span>
-              <span>{renderInline(line.slice(2))}</span>
-            </div>
-          );
-        }
+    <article className="text-sm leading-relaxed text-foreground" dir="rtl">
+      <section data-pdf-section="true" style={sectionStyle}>
+        <h1 className={headingClass(1)}>{parsed.title}</h1>
+        {parsed.preamble ? (
+          <MarkdownBlock markdown={parsed.preamble} components={printComponents} />
+        ) : null}
+        {first ? (
+          <>
+            <h2 className="text-xl font-bold text-foreground mb-3 pb-2 border-b border-border">
+              {first.title}
+            </h2>
+            <MarkdownBlock markdown={first.markdown} components={printComponents} />
+          </>
+        ) : null}
+      </section>
+      {rest.map((chapter) => (
+        <section key={chapter.id} data-pdf-section="true" style={sectionStyle}>
+          <h2 className="text-xl font-bold text-foreground mb-3 pb-2 border-b border-border">
+            {chapter.title}
+          </h2>
+          <MarkdownBlock markdown={chapter.markdown} components={printComponents} />
+        </section>
+      ))}
+    </article>
+  );
+}
+
+function chapterOwnsAnchor(chapter, anchorId) {
+  if (chapter.id === anchorId) return true;
+  return chapter.markdown.split("\n").some((line) => {
+    const match = /^(#{1,6})\s+(.+)$/.exec(line);
+    return Boolean(match && slugifyHeading(match[2]) === anchorId);
+  });
+}
+
+function ChapterAccordions({ markdown }) {
+  const parsed = useMemo(() => splitMarkdownChapters(markdown), [markdown]);
+  const [open, setOpen] = useState({});
+  const [scrollTo, setScrollTo] = useState("");
+
+  useEffect(() => {
+    if (!scrollTo) return;
+    const target = document.getElementById(scrollTo);
+    if (!target) return;
+    target.scrollIntoView({ behavior: "smooth", block: "start" });
+    setScrollTo("");
+  }, [scrollTo, open]);
+
+  const handleClick = (event) => {
+    const anchor = event.target.closest("a");
+    if (!anchor) return;
+    const href = anchor.getAttribute("href") || "";
+    if (!href.startsWith("#")) return;
+    const anchorId = decodeURIComponent(href.slice(1));
+    const chapter = parsed.chapters.find((item) => chapterOwnsAnchor(item, anchorId));
+    if (!chapter) return;
+    event.preventDefault();
+    setOpen((prev) => ({ ...prev, [chapter.id]: true }));
+    setScrollTo(anchorId);
+  };
+
+  return (
+    <div className="space-y-3" onClick={handleClick}>
+      {parsed.preamble ? (
+        <MarkdownBlock markdown={parsed.preamble} components={screenComponents} />
+      ) : null}
+      {parsed.chapters.map((chapter) => {
+        const isOpen = open[chapter.id] === true;
         return (
-          <p key={i} style={{ margin: "2px 0" }}>
-            {renderInline(line)}
-          </p>
+          <section key={chapter.id} className="border border-border rounded-xl overflow-hidden">
+            <button
+              type="button"
+              onClick={() =>
+                setOpen((prev) => ({ ...prev, [chapter.id]: !isOpen }))
+              }
+              className="w-full flex items-center justify-between gap-3 px-5 py-4 bg-secondary/40 hover:bg-secondary/70 transition-colors text-right"
+              aria-expanded={isOpen}
+            >
+              <h2 id={chapter.id} className="font-bold text-base text-foreground scroll-mt-4">
+                {chapter.title}
+              </h2>
+              <span className="text-muted-foreground text-lg shrink-0">{isOpen ? "▲" : "▼"}</span>
+            </button>
+            {isOpen ? (
+              <div className="p-5 bg-card">
+                <MarkdownBlock markdown={chapter.markdown} components={screenComponents} />
+              </div>
+            ) : null}
+          </section>
         );
       })}
     </div>
   );
 }
 
-function buildDocxParagraphs() {
-  const paragraphs = [];
-
-  const RTL = AlignmentType.RIGHT;
-
-  // Title
-  paragraphs.push(
-    new Paragraph({
-      text: "מפרט דרישות מערכת — רגבים",
-      heading: HeadingLevel.TITLE,
-      alignment: AlignmentType.CENTER,
-      bidirectional: true,
-      spacing: { after: 200 },
-    }),
-  );
-  paragraphs.push(
-    new Paragraph({
-      children: [
-        new TextRun({
-          text: "גרסה 1.1 | 2026-05-12",
-          color: "888888",
-          size: 22,
-        }),
-      ],
-      alignment: AlignmentType.CENTER,
-      bidirectional: true,
-      spacing: { after: 400 },
-    }),
-  );
-
-  for (const section of SECTIONS) {
-    // Section heading
-    paragraphs.push(
-      new Paragraph({
-        text: section.title,
-        heading: HeadingLevel.HEADING_1,
-        alignment: RTL,
-        bidirectional: true,
-        spacing: { before: 400, after: 120 },
-        border: {
-          bottom: { style: BorderStyle.SINGLE, size: 6, color: "3b4fa8" },
-        },
-      }),
-    );
-
-    if (section.content) {
-      for (const line of section.content.split("\n")) {
-        paragraphs.push(...lineToDocxParagraph(line));
-      }
-    }
-
-    for (const sub of section.subsections || []) {
-      paragraphs.push(
-        new Paragraph({
-          text: sub.title,
-          heading: HeadingLevel.HEADING_2,
-          alignment: RTL,
-          bidirectional: true,
-          spacing: { before: 240, after: 80 },
-        }),
-      );
-      for (const line of sub.content.split("\n")) {
-        paragraphs.push(...lineToDocxParagraph(line));
+function inkRows(canvas) {
+  const { width, height } = canvas;
+  const data = canvas.getContext("2d").getImageData(0, 0, width, height).data;
+  const mask = new Uint8Array(height);
+  for (let y = 0; y < height; y += 1) {
+    const row = y * width * 4;
+    for (let x = 0; x < width; x += 1) {
+      const i = row + x * 4;
+      if (data[i] < 230 || data[i + 1] < 230 || data[i + 2] < 230) {
+        mask[y] = 1;
+        break;
       }
     }
   }
-
-  return paragraphs;
+  return mask;
 }
 
-function lineToDocxParagraph(line) {
-  if (!line.trim())
-    return [
-      new Paragraph({ text: "", spacing: { after: 60 }, bidirectional: true }),
-    ];
-
-  const isBullet = line.startsWith("- ");
-  const text = isBullet ? line.slice(2) : line;
-
-  // Parse bold (**text**)
-  const parts = text.split(/(\*\*[^*]+\*\*)/g);
-  const runs = parts.map((p) =>
-    p.startsWith("**") && p.endsWith("**")
-      ? new TextRun({ text: p.slice(2, -2), bold: true, size: 22 })
-      : new TextRun({ text: p, size: 22 }),
-  );
-
-  return [
-    new Paragraph({
-      children: runs,
-      bullet: isBullet ? { level: 0 } : undefined,
-      alignment: AlignmentType.RIGHT,
-      bidirectional: true,
-      spacing: { after: 60 },
-    }),
-  ];
+function subtitleFor(markdown) {
+  const { title } = splitMarkdownChapters(markdown);
+  const version = parseSrsVersion(markdown);
+  return version ? `${title} — גרסה ${version}` : title;
 }
 
 export default function SRSViewer() {
-  const [openSections, setOpenSections] = useState({ 0: true });
+  const printRef = useRef(null);
+  const [docId, setDocId] = useState("user");
   const [exporting, setExporting] = useState(false);
   const [exportingWord, setExportingWord] = useState(false);
-  const printRef = useRef(null);
-
-  const toggle = (i) => setOpenSections((prev) => ({ ...prev, [i]: !prev[i] }));
+  const activeDoc = DOCUMENTS.find((item) => item.id === docId) || DOCUMENTS[0];
 
   const handleDownloadWord = async () => {
     setExportingWord(true);
-    const doc = new Document({
-      sections: [{ children: buildDocxParagraphs() }],
-    });
-    const blob = await Packer.toBlob(doc);
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "מפרט_מערכת_רגבים.docx";
-    a.click();
-    URL.revokeObjectURL(url);
-    setExportingWord(false);
+    try {
+      const blob = await markdownToDocxBlob(activeDoc.markdown);
+      const url = URL.createObjectURL(blob);
+      const a = window.document.createElement("a");
+      a.href = url;
+      a.download = `${activeDoc.downloadBase}.docx`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } finally {
+      setExportingWord(false);
+    }
   };
 
   const handleDownloadPdf = async () => {
     setExporting(true);
-    const el = printRef.current;
-    el.style.display = "block";
-    await new Promise((r) => setTimeout(r, 150));
-
-    const canvas = await html2canvas(el, {
-      scale: 1.5,
-      useCORS: true,
-      backgroundColor: "#ffffff",
-    });
-    el.style.display = "none";
-
-    const pdf = new jsPDF({
-      orientation: "portrait",
-      unit: "mm",
-      format: "a4",
-    });
-    const pageW = pdf.internal.pageSize.getWidth();
-    const pageH = pdf.internal.pageSize.getHeight();
-    const margin = 10;
-    const contentW = pageW - margin * 2;
-    const contentH = pageH - margin * 2;
-    const pxPerMM = canvas.width / contentW;
-    const pageHeightPx = contentH * pxPerMM;
-
-    let srcY = 0;
-    let firstPage = true;
-    while (srcY < canvas.height) {
-      const sliceH = Math.min(pageHeightPx, canvas.height - srcY);
-      const slice = document.createElement("canvas");
-      slice.width = canvas.width;
-      slice.height = sliceH;
-      slice
-        .getContext("2d")
-        .drawImage(
-          canvas,
-          0,
-          srcY,
-          canvas.width,
-          sliceH,
-          0,
-          0,
-          canvas.width,
-          sliceH,
-        );
-      if (!firstPage) pdf.addPage();
-      pdf.addImage(
-        slice.toDataURL("image/jpeg", 0.9),
-        "JPEG",
-        margin,
-        margin,
-        contentW,
-        sliceH / pxPerMM,
-      );
-      srcY += sliceH;
-      firstPage = false;
+    const root = printRef.current;
+    root.style.display = "block";
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    try {
+      const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+      const pageW = pdf.internal.pageSize.getWidth();
+      const pageH = pdf.internal.pageSize.getHeight();
+      const margin = 10;
+      const contentW = pageW - margin * 2;
+      const contentH = pageH - margin * 2;
+      const sections = [...root.querySelectorAll("[data-pdf-section]")];
+      let pageIndex = 0;
+      for (const section of sections) {
+        const canvas = await html2canvas(section, {
+          scale: 1,
+          backgroundColor: "#ffffff",
+          useCORS: true,
+          windowWidth: 794,
+          width: section.scrollWidth,
+          height: section.scrollHeight,
+        });
+        const pxPerMM = canvas.width / contentW;
+        const pageHeightPx = Math.floor(contentH * pxPerMM) - 12;
+        const mask = inkRows(canvas);
+        const cuts = chooseSliceEnds({
+          height: canvas.height,
+          pageHeight: pageHeightPx,
+          isTextRow: (y) => mask[y] === 1,
+        });
+        let srcY = 0;
+        for (const cut of cuts) {
+          const top = Math.round(srcY);
+          const end = Math.min(canvas.height, Math.max(top + 1, Math.round(cut)));
+          const sliceH = end - top;
+          const slice = window.document.createElement("canvas");
+          slice.width = canvas.width;
+          slice.height = sliceH;
+          slice
+            .getContext("2d")
+            .drawImage(canvas, 0, top, canvas.width, sliceH, 0, 0, canvas.width, sliceH);
+          if (pageIndex > 0) pdf.addPage();
+          pdf.addImage(
+            slice.toDataURL("image/jpeg", 0.92),
+            "JPEG",
+            margin,
+            margin,
+            contentW,
+            sliceH / pxPerMM,
+          );
+          srcY = end;
+          pageIndex += 1;
+        }
+      }
+      pdf.save(`${activeDoc.downloadBase}.pdf`);
+    } finally {
+      root.style.display = "none";
+      setExporting(false);
     }
-
-    pdf.save("מפרט_מערכת_רגבים.pdf");
-    setExporting(false);
   };
 
   return (
-    <div className="space-y-4 max-w-3xl">
-      <SRSPrintContent innerRef={printRef} />
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-muted-foreground">
-          מפרט דרישות מערכת רגבים — גרסה 1.2
-        </p>
+    <div className="space-y-4">
+      <div
+        ref={printRef}
+        aria-hidden="true"
+        style={{
+          display: "none",
+          position: "absolute",
+          left: "-10000px",
+          top: 0,
+          width: "794px",
+          background: "#ffffff",
+          padding: "24px",
+          fontFamily: "Heebo, Arial, sans-serif",
+        }}
+      >
+        <PrintCopy markdown={activeDoc.markdown} />
+      </div>
+
+      <div className="flex gap-1 bg-secondary/50 rounded-xl p-1 w-fit">
+        {DOCUMENTS.map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            onClick={() => setDocId(item.id)}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+              docId === item.id
+                ? "bg-card shadow-sm text-foreground"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {item.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <p className="text-sm text-muted-foreground">{subtitleFor(activeDoc.markdown)}</p>
         <div className="flex gap-2">
           <Button
             variant="outline"
@@ -632,16 +409,7 @@ export default function SRSViewer() {
         </div>
       </div>
 
-      <div className="space-y-2">
-        {SECTIONS.map((section, i) => (
-          <Section
-            key={i}
-            section={section}
-            isOpen={!!openSections[i]}
-            onToggle={() => toggle(i)}
-          />
-        ))}
-      </div>
+      <ChapterAccordions key={activeDoc.id} markdown={activeDoc.markdown} />
     </div>
   );
 }
