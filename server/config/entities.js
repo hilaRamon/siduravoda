@@ -1,20 +1,4 @@
 export const entityDefinitions = {
-  User: {
-    required: ["email", "role"],
-    schema: {
-      email: { type: String, required: true, trim: true, lowercase: true },
-      password_hash: { type: String, required: true, select: false },
-      full_name: { type: String, trim: true, default: "" },
-      role: {
-        type: String,
-        enum: ["admin", "user", "workplace_manager", "reporter"],
-        required: true,
-        default: "user",
-      },
-      is_active: { type: Boolean, default: true },
-    },
-    indexes: [{ fields: { email: 1 }, options: { unique: true } }],
-  },
   Role: {
     required: ["name"],
     schema: {

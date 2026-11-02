@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { useAuth, EXPLICIT_LOGOUT_KEY } from '@/lib/AuthContext';
-import { base44 } from '@/api/base44Client';
+import { authApi } from '@/api/authApi';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -116,7 +116,7 @@ export default function Login() {
     let cancelled = false;
     (async () => {
       try {
-        const data = await base44.auth.googleClientId();
+        const data = await authApi.googleClientId();
         if (!cancelled) setGoogleClientId(data?.clientId || '');
       } catch {
         if (!cancelled) setGoogleClientId('');
@@ -186,7 +186,7 @@ export default function Login() {
     let cancelled = false;
     (async () => {
       try {
-        const list = await base44.auth.listLoginEmails();
+        const list = await authApi.listLoginEmails();
         if (!cancelled) setEmails(Array.isArray(list) ? list : []);
       } catch {
         if (!cancelled) setEmails([]);

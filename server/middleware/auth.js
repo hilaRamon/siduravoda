@@ -1,5 +1,5 @@
 import { verifyToken } from "../lib/jwt.js";
-import { getModel } from "../models/index.js";
+import User from "../models/User.js";
 import { sanitizeUser } from "../config/permissions.js";
 import { hydrateUser } from "../services/permissionRuleService.js";
 import {
@@ -47,7 +47,6 @@ export async function attachUser(req, res, next) {
 
   try {
     const payload = verifyToken(token);
-    const User = getModel("User");
     const doc = await User.findById(payload.sub).select("+password_hash");
     if (!doc || doc.is_active === false) {
       return next();

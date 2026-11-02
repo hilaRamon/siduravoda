@@ -1,5 +1,5 @@
-import { getModel } from "../models/index.js";
 import Farm from "../models/Farm.js";
+import User from "../models/User.js";
 import Workplace from "../models/Workplace.js";
 import { hashPassword } from "./password.js";
 import { ROLES } from "../config/permissions.js";
@@ -34,7 +34,6 @@ export async function ensurePnimiyaWorkplace() {
 export async function ensureAdminUser() {
   await ensurePermissionRulesSeeded();
 
-  const User = getModel("User");
   const count = await User.countDocuments();
   if (count > 0) return;
 

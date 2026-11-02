@@ -1,5 +1,6 @@
 import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
-import { base44, getAuthToken, setAuthToken } from '@/api/base44Client';
+import { getAuthToken, setAuthToken } from '@/api/base44Client';
+import { authApi } from '@/api/authApi';
 import { isPublicPath } from '@/lib/publicRoutes';
 
 const AuthContext = createContext(null);
@@ -36,7 +37,7 @@ export const AuthProvider = ({ children }) => {
     }
 
     try {
-      const currentUser = await base44.auth.me();
+      const currentUser = await authApi.me();
       setUser(currentUser);
       setIsAuthenticated(true);
       setAuthError(null);
@@ -63,7 +64,7 @@ export const AuthProvider = ({ children }) => {
   }, [checkUserAuth]);
 
   const login = useCallback(async (email, password, rememberMe = false) => {
-    const loggedInUser = await base44.auth.login(email, password, rememberMe);
+    const loggedInUser = await authApi.login(email, password, rememberMe);
     setUser(loggedInUser);
     setIsAuthenticated(true);
     setAuthError(null);
@@ -73,7 +74,7 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const autoLogin = useCallback(async (email) => {
-    const loggedInUser = await base44.auth.autoLogin(email);
+    const loggedInUser = await authApi.autoLogin(email);
     setUser(loggedInUser);
     setIsAuthenticated(true);
     setAuthError(null);
@@ -83,7 +84,7 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const loginWithGoogle = useCallback(async (credential, rememberMe = false) => {
-    const loggedInUser = await base44.auth.loginWithGoogle(credential, rememberMe);
+    const loggedInUser = await authApi.loginWithGoogle(credential, rememberMe);
     setUser(loggedInUser);
     setIsAuthenticated(true);
     setAuthError(null);
@@ -93,7 +94,7 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const resumeRememberedSession = useCallback(async () => {
-    const loggedInUser = await base44.auth.rememberedSession();
+    const loggedInUser = await authApi.rememberedSession();
     setUser(loggedInUser);
     setIsAuthenticated(true);
     setAuthError(null);
@@ -104,7 +105,7 @@ export const AuthProvider = ({ children }) => {
 
   const logout = useCallback(async () => {
     try {
-      await base44.auth.logout();
+      await authApi.logout();
     } finally {
       sessionStorage.setItem(EXPLICIT_LOGOUT_KEY, '1');
       setUser(null);

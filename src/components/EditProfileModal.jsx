@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PasswordField } from "@/components/ui/password-field";
-import { base44 } from "@/api/base44Client";
+import { authApi } from "@/api/authApi";
 import { useAuth } from "@/lib/AuthContext";
 
 export default function EditProfileModal({ open, onClose }) {
@@ -53,7 +53,7 @@ export default function EditProfileModal({ open, onClose }) {
     try {
       const previousEmail = user?.email?.trim().toLowerCase() || "";
       const nextEmail = email.trim().toLowerCase();
-      const updated = await base44.auth.updateMe({
+      const updated = await authApi.updateMe({
         full_name: name.trim(),
         email: nextEmail,
       });
@@ -90,7 +90,7 @@ export default function EditProfileModal({ open, onClose }) {
     }
     setPasswordLoading(true);
     try {
-      await base44.auth.changePassword(currentPassword, newPassword);
+      await authApi.changePassword(currentPassword, newPassword);
       setPasswordSuccess(
         "הסיסמה עודכנה בהצלחה. בהתחברות הבאה השתמש בסיסמה החדשה.",
       );

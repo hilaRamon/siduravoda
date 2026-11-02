@@ -20,6 +20,7 @@ import TimeReport from "../models/TimeReport.js";
 import Vehicle from "../models/Vehicle.js";
 import Farm from "../models/Farm.js";
 import Workplace from "../models/Workplace.js";
+import User from "../models/User.js";
 import { hashPassword } from "../lib/password.js";
 import { ROLES } from "../config/permissions.js";
 import { ensurePermissionRulesSeeded } from "../services/permissionRuleService.js";
@@ -341,7 +342,6 @@ function buildSnapshot(date, dayAssignments, logisticsDocs, studentDocs, vehicle
 }
 
 async function upsertAdmin() {
-  const User = getModel("User");
   const email = (process.env.ADMIN_EMAIL || "admin@siduravoda.local")
     .toLowerCase()
     .trim();
@@ -370,7 +370,6 @@ async function upsertAdmin() {
 }
 
 async function resetOperationalData() {
-  const User = getModel("User");
   await Promise.all([
     Student.deleteMany({}),
     Assignment.deleteMany({}),
@@ -458,7 +457,6 @@ async function main() {
 
   const admin = await upsertAdmin();
   const demoHash = await hashPassword(DEMO_PASSWORD);
-  const User = getModel("User");
   for (const demo of DEMO_USERS) {
     await User.findOneAndUpdate(
       { email: demo.email },

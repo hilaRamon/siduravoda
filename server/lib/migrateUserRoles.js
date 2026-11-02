@@ -1,4 +1,4 @@
-import { getModel } from "../models/index.js";
+import User from "../models/User.js";
 
 const LEGACY_FLAGS = [
   "can_report_time",
@@ -30,7 +30,6 @@ function needsLegacyCleanup(doc) {
  * strip filters for paths removed from the User schema.
  */
 export async function migrateLegacyUserRoles() {
-  const User = getModel("User");
   const users = await User.collection.find({}).toArray();
 
   let updated = 0;
