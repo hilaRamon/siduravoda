@@ -732,7 +732,6 @@ validateTimes(start, end):
 |------|-------|--------|
 | `links` | קישורים | PublishedScheduleCard + TimeReportingLink |
 | `backup` | גיבוי ושחזור | BackupExport + ImportAssignments + BackupEmailSettings |
-| `random` | שיבוץ אקראי | כלים לשיבוץ רנדומלי ושיבוץ תפקידים אוטומטי |
 | `settings` | הגדרות ברירות מחדל | DefaultSettings (תעריף ושעות ברירת מחדל) |
 | `srs` | מפרט מערכת | SRSViewer — מפרט המערכת הנוכחי |
 
@@ -744,15 +743,6 @@ validateTimes(start, end):
 - מאפשר עריכת `default_rate` ו-`default_hours`
 - שמירה: CREATE אם לא קיים, UPDATE אם קיים
 - מציג הודעת "נשמר!" אחרי שמירה
-
-#### 4.10.2 שיבוץ אקראי (כלי dev)
-
-- מוחק את כל השיבוצים מ-01/04/2026 ומשבץ מחדש רנדומלית
-- מגביל ל-10 מקומות עבודה ראשונים + "לא עובד" + "לימודים"
-
-#### 4.10.3 שיבוץ תפקידים אוטומטי (כלי dev)
-
-- משבץ נהג / אחראי פק"ל / ראש צוות לכל יום בצורה מחזורית
 
 ---
 
