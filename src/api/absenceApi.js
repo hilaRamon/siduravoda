@@ -22,10 +22,17 @@ export const absenceApi = {
     return apiRequest(`${BASE}/${id}`);
   },
 
-  createManual({ date, student_id, reason, notes }) {
+  createManual({ date, student_id, reason, notes, workplace_name }) {
     return apiRequest(BASE, {
       method: "POST",
-      body: JSON.stringify({ date, student_id, reason, notes }),
+      body: JSON.stringify({ date, student_id, reason, notes, workplace_name }),
+    });
+  },
+
+  setWorkplace(id, { workplace_name }) {
+    return apiRequest(`${BASE}/${id}/workplace`, {
+      method: "POST",
+      body: JSON.stringify({ workplace_name }),
     });
   },
 

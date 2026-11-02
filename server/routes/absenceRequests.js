@@ -27,6 +27,7 @@ router.get("/", absenceRequestController.list);
 router.post("/", absenceRequestController.create);
 router.get("/:id", absenceRequestController.getById);
 router.patch("/:id", absenceRequestController.update);
+router.post("/:id/workplace", absenceRequestController.setWorkplace);
 router.post("/:id/approve", absenceRequestController.approve);
 router.post("/:id/reject", absenceRequestController.reject);
 router.delete("/:id", absenceRequestController.remove);

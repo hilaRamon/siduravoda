@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { base44 } from '@/api/base44Client';
+import { authApi } from '@/api/authApi';
 import { Button } from '@/components/ui/button';
 import { Shield, UserCheck, Loader2, Trash2, KeyRound, Sparkles } from 'lucide-react';
 import { Input } from '@/components/ui/input';
@@ -89,7 +89,7 @@ function SetPasswordDialog({ user, open, onClose }) {
     }
     setSaving(true);
     try {
-      await base44.auth.setUserPassword(user.id, password);
+      await authApi.setUserPassword(user.id, password);
       setSuccess(true);
     } catch (err) {
       setError(err?.message || 'שגיאה בעדכון הסיסמה');
@@ -188,7 +188,7 @@ function InviteBox({ allowedLevel, label }) {
     setResult(null);
     setError('');
     try {
-      const res = await base44.auth.inviteUser(email.trim(), allowedLevel, fullName.trim());
+      const res = await authApi.inviteUser(email.trim(), allowedLevel, fullName.trim());
       setResult({ email: email.trim(), password: res.temporaryPassword });
       setEmail('');
       setFullName('');
@@ -267,7 +267,7 @@ function UserManager({ canManageUsers, inviteOptions, levelOptions }) {
 
   const { data: users = [], isLoading } = useQuery({
     queryKey: ['users-list'],
-    queryFn: () => base44.auth.listUsers(),
+    queryFn: () => authApi.listUsers(),
     enabled: canManageUsers,
   });
 
@@ -277,7 +277,7 @@ function UserManager({ canManageUsers, inviteOptions, levelOptions }) {
   const handleSetLevel = async (user, level) => {
     setUpdating(user.id);
     try {
-      await base44.auth.updateUser(user.id, { role: level, level });
+      await authApi.updateUser(user.id, { role: level, level });
       queryClient.invalidateQueries({ queryKey: ['users-list'] });
     } finally {
       setUpdating(null);
@@ -288,7 +288,7 @@ function UserManager({ canManageUsers, inviteOptions, levelOptions }) {
     if (!window.confirm(`למחוק את המשתמש ${user.email}?`)) return;
     setDeleting(user.id);
     try {
-      await base44.auth.deleteUser(user.id);
+      await authApi.deleteUser(user.id);
       queryClient.invalidateQueries({ queryKey: ['users-list'] });
     } finally {
       setDeleting(null);

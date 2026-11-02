@@ -1,4 +1,5 @@
 export const NOT_WORKING_WORKPLACE_NAME = "תתת - לא עובד";
+export const PNIMIYA_WORKPLACE_NAME = "תתת - לא עובד, פנימיה";
 export const PRE_ASSIGNMENT_WORKPLACE_NAME = "אאא- לפני שיבוץ";
 export const MILUIM_WORKPLACE_NAME = "תתח - מילואים";
 export const DISTANCE_WORKPLACE_NAMES = [
@@ -23,8 +24,14 @@ function requireWorkplace(wp, name) {
   return { id: wp.id, name: wp.name };
 }
 
+function isNotWorkingSource(name) {
+  return (
+    name === NOT_WORKING_WORKPLACE_NAME || name === PNIMIYA_WORKPLACE_NAME
+  );
+}
+
 function workplaceFromSource(src, preAssignmentWp) {
-  if (src.workplace_name === NOT_WORKING_WORKPLACE_NAME) {
+  if (isNotWorkingSource(src.workplace_name)) {
     return requireWorkplace(preAssignmentWp, PRE_ASSIGNMENT_WORKPLACE_NAME);
   }
   if (!src.workplace_id) return null;

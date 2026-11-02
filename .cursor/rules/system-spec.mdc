@@ -1,0 +1,27 @@
+---
+description: Keep the developer spec and user guide aligned with application changes
+alwaysApply: true
+---
+
+# System spec
+
+When application code changes, check whether the system documentation must change too. There are two sources, and the on-site viewer, PDF, and Word export are generated from them:
+
+- Developer specification: `src/docs/SRS_Regivim_System.md`
+- User guide: `src/docs/UserGuide_Regivim.md`
+
+Update the developer specification when technical implementation, architecture, data models, business logic, permissions, or system behavior changes.
+
+Update the user guide when user-facing features, workflows, or usage instructions change.
+
+Update both when a change affects technical behavior and what a user does or sees.
+
+Preserve each file's existing structure, heading style, and level of detail. The developer specification stays technical. The user guide stays short, declarative, and non-technical, in its numbered chapter form. Document only behavior that is actually implemented. Do not edit either file for unrelated cleanup, rewording, or version notes the change did not require.
+
+```markdown
+<!-- A new permission that changes who can open a screen -->
+<!-- Update SRS_Regivim_System.md (roles and access) and UserGuide_Regivim.md (who sees what). -->
+
+<!-- A refactor that does not change behavior, screens, or data -->
+<!-- Leave both documents unchanged. -->
+```

@@ -19,15 +19,7 @@ export function checkEntityAccess(req, res, next) {
     return res.status(401).json({ message: "Authentication required" });
   }
 
-  // User entity: admin only
-  if (entityName === "User") {
-    if (!isAdmin(req.user)) {
-      return res.status(403).json({ message: "Admin access required" });
-    }
-    return next();
-  }
-
-  // Admins and regular users: full access to all other entities
+  // Admins and regular users: full access to entities
   if (isAdmin(req.user) || isRegularUser(req.user)) {
     return next();
   }

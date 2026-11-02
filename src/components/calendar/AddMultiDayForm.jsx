@@ -5,6 +5,11 @@ import { Button } from '@/components/ui/button';
 import { Calendar as DayPickerCalendar } from '@/components/ui/calendar';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { Plus, X } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import {
+  NOT_WORKING_WORKPLACE_NAME,
+  PNIMIYA_WORKPLACE_NAME,
+} from '@/lib/assignmentHelpers';
 import { format, parseISO } from 'date-fns';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
@@ -27,7 +32,8 @@ function dateKey(day) {
  * @param {(item: any) => string} props.getItemLabel
  * @param {string} props.selectPlaceholder
  * @param {{ type: string, placeholder: string, min?: string|number }} [props.detailField]
- * @param {(args: { item: any, detail: string, dates: Date[] }) => Promise<void>} props.onSubmit
+ * @param {{ defaultValue: string, onValue: string, label: string }} [props.choiceField]
+ * @param {(args: { item: any, detail: string, dates: Date[], choice: string }) => Promise<void>} props.onSubmit
  * @param {boolean} [props.pending]
  */
 export function AddMultiDayForm({
@@ -37,6 +43,7 @@ export function AddMultiDayForm({
   getItemLabel,
   selectPlaceholder,
   detailField,
+  choiceField,
   onSubmit,
   pending = false,
 }) {
@@ -44,6 +51,7 @@ export function AddMultiDayForm({
   const [datePickerOpen, setDatePickerOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
   const [detail, setDetail] = useState('');
+  const [choice, setChoice] = useState(choiceField?.defaultValue || '');
   const [selectedDates, setSelectedDates] = useState([]);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -58,6 +66,7 @@ export function AddMultiDayForm({
   const resetForm = () => {
     setSelectedItem(null);
     setDetail('');
+    setChoice(choiceField?.defaultValue || '');
     setSelectedDates([]);
     setDatePickerOpen(false);
     setError('');
@@ -84,6 +93,7 @@ export function AddMultiDayForm({
         item: selectedItem,
         detail,
         dates: selectedDates,
+        choice,
       });
       resetForm();
     } catch (err) {
@@ -130,6 +140,29 @@ export function AddMultiDayForm({
           placeholder={detailField.placeholder}
           className="w-full h-7 border border-border rounded-md px-2 text-xs bg-card focus:outline-none focus:ring-1 focus:ring-primary/40"
         />
+      )}
+
+      {choiceField && (
+        <label className="inline-flex items-center gap-1.5 cursor-pointer">
+          <Switch
+            size="xs"
+            checked={choice === choiceField.onValue}
+            disabled={isBusy}
+            onCheckedChange={(checked) =>
+              setChoice(checked ? choiceField.onValue : choiceField.defaultValue)
+            }
+            aria-label={choiceField.label}
+          />
+          <span
+            className={`text-[11px] leading-none ${
+              choice === choiceField.onValue
+                ? 'text-primary font-medium'
+                : 'text-muted-foreground'
+            }`}
+          >
+            {choiceField.label}
+          </span>
+        </label>
       )}
 
       <div className="space-y-1">
@@ -248,9 +281,14 @@ export function AddAbsenceForm({ date, students }) {
         type: 'text',
         placeholder: 'סיבה (אופציונלי)',
       }}
+      choiceField={{
+        defaultValue: NOT_WORKING_WORKPLACE_NAME,
+        onValue: PNIMIYA_WORKPLACE_NAME,
+        label: 'בפנימיה',
+      }}
       pending={createMutation.isPending}
-      onSubmit={async ({ item, detail, dates }) => {
-        /** @type {(vars: { date: string, student_id: string, reason?: string }) => Promise<unknown>} */
+      onSubmit={async ({ item, detail, dates, choice }) => {
+        /** @type {(vars: { date: string, student_id: string, reason?: string, workplace_name?: string }) => Promise<unknown>} */
         const createAbsence = createMutation.mutateAsync;
         await Promise.all(
           dates.map((d) =>
@@ -258,6 +296,7 @@ export function AddAbsenceForm({ date, students }) {
               date: dateKey(d),
               student_id: item.id,
               reason: detail || '',
+              workplace_name: choice || NOT_WORKING_WORKPLACE_NAME,
             }),
           ),
         );

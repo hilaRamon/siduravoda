@@ -120,34 +120,46 @@ export async function createRememberToken(userId, existingEntries = []) {
   return [...keptEntries, { selector, validator }];
 }
 
+function tokenMatches(doc, entry) {
+  const expected = Buffer.from(doc.tokenHash, "hex");
+  const actual = Buffer.from(hashValidator(entry.validator), "hex");
+  return (
+    expected.length === actual.length &&
+    crypto.timingSafeEqual(expected, actual)
+  );
+}
+
+/**
+ * Find every cookie entry whose selector and validator match a live token.
+ * Returns [{ doc, entry }, ...].
+ */
+export async function findValidRememberTokens(entries) {
+  if (!entries.length) return [];
+  const selectors = entries.map((e) => e.selector);
+  const docs = await RememberToken.find({
+    selector: { $in: selectors },
+    expiresAt: { $gt: new Date() },
+  }).exec();
+
+  const bySelector = new Map(docs.map((d) => [d.selector, d]));
+  const matches = [];
+
+  for (const entry of entries) {
+    const doc = bySelector.get(entry.selector);
+    if (!doc || !tokenMatches(doc, entry)) continue;
+    matches.push({ doc, entry });
+  }
+  return matches;
+}
+
 /**
  * Find a valid remember token for userId among cookie entries.
  * Returns { doc, entry } or null.
  */
 export async function findValidRememberToken(userId, entries) {
-  if (!entries.length) return null;
-  const selectors = entries.map((e) => e.selector);
-  const docs = await RememberToken.find({
-    selector: { $in: selectors },
-    userId,
-    expiresAt: { $gt: new Date() },
-  }).exec();
-
-  const bySelector = new Map(docs.map((d) => [d.selector, d]));
-
-  for (const entry of entries) {
-    const doc = bySelector.get(entry.selector);
-    if (!doc) continue;
-    const expected = Buffer.from(doc.tokenHash, "hex");
-    const actual = Buffer.from(hashValidator(entry.validator), "hex");
-    if (
-      expected.length === actual.length &&
-      crypto.timingSafeEqual(expected, actual)
-    ) {
-      return { doc, entry };
-    }
-  }
-  return null;
+  const matches = await findValidRememberTokens(entries);
+  const userKey = String(userId);
+  return matches.find((match) => String(match.doc.userId) === userKey) || null;
 }
 
 /**

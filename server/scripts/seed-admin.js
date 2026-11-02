@@ -3,7 +3,7 @@
  */
 import dotenv from "dotenv";
 import mongoose from "mongoose";
-import { getModel } from "../models/index.js";
+import User from "../models/User.js";
 import { hashPassword } from "../lib/password.js";
 import { ROLES } from "../config/permissions.js";
 import { ensurePermissionRulesSeeded } from "../services/permissionRuleService.js";
@@ -23,7 +23,6 @@ async function main() {
 
   await mongoose.connect(mongoUri);
   await ensurePermissionRulesSeeded();
-  const User = getModel("User");
 
   const password_hash = await hashPassword(password);
   const existing = await User.findOne({ email });

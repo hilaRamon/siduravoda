@@ -420,9 +420,8 @@ export default function TimeReporting() {
 
   const totalStudents = workplacesToShow.reduce((s, wp) => s + (workplaceStudents[wp.workplace_id || wp.id] || []).length, 0);
 
-  const handleLogout = async () => {
-    await logout();
-    window.location.href = '/login';
+  const handleLogout = () => {
+    logout();
   };
 
   if (loadingUser) {
