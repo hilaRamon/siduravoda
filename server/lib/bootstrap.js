@@ -1,7 +1,35 @@
 import { getModel } from "../models/index.js";
+import Farm from "../models/Farm.js";
+import Workplace from "../models/Workplace.js";
 import { hashPassword } from "./password.js";
 import { ROLES } from "../config/permissions.js";
+import { PNIMIYA_WORKPLACE_NAME } from "./cloneWorkplaceDecision.js";
 import { ensurePermissionRulesSeeded } from "../services/permissionRuleService.js";
+
+const NO_CHARGE_FARM_NAME = "ללא חיוב";
+
+export async function ensurePnimiyaWorkplace() {
+  const farm = await Farm.findOne({ name: NO_CHARGE_FARM_NAME });
+  const farmId = farm?._id?.toString() || "";
+  if (!farmId) {
+    console.warn(
+      `Farm "${NO_CHARGE_FARM_NAME}" was not found. "${PNIMIYA_WORKPLACE_NAME}" stays without a farm.`,
+    );
+  }
+
+  const existing = await Workplace.findOne({ name: PNIMIYA_WORKPLACE_NAME });
+  if (!existing) {
+    await Workplace.create({
+      name: PNIMIYA_WORKPLACE_NAME,
+      ...(farmId ? { farm_id: farmId } : {}),
+    });
+    return;
+  }
+  if (farmId && existing.farm_id !== farmId) {
+    existing.farm_id = farmId;
+    await existing.save();
+  }
+}
 
 export async function ensureAdminUser() {
   await ensurePermissionRulesSeeded();

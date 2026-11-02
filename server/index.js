@@ -24,7 +24,7 @@ import workplaceLogisticsRouter from "./routes/workplaceLogistics.js";
 import vehiclesRouter from "./routes/vehicles.js";
 import farmsRouter from "./routes/farms.js";
 import workplacesRouter from "./routes/workplaces.js";
-import { ensureAdminUser } from "./lib/bootstrap.js";
+import { ensureAdminUser, ensurePnimiyaWorkplace } from "./lib/bootstrap.js";
 import { migrateAssignmentWorkNumber } from "./lib/migrateAssignmentWorkNumber.js";
 import { migrateWorkplaceLogisticsUnique } from "./lib/migrateWorkplaceLogisticsUnique.js";
 import { migrateLegacyUserRoles } from "./lib/migrateUserRoles.js";
@@ -108,6 +108,7 @@ async function start() {
   await ensurePermissionRulesSeeded();
   await migrateLegacyUserRoles();
   await ensureAdminUser();
+  await ensurePnimiyaWorkplace();
   app.listen(port, () => {
     console.log(`Server listening on http://localhost:${port}`);
     console.log(

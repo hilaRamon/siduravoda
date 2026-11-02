@@ -1,7 +1,14 @@
 import { showAlert } from "@/components/AppAlert";
 
 export const NOT_WORKING_WORKPLACE_NAME = "תתת - לא עובד";
+export const PNIMIYA_WORKPLACE_NAME = "תתת - לא עובד, פנימיה";
 export const PRE_ASSIGNMENT_WORKPLACE_NAME = "אאא- לפני שיבוץ";
+
+export function isAbsenceWorkplaceName(name) {
+  return (
+    name === NOT_WORKING_WORKPLACE_NAME || name === PNIMIYA_WORKPLACE_NAME
+  );
+}
 export const REQUEST_FULFILLED_SNACKBAR_MS = 4000;
 
 export function assignmentWorkNumber(assignment) {
@@ -204,7 +211,7 @@ export function buildBulkAssignmentOps({
     const studentId = existingAssignment?.student_id || selId;
     const student = studentById[studentId];
     const isAbsent = !!absentByStudentId[studentId];
-    const changingWorkplace = wp && wp.name !== NOT_WORKING_WORKPLACE_NAME;
+    const changingWorkplace = wp && !isAbsenceWorkplaceName(wp.name);
 
     if (isAbsent && changingWorkplace) {
       skippedAbsent++;

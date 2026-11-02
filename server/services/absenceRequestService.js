@@ -7,9 +7,16 @@ import {
 } from "../lib/pricing.js";
 import * as absenceRequestRepository from "../repositories/absenceRequestRepository.js";
 import * as studentRepository from "../repositories/studentRepository.js";
+import {
+  NOT_WORKING_WORKPLACE_NAME,
+  PNIMIYA_WORKPLACE_NAME,
+} from "../lib/cloneWorkplaceDecision.js";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
-const NOT_WORKING_WORKPLACE_NAME = "תתת - לא עובד";
+const ABSENCE_WORKPLACE_NAMES = new Set([
+  NOT_WORKING_WORKPLACE_NAME,
+  PNIMIYA_WORKPLACE_NAME,
+]);
 
 export class AbsenceRequestError extends Error {
   constructor(message, status = 400) {
@@ -49,14 +56,20 @@ async function findStudentIdByPhone(phone) {
   return matches[0].id;
 }
 
-async function getNotWorkingWorkplace() {
-  const workplace = await Workplace.findOne({
-    name: NOT_WORKING_WORKPLACE_NAME,
-  }).lean();
+function resolveAbsenceWorkplaceName(workplaceName) {
+  if (workplaceName == null || workplaceName === "") {
+    return NOT_WORKING_WORKPLACE_NAME;
+  }
+  if (!ABSENCE_WORKPLACE_NAMES.has(workplaceName)) {
+    throw new AbsenceRequestError("Invalid workplace_name");
+  }
+  return workplaceName;
+}
+
+async function getWorkplaceByName(name) {
+  const workplace = await Workplace.findOne({ name }).lean();
   if (!workplace) {
-    throw new AbsenceRequestError(
-      `Workplace "${NOT_WORKING_WORKPLACE_NAME}" not found`,
-    );
+    throw new AbsenceRequestError(`Workplace "${name}" not found`);
   }
   return {
     id: workplace._id.toString(),
@@ -72,8 +85,14 @@ async function getAssignmentDefaultsFromSettings() {
   return getAssignmentDefaults(normalizeAppSettings(settings));
 }
 
-async function assignNotWorking(studentId, date) {
-  const workplace = await getNotWorkingWorkplace();
+async function assignNotWorking(
+  studentId,
+  date,
+  workplaceName = NOT_WORKING_WORKPLACE_NAME,
+) {
+  const workplace = await getWorkplaceByName(
+    resolveAbsenceWorkplaceName(workplaceName),
+  );
   const student = await studentRepository.findById(studentId);
   const studentName = student?.full_name || "";
 
@@ -147,11 +166,18 @@ export async function getAbsenceRequest(id) {
   return doc;
 }
 
-export async function createManualAbsence({ date, student_id, reason, notes }) {
+export async function createManualAbsence({
+  date,
+  student_id,
+  reason,
+  notes,
+  workplace_name,
+}) {
   assertDate(date);
   if (!student_id) {
     throw new AbsenceRequestError("student_id is required for manual absences");
   }
+  const workplaceName = resolveAbsenceWorkplaceName(workplace_name);
 
   const created = await absenceRequestRepository.create({
     date,
@@ -161,8 +187,26 @@ export async function createManualAbsence({ date, student_id, reason, notes }) {
     source: "manual",
     status: "אושר",
   });
-  await assignNotWorking(student_id, date);
+  await assignNotWorking(student_id, date, workplaceName);
   return created;
+}
+
+export async function setAbsenceWorkplace(id, workplaceName) {
+  const existing = await getAbsenceRequest(id);
+  if (existing.status !== "אושר") {
+    throw new AbsenceRequestError(
+      "Only an approved absence can set the workplace",
+    );
+  }
+  if (!existing.student_id || !existing.date) {
+    throw new AbsenceRequestError("student_id and date are required");
+  }
+  await assignNotWorking(
+    existing.student_id,
+    existing.date,
+    resolveAbsenceWorkplaceName(workplaceName),
+  );
+  return existing;
 }
 
 export async function createFromSms({

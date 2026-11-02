@@ -32,6 +32,7 @@ const SKIP_WORKPLACE_NAMES = new Set([
   "רחוק",
   "אאא- לפני שיבוץ",
   "תתת - לא עובד",
+  "תתת - לא עובד, פנימיה",
 ]);
 
 const FIRST_WORK_TIMES = { start_time: "07:00", end_time: "10:00" };

@@ -5,6 +5,7 @@ import {
   createManualAbsence,
   createFromSms,
   updateAbsenceRequest,
+  setAbsenceWorkplace,
   approveAbsenceRequest,
   rejectAbsenceRequest,
   deleteAbsenceRequest,
@@ -56,6 +57,18 @@ export async function createFromSmsHandler(req, res, next) {
 export async function update(req, res, next) {
   try {
     const item = await updateAbsenceRequest(req.params.id, req.body || {});
+    return res.json(item);
+  } catch (error) {
+    return handleError(res, next, error);
+  }
+}
+
+export async function setWorkplace(req, res, next) {
+  try {
+    const item = await setAbsenceWorkplace(
+      req.params.id,
+      req.body?.workplace_name,
+    );
     return res.json(item);
   } catch (error) {
     return handleError(res, next, error);

@@ -63,6 +63,7 @@ const SPECIAL_WORKPLACE_NAMES = [
   "רחוק",
   "אאא- לפני שיבוץ",
   "תתת - לא עובד",
+  "תתת - לא עובד, פנימיה",
 ];
 
 const FARMS = [
@@ -704,7 +705,9 @@ async function main() {
   const reportDate = lastWorkDayOnOrBefore(today);
   const reportAssignments = await Assignment.find({
     date: reportDate,
-    workplace_name: { $nin: ["לא עובד", "לימודים", "לא יצא", "תתת - לא עובד"] },
+    workplace_name: {
+      $nin: ["לא עובד", "לימודים", "לא יצא", "תתת - לא עובד", "תתת - לא עובד, פנימיה"],
+    },
   }).limit(10);
   const reportStatuses = ["ממתין", "אושר", "נדחה", "ממתין", "אושר"];
   await TimeReport.insertMany(

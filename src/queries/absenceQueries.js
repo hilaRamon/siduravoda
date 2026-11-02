@@ -9,8 +9,10 @@ export const absenceKeys = {
 };
 
 function invalidateAbsenceQueries(queryClient) {
-  queryClient.invalidateQueries({ queryKey: absenceKeys.all });
-  queryClient.invalidateQueries({ queryKey: ["assignments"] });
+  return Promise.all([
+    queryClient.invalidateQueries({ queryKey: absenceKeys.all }),
+    queryClient.invalidateQueries({ queryKey: ["assignments"] }),
+  ]);
 }
 
 export function useAbsenceRequests(filters = {}, options = {}) {
@@ -34,7 +36,7 @@ export function usePendingAbsenceCount(options = {}) {
 }
 
 /**
- * @typedef {{ date: string, student_id: string, reason?: string }} ManualAbsenceInput
+ * @typedef {{ date: string, student_id: string, reason?: string, workplace_name?: string }} ManualAbsenceInput
  */
 
 export function useCreateManualAbsence() {
@@ -42,6 +44,15 @@ export function useCreateManualAbsence() {
   return useMutation({
     /** @param {ManualAbsenceInput} data */
     mutationFn: (data) => absenceApi.createManual(data),
+    onSuccess: () => invalidateAbsenceQueries(queryClient),
+  });
+}
+
+export function useSetAbsenceWorkplace() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, workplace_name }) =>
+      absenceApi.setWorkplace(id, { workplace_name }),
     onSuccess: () => invalidateAbsenceQueries(queryClient),
   });
 }

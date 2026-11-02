@@ -4,11 +4,13 @@ import {
   CloneWorkplaceError,
   MILUIM_WORKPLACE_NAME,
   NOT_WORKING_WORKPLACE_NAME,
+  PNIMIYA_WORKPLACE_NAME,
   PRE_ASSIGNMENT_WORKPLACE_NAME,
   decideCloneWorkplace,
 } from "./cloneWorkplaceDecision.js";
 
 const notWorkingWp = { id: "nw-1", name: NOT_WORKING_WORKPLACE_NAME };
+const pnimiyaWp = { id: "pn-1", name: PNIMIYA_WORKPLACE_NAME };
 const preAssignmentWp = { id: "pa-1", name: PRE_ASSIGNMENT_WORKPLACE_NAME };
 const nearWp = { id: "near-1", name: "קרוב" };
 const farmWp = { id: "farm-1", name: "משק א" };
@@ -81,6 +83,27 @@ test("regular weekday remaps לא עובד to לפני שיבוץ", () => {
     },
   });
   assert.deepEqual(result, preAssignmentWp);
+});
+
+test("regular weekday remaps פנימיה to לפני שיבוץ", () => {
+  const result = decide({
+    src: {
+      workplace_id: pnimiyaWp.id,
+      workplace_name: PNIMIYA_WORKPLACE_NAME,
+    },
+  });
+  assert.deepEqual(result, preAssignmentWp);
+});
+
+test("approved absence replaces פנימיה with לא עובד", () => {
+  const result = decide({
+    isAbsent: true,
+    src: {
+      workplace_id: pnimiyaWp.id,
+      workplace_name: PNIMIYA_WORKPLACE_NAME,
+    },
+  });
+  assert.deepEqual(result, notWorkingWp);
 });
 
 test("regular weekday copies source workplace", () => {

@@ -41,7 +41,7 @@ import {
   parseDisplayRateInput,
 } from "@/lib/pricing";
 import {
-  NOT_WORKING_WORKPLACE_NAME,
+  isAbsenceWorkplaceName,
   PRE_ASSIGNMENT_WORKPLACE_NAME,
   REQUEST_FULFILLED_SNACKBAR_MS,
   assignmentWorkNumber,
@@ -333,7 +333,7 @@ export default function Assignments() {
 
   const handleAssign = async (student, workplace, assignment) => {
     const absence = absentByStudentId[student.id];
-    if (absence && workplace.name !== NOT_WORKING_WORKPLACE_NAME) {
+    if (absence && !isAbsenceWorkplaceName(workplace.name)) {
       await offerRejectAbsence(student, absence);
       return false;
     }

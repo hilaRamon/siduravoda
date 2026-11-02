@@ -1,6 +1,18 @@
 import { useState, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useWorkplaces } from '@/queries/workplaceQueries';
-import { useAbsenceRequests, useDeleteAbsence } from '@/queries/absenceQueries';
+import { assignmentApi } from '@/api/assignmentApi';
+import { assignmentKeys } from '@/queries/assignmentQueries';
+import {
+  useAbsenceRequests,
+  useDeleteAbsence,
+  useSetAbsenceWorkplace,
+} from '@/queries/absenceQueries';
+import {
+  NOT_WORKING_WORKPLACE_NAME,
+  PNIMIYA_WORKPLACE_NAME,
+} from '@/lib/assignmentHelpers';
+import { showAlert } from '@/components/AppAlert';
 import {
   useFarmerRequests,
   useDeleteFarmerRequest,
@@ -8,7 +20,8 @@ import {
 import { AddFarmerRequestForm, AddAbsenceForm } from '@/components/calendar/AddMultiDayForm';
 import { DeleteIconButton } from '@/components/calendar/DeleteIconButton';
 import { Button } from '@/components/ui/button';
-import { ChevronRight, ChevronLeft, CalendarDays } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { ChevronRight, ChevronLeft, CalendarDays, Loader2 } from 'lucide-react';
 import { format, addWeeks, subWeeks, startOfWeek, addDays } from 'date-fns';
 import { useStudents } from '@/queries/studentQueries';
 
@@ -19,9 +32,10 @@ function getWeekDays(baseDate) {
 
 const DAY_NAMES = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי'];
 
-function DayColumn({ day, farmerRequests, absences, workplaces, students, studentsById }) {
+function DayColumn({ day, farmerRequests, absences, assignments, workplaces, students, studentsById }) {
   const deleteRequestMutation = useDeleteFarmerRequest();
   const deleteAbsenceMutation = useDeleteAbsence();
+  const setWorkplaceMutation = useSetAbsenceWorkplace();
   const [deletingId, setDeletingId] = useState(null);
   const dateStr = format(day, 'yyyy-MM-dd');
   const isToday = dateStr === format(new Date(), 'yyyy-MM-dd');
@@ -30,6 +44,35 @@ function DayColumn({ day, farmerRequests, absences, workplaces, students, studen
   const dayAbsences = absences.filter(
     a => a.date === dateStr && a.status === 'אושר' && a.student_id,
   );
+  const assignmentByStudent = useMemo(() => {
+    const map = {};
+    assignments
+      .filter((row) => row.date === dateStr && row.student_id)
+      .forEach((row) => {
+        const current = map[row.student_id];
+        if (!current) {
+          map[row.student_id] = row;
+          return;
+        }
+        const currentNumber = current.work_number ?? 1;
+        const nextNumber = row.work_number ?? 1;
+        if (nextNumber < currentNumber) map[row.student_id] = row;
+      });
+    return map;
+  }, [assignments, dateStr]);
+
+  const handleWorkplace = async (absence, workplaceName) => {
+    const assignment = assignmentByStudent[absence.student_id];
+    if (assignment?.workplace_name === workplaceName) return;
+    try {
+      await setWorkplaceMutation.mutateAsync({
+        id: absence.id,
+        workplace_name: workplaceName,
+      });
+    } catch (error) {
+      await showAlert(error.message || 'העדכון נכשל');
+    }
+  };
 
   const handleDelete = async (id, mutateAsync) => {
     if (deletingId) return;
@@ -93,6 +136,13 @@ function DayColumn({ day, farmerRequests, absences, workplaces, students, studen
           <div className="space-y-1">
             {dayAbsences.map(abs => {
               const isDeleting = deletingId === abs.id;
+              const workplacePending =
+                setWorkplaceMutation.isPending &&
+                setWorkplaceMutation.variables?.id === abs.id;
+              const shownWorkplace = workplacePending
+                ? setWorkplaceMutation.variables.workplace_name
+                : assignmentByStudent[abs.student_id]?.workplace_name;
+              const isPnimiya = shownWorkplace === PNIMIYA_WORKPLACE_NAME;
               return (
                 <div
                   key={abs.id}
@@ -105,6 +155,38 @@ function DayColumn({ day, farmerRequests, absences, workplaces, students, studen
                     {abs.reason && (
                       <div className="text-sm text-muted-foreground truncate">{abs.reason}</div>
                     )}
+                    <label className="mt-0.5 inline-flex items-center gap-1.5 cursor-pointer">
+                      <Switch
+                        size="xs"
+                        checked={isPnimiya}
+                        disabled={!!deletingId || workplacePending}
+                        onCheckedChange={(checked) =>
+                          handleWorkplace(
+                            abs,
+                            checked
+                              ? PNIMIYA_WORKPLACE_NAME
+                              : NOT_WORKING_WORKPLACE_NAME,
+                          )
+                        }
+                        aria-label="בפנימיה"
+                      />
+                      <span
+                        className={`text-[11px] leading-none ${
+                          isPnimiya
+                            ? 'text-primary font-medium'
+                            : 'text-muted-foreground'
+                        }`}
+                      >
+                        בפנימיה
+                      </span>
+                      {workplacePending && (
+                        <Loader2
+                          size={11}
+                          className="animate-spin text-muted-foreground"
+                          aria-label="טוען"
+                        />
+                      )}
+                    </label>
                   </div>
                   <DeleteIconButton
                     onClick={() => handleDelete(abs.id, deleteAbsenceMutation.mutateAsync)}
@@ -139,6 +221,12 @@ export default function Calendar() {
     startDate,
     endDate,
     status: 'אושר',
+  });
+
+  const { data: assignments = [] } = useQuery({
+    queryKey: [...assignmentKeys.all, 'range', startDate, endDate],
+    queryFn: () =>
+      assignmentApi.list({ startDate, endDate, limit: 5000 }),
   });
 
   const { students } = useStudents();
@@ -183,6 +271,7 @@ export default function Calendar() {
             day={day}
             farmerRequests={farmerRequests}
             absences={absences}
+            assignments={assignments}
             workplaces={workplaces}
             students={students}
             studentsById={studentsById}
