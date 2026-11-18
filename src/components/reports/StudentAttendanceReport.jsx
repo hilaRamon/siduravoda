@@ -33,7 +33,7 @@ const COLUMNS = [
   { key: 'studies', field: 'attendance_studies', label: 'לימודים' },
 ];
 
-const NO_CHARGE_FARM = 'ללא חיוב';
+const ATTENDANCE_FARM = 'לא עובד';
 const NOT_ASSIGNED_WORKPLACE = 'אאא- לפני שיבוץ';
 const DELETED_WORKPLACE_LABEL = 'מקום עבודה שנמחק';
 
@@ -102,12 +102,12 @@ function AttendanceBucketDialog({
           <DialogTitle>{column?.label}</DialogTitle>
         </DialogHeader>
         <p className="text-sm text-muted-foreground">
-          מקומות העבודה שנכללים בעמודה. הרשימה מציגה מקומות ממשק {NO_CHARGE_FARM}.
+          מקומות העבודה שנכללים בעמודה. הרשימה מציגה מקומות ממשק {ATTENDANCE_FARM}.
         </p>
         {optionsLoading ? (
           <p className="text-sm text-muted-foreground">טוען...</p>
         ) : options.length === 0 ? (
-          <p className="text-sm text-muted-foreground">אין מקומות עבודה במשק {NO_CHARGE_FARM}</p>
+          <p className="text-sm text-muted-foreground">אין מקומות עבודה במשק {ATTENDANCE_FARM}</p>
         ) : (
           <div className="max-h-80 space-y-1 overflow-y-auto">
             {options.map((option) => {
@@ -147,7 +147,7 @@ function AttendanceBucketDialog({
 }
 
 export default function StudentAttendanceReport() {
-  const filters = useStudentReportSelection();
+  const filters = useStudentReportSelection({ activeOnly: true });
   const { user } = useAuth();
   const canEdit = isAdmin(user) || isRegularUser(user);
   const queryClient = useQueryClient();
@@ -166,7 +166,12 @@ export default function StudentAttendanceReport() {
 
   const workplacesQuery = useWorkplaces();
   const farmsQuery = useFarms({ enabled: canEdit });
-  const reportData = /** @type {StudentAttendanceRow[]} */ (data?.students ?? []);
+  const returnedStudents = /** @type {StudentAttendanceRow[]} */ (data?.students ?? []);
+  const reportData = useMemo(() => {
+    const activeIds = new Set(Object.keys(filters.studentNameById));
+    return returnedStudents.filter((student) => activeIds.has(student.studentId));
+  }, [returnedStudents, filters.studentNameById]);
+  const reportLoading = isLoading || filters.studentsLoading;
   const buckets = /** @type {AttendanceBuckets} */ (data?.buckets ?? EMPTY_BUCKETS);
   const workplaces = /** @type {WorkplaceRecord[]} */ (workplacesQuery.workplaces ?? []);
   const farms = /** @type {WorkplaceRecord[]} */ (farmsQuery.data ?? []);
@@ -174,7 +179,7 @@ export default function StudentAttendanceReport() {
   const noChargeOptions = useMemo(() => {
     const farmIds = new Set(
       farms
-        .filter((farm) => farm.name === NO_CHARGE_FARM)
+        .filter((farm) => farm.name === ATTENDANCE_FARM)
         .map((farm) => farm.id),
     );
     return workplaces
@@ -300,10 +305,10 @@ export default function StudentAttendanceReport() {
         </p>
       )}
 
-      {isLoading && <p className="text-sm text-muted-foreground">טוען...</p>}
+      {reportLoading && <p className="text-sm text-muted-foreground">טוען...</p>}
       {isError && <p className="text-sm text-destructive">לא ניתן לטעון את הדוח</p>}
 
-      {!isLoading && !isError && (
+      {!reportLoading && !isError && (
         <div ref={reportRef} className="bg-white rounded-xl border border-border overflow-hidden" dir="rtl">
           <div className="px-4 py-2 bg-gray-50 border-b border-gray-200 text-xs text-gray-500">
             דוח נוכחות תלמידים | {periodLabel}

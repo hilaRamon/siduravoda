@@ -17,6 +17,7 @@ const appSettingsSchema = new mongoose.Schema(
     attendance_did_not_leave: { type: [String] },
     attendance_did_not_work: { type: [String] },
     attendance_studies: { type: [String] },
+    arzenu_skip_farms: { type: [String] },
   },
   baseSchemaOptions,
 );

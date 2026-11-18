@@ -9,6 +9,7 @@ import { useStudents } from '@/queries/studentQueries';
  * @property {string} id
  * @property {string} [full_name]
  * @property {string} [cohort]
+ * @property {boolean} [is_active]
  */
 
 /**
@@ -39,7 +40,10 @@ import { useStudents } from '@/queries/studentQueries';
  * @property {boolean} exporting
  */
 
-export function useStudentReportSelection() {
+/**
+ * @param {{ activeOnly?: boolean }} [options]
+ */
+export function useStudentReportSelection({ activeOnly = false } = {}) {
   const today = new Date().toISOString().slice(0, 10);
   const firstOfMonth = today.slice(0, 7) + '-01';
   const [fromDate, setFromDate] = useState(firstOfMonth);
@@ -49,10 +53,40 @@ export function useStudentReportSelection() {
   const [searchInput, setSearchInput] = useState('');
 
   const studentDirectory = useStudents();
-  const students = /** @type {ReportStudent[]} */ (studentDirectory.students);
-  const cohorts = /** @type {string[]} */ (studentDirectory.cohorts);
-  const studentOptions = /** @type {StudentOption[]} */ (studentDirectory.studentOptions);
-  const studentNameById = /** @type {Record<string, string>} */ (studentDirectory.studentNameById);
+  const directoryStudents = /** @type {ReportStudent[]} */ (studentDirectory.students);
+  const students = useMemo(
+    () => (activeOnly
+      ? directoryStudents.filter((student) => student.is_active !== false)
+      : directoryStudents),
+    [activeOnly, directoryStudents],
+  );
+  const directoryCohorts = /** @type {string[]} */ (studentDirectory.cohorts);
+  const directoryOptions = /** @type {StudentOption[]} */ (studentDirectory.studentOptions);
+  const directoryNames = /** @type {Record<string, string>} */ (studentDirectory.studentNameById);
+  const cohorts = useMemo(() => {
+    if (!activeOnly) return directoryCohorts;
+    /** @type {string[]} */
+    const names = [];
+    for (const student of students) {
+      if (student.cohort) names.push(student.cohort);
+    }
+    return [...new Set(names)].sort();
+  }, [activeOnly, directoryCohorts, students]);
+  const studentOptions = useMemo(() => {
+    if (!activeOnly) return directoryOptions;
+    /** @type {StudentOption[]} */
+    const options = [];
+    for (const student of students) {
+      if (!student.id || !student.full_name) continue;
+      options.push({ id: student.id, name: student.full_name });
+    }
+    options.sort((a, b) => a.name.localeCompare(b.name, 'he'));
+    return options;
+  }, [activeOnly, directoryOptions, students]);
+  const studentNameById = useMemo(() => {
+    if (!activeOnly) return directoryNames;
+    return Object.fromEntries(studentOptions.map((student) => [student.id, student.name]));
+  }, [activeOnly, directoryNames, studentOptions]);
 
   /** @param {string} cohort */
   const handleCohortChange = (cohort) => {
@@ -103,6 +137,7 @@ export function useStudentReportSelection() {
     setSearchInput,
     cohorts,
     studentNameById,
+    studentsLoading: studentDirectory.isLoading,
     filteredSuggestions,
     handleCohortChange,
     addStudent,

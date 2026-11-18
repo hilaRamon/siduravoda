@@ -2,12 +2,13 @@ import { getModel } from "../models/index.js";
 import Assignment from "../models/Assignment.js";
 import Farm from "../models/Farm.js";
 import Workplace from "../models/Workplace.js";
-import { SKIP_FARMS, SKIP_WORKPLACES } from "../lib/reportConstants.js";
+import { SKIP_WORKPLACES } from "../lib/reportConstants.js";
 import {
   attendanceAbsentPercent,
   classifyAttendanceWorkplace,
   resolveAttendanceBuckets,
 } from "../lib/attendanceBuckets.js";
+import { resolveArzenuSkipFarms } from "../lib/arzenuSkipFarms.js";
 import { primaryWorkNumberMatch } from "../lib/assignmentWorkNumber.js";
 import {
   calcAvgDailyUnits,
@@ -52,6 +53,7 @@ async function listWorkplacesWithFarmName() {
     return {
       id: workplace._id.toString(),
       name: workplace.name || "",
+      farmId: workplace.farm_id || "",
       farmName: farm?.name || "",
       companyId: farm?.companyId || "",
     };
@@ -94,7 +96,7 @@ async function getStudentWorkWorkplaceMaps() {
   return { byId, skipIds };
 }
 
-async function getArzenuWorkplaceMaps() {
+async function getArzenuWorkplaceMaps(skipFarmIds) {
   const workplaces = await listWorkplacesWithFarmName();
   const byId = {};
   const skipIds = [];
@@ -102,17 +104,28 @@ async function getArzenuWorkplaceMaps() {
   for (const workplace of workplaces) {
     byId[workplace.id] = {
       name: workplace.name,
+      farmId: workplace.farmId,
       farmName: workplace.farmName,
     };
     if (
       SKIP_WORKPLACES.includes(workplace.name) ||
-      SKIP_FARMS.includes(workplace.farmName)
+      skipFarmIds.has(workplace.farmId)
     ) {
       skipIds.push(workplace.id);
     }
   }
 
   return { byId, skipIds };
+}
+
+async function persistAppSettings(settings, stored) {
+  const AppSettings = getModel("AppSettings");
+  if (settings?._id) {
+    await AppSettings.updateOne({ _id: settings._id }, { $set: stored });
+    return settings._id.toString();
+  }
+  const created = await AppSettings.create(stored);
+  return created._id.toString();
 }
 
 function resolveWorkByWorkplaceName(workplaceId, assignmentName, byId) {
@@ -257,12 +270,12 @@ function toFarmGroups(rowBuckets) {
     .sort((a, b) => a.farmName.localeCompare(b.farmName, "he"));
 }
 
-function shouldSkipArzenuAssignment(workplaceId, workplaceName, byId) {
+function shouldSkipArzenuAssignment(workplaceId, workplaceName, byId, skipFarmIds) {
   const info = byId[workplaceId];
   if (info) {
     return (
       SKIP_WORKPLACES.includes(info.name) ||
-      SKIP_FARMS.includes(info.farmName)
+      skipFarmIds.has(info.farmId)
     );
   }
   return SKIP_WORKPLACES.includes(workplaceName);
@@ -567,11 +580,20 @@ export async function getStudentAttendanceReport({
   endDate,
   students = [],
 }) {
-  const [settings, workplaceDocs, studentById] = await Promise.all([
+  const [settings, workplaceDocs, activeStudents] = await Promise.all([
     findAppSettings(),
     Workplace.find().select("name").lean(),
-    getStudentMap(),
+    studentRepository.find({ is_active: { $ne: false } }),
   ]);
+  const studentById = {};
+  for (const student of activeStudents) {
+    if (!student?.id) continue;
+    studentById[student.id] = student.full_name || "";
+  }
+  const activeIds = Object.keys(studentById);
+  const countedIds = students.length > 0
+    ? students.filter((id) => Object.prototype.hasOwnProperty.call(studentById, id))
+    : activeIds;
   const workplaceRecords = workplaceDocs.map((workplace) => ({
     id: workplace._id.toString(),
     name: workplace.name || "",
@@ -589,15 +611,16 @@ export async function getStudentAttendanceReport({
   }
   const { buckets, notAssignedIds } = resolved;
 
+  if (countedIds.length === 0) {
+    return { students: [], buckets, settingsId };
+  }
+
   const match = {
     date: { $gte: startDate, $lte: endDate },
     workplace_name: { $exists: true, $ne: "" },
-    student_id: { $exists: true, $ne: "" },
+    student_id: { $in: countedIds },
     ...primaryWorkNumberMatch(),
   };
-  if (students.length > 0) {
-    match.student_id = { $in: students };
-  }
 
   const rows = await Assignment.aggregate([
     { $match: match },
@@ -663,10 +686,20 @@ export async function getStudentAttendanceReport({
  * @param {{ startDate: string, endDate: string }} params
  */
 export async function getArzenuReport({ startDate, endDate }) {
-  const [{ byId: workplaceById, skipIds }, studentById] = await Promise.all([
-    getArzenuWorkplaceMaps(),
+  const [settings, farmDocs, studentById] = await Promise.all([
+    findAppSettings(),
+    Farm.find().select("name").lean(),
     getStudentMap(),
   ]);
+  const resolved = resolveArzenuSkipFarms(
+    settings,
+    farmDocs.map((farm) => ({ id: farm._id.toString(), name: farm.name || "" })),
+  );
+  if (resolved.changed) {
+    await persistAppSettings(settings, resolved.stored);
+  }
+  const skipFarmIds = new Set(resolved.ids);
+  const { byId: workplaceById, skipIds } = await getArzenuWorkplaceMaps(skipFarmIds);
 
   const match = {
     date: { $gte: startDate, $lte: endDate },
@@ -697,6 +730,7 @@ export async function getArzenuReport({ startDate, endDate }) {
         assignment.workplace_id,
         assignment.workplace_name,
         workplaceById,
+        skipFarmIds,
       )
     ) {
       continue;
