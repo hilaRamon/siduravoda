@@ -21,6 +21,11 @@ router.get(
   reportController.workByWorkplace,
 );
 router.get("/student-work", requireReportAccess, reportController.studentWork);
+router.get(
+  "/student-attendance",
+  requireReportAccess,
+  reportController.studentAttendance,
+);
 router.get("/arzenu", requireReportAccess, reportController.arzenu);
 
 export default router;

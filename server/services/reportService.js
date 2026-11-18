@@ -3,6 +3,11 @@ import Assignment from "../models/Assignment.js";
 import Farm from "../models/Farm.js";
 import Workplace from "../models/Workplace.js";
 import { SKIP_FARMS, SKIP_WORKPLACES } from "../lib/reportConstants.js";
+import {
+  attendanceAbsentPercent,
+  classifyAttendanceWorkplace,
+  resolveAttendanceBuckets,
+} from "../lib/attendanceBuckets.js";
 import { primaryWorkNumberMatch } from "../lib/assignmentWorkNumber.js";
 import {
   calcAvgDailyUnits,
@@ -20,12 +25,15 @@ import {
   pickCanonicalLogistics,
 } from "../lib/pieceworkLogistics.js";
 
-async function getAppSettings() {
+async function findAppSettings() {
   const AppSettings = getModel("AppSettings");
-  const settings = await AppSettings.findOne()
+  return AppSettings.findOne()
     .sort({ updated_date: -1, created_date: -1 })
     .lean();
-  return normalizeAppSettings(settings);
+}
+
+async function getAppSettings() {
+  return normalizeAppSettings(await findAppSettings());
 }
 
 async function listWorkplacesWithFarmName() {
@@ -549,6 +557,106 @@ export async function getStudentWorkReport({
     .sort((a, b) => a.name.localeCompare(b.name, "he"));
 
   return { students: result };
+}
+
+/**
+ * @param {{ startDate: string, endDate: string, students?: string[] }} params
+ */
+export async function getStudentAttendanceReport({
+  startDate,
+  endDate,
+  students = [],
+}) {
+  const [settings, workplaceDocs, studentById] = await Promise.all([
+    findAppSettings(),
+    Workplace.find().select("name").lean(),
+    getStudentMap(),
+  ]);
+  const workplaceRecords = workplaceDocs.map((workplace) => ({
+    id: workplace._id.toString(),
+    name: workplace.name || "",
+  }));
+  const resolved = resolveAttendanceBuckets(settings, workplaceRecords);
+  const AppSettings = getModel("AppSettings");
+  let settingsId = settings?._id ? settings._id.toString() : null;
+  if (resolved.changed) {
+    if (settingsId) {
+      await AppSettings.updateOne({ _id: settings._id }, { $set: resolved.stored });
+    } else {
+      const created = await AppSettings.create(resolved.stored);
+      settingsId = created._id.toString();
+    }
+  }
+  const { buckets, notAssignedIds } = resolved;
+
+  const match = {
+    date: { $gte: startDate, $lte: endDate },
+    workplace_name: { $exists: true, $ne: "" },
+    student_id: { $exists: true, $ne: "" },
+    ...primaryWorkNumberMatch(),
+  };
+  if (students.length > 0) {
+    match.student_id = { $in: students };
+  }
+
+  const rows = await Assignment.aggregate([
+    { $match: match },
+    { $sort: { updated_date: -1, created_date: -1 } },
+    {
+      $group: {
+        _id: { student_id: "$student_id", date: "$date" },
+        workplace_id: { $first: "$workplace_id" },
+        student_name: { $first: "$student_name" },
+      },
+    },
+  ]);
+
+  const studentBuckets = {};
+
+  for (const item of rows) {
+    const studentId = item._id.student_id;
+    const kind = classifyAttendanceWorkplace(
+      item.workplace_id,
+      buckets,
+      notAssignedIds,
+    );
+    if (!kind) continue;
+
+    if (!studentBuckets[studentId]) {
+      studentBuckets[studentId] = {
+        studentId,
+        name: resolveStudentName(studentId, item.student_name, studentById),
+        didNotLeave: 0,
+        didNotWork: 0,
+        studies: 0,
+        worked: 0,
+      };
+    }
+    studentBuckets[studentId][kind] += 1;
+  }
+
+  const result = Object.values(studentBuckets)
+    .map((student) => {
+      const assignedDays =
+        student.didNotLeave + student.didNotWork + student.studies + student.worked;
+      return {
+        ...student,
+        assignedDays,
+        absentPercent: attendanceAbsentPercent(
+          student.didNotLeave,
+          student.didNotWork,
+          assignedDays,
+        ),
+      };
+    })
+    .filter((student) => student.assignedDays > 0)
+    .sort((a, b) => a.name.localeCompare(b.name, "he"));
+
+  return {
+    students: result,
+    buckets,
+    settingsId,
+  };
 }
 
 /**

@@ -1,5 +1,6 @@
 import {
   getArzenuReport,
+  getStudentAttendanceReport,
   getStudentWorkReport,
   getWorkByWorkplaceReport,
 } from "../services/reportService.js";
@@ -58,6 +59,25 @@ export async function studentWork(req, res, next) {
     }
 
     const result = await getStudentWorkReport({
+      startDate: range.startDate,
+      endDate: range.endDate,
+      students: parseListParam(req.query.students),
+    });
+
+    return res.json(result);
+  } catch (error) {
+    return next(error);
+  }
+}
+
+export async function studentAttendance(req, res, next) {
+  try {
+    const range = readDateRange(req.query);
+    if (range.error) {
+      return res.status(400).json({ message: range.error });
+    }
+
+    const result = await getStudentAttendanceReport({
       startDate: range.startDate,
       endDate: range.endDate,
       students: parseListParam(req.query.students),

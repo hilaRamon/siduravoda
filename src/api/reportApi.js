@@ -1,5 +1,67 @@
 import { apiRequest } from "@/api/base44Client";
 
+/**
+ * @typedef {object} ReportRangeParams
+ * @property {string} [startDate]
+ * @property {string} [endDate]
+ */
+
+/**
+ * @typedef {ReportRangeParams & { students?: string[] }} StudentReportParams
+ */
+
+/**
+ * @typedef {ReportRangeParams & { workplaces?: string[], farms?: string[], groupBy?: 'workplace' | 'farm' }} WorkByWorkplaceParams
+ */
+
+/**
+ * @typedef {object} StudentWorkWorkplace
+ * @property {string} workplaceName
+ * @property {number} days
+ */
+
+/**
+ * @typedef {object} StudentWorkRow
+ * @property {string} studentId
+ * @property {string} name
+ * @property {StudentWorkWorkplace[]} workplaces
+ * @property {number} totalDays
+ */
+
+/**
+ * @typedef {object} StudentWorkReportData
+ * @property {StudentWorkRow[]} students
+ */
+
+/**
+ * @typedef {object} AttendanceBuckets
+ * @property {string[]} didNotLeave
+ * @property {string[]} didNotWork
+ * @property {string[]} studies
+ */
+
+/**
+ * @typedef {object} StudentAttendanceRow
+ * @property {string} studentId
+ * @property {string} name
+ * @property {number} didNotLeave
+ * @property {number} didNotWork
+ * @property {number} studies
+ * @property {number} worked
+ * @property {number} assignedDays
+ * @property {number} absentPercent
+ */
+
+/**
+ * @typedef {object} StudentAttendanceReportData
+ * @property {StudentAttendanceRow[]} students
+ * @property {AttendanceBuckets} buckets
+ * @property {string | null} settingsId
+ */
+
+/**
+ * @param {Record<string, string | number | boolean | null | undefined>} [params]
+ */
 function buildQuery(params = {}) {
   const search = new URLSearchParams();
   Object.entries(params).forEach(([key, value]) => {
@@ -11,6 +73,10 @@ function buildQuery(params = {}) {
   return query ? `?${query}` : "";
 }
 
+/**
+ * @param {string[] | undefined} values
+ * @returns {string | undefined}
+ */
 function joinList(values) {
   if (!values?.length) return undefined;
   return values.join(",");
@@ -19,6 +85,9 @@ function joinList(values) {
 const BASE = "/api/reports";
 
 export const reportApi = {
+  /**
+   * @param {WorkByWorkplaceParams} params
+   */
   workByWorkplace({ startDate, endDate, workplaces, farms, groupBy }) {
     return apiRequest(
       `${BASE}/work-by-workplace${buildQuery({
@@ -31,6 +100,10 @@ export const reportApi = {
     );
   },
 
+  /**
+   * @param {StudentReportParams} params
+   * @returns {Promise<StudentWorkReportData>}
+   */
   studentWork({ startDate, endDate, students }) {
     return apiRequest(
       `${BASE}/student-work${buildQuery({
@@ -41,6 +114,23 @@ export const reportApi = {
     );
   },
 
+  /**
+   * @param {StudentReportParams} params
+   * @returns {Promise<StudentAttendanceReportData>}
+   */
+  studentAttendance({ startDate, endDate, students }) {
+    return apiRequest(
+      `${BASE}/student-attendance${buildQuery({
+        startDate,
+        endDate,
+        students: joinList(students),
+      })}`,
+    );
+  },
+
+  /**
+   * @param {ReportRangeParams} params
+   */
   arzenu({ startDate, endDate }) {
     return apiRequest(
       `${BASE}/arzenu${buildQuery({ startDate, endDate })}`,
