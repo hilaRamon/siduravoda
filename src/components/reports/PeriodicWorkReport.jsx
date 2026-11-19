@@ -30,12 +30,40 @@ import {
 } from "lucide-react";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
-import * as XLSX from "xlsx";
 import { format, subMonths } from "date-fns";
+import { reportApi } from "@/api/reportApi";
 import { useWorkByWorkplaceReport } from "@/queries/reports/useWorkByWorkplaceReport";
 import { useWorkplaces } from "@/queries/reports/useWorkplaces";
-import { markWorkbookRtl } from "@/lib/excel";
 
+/**
+ * @typedef {object} PeriodicWorkRow
+ * @property {string} date
+ * @property {string} workplaceName
+ * @property {number | null} rate
+ * @property {string} unitName
+ * @property {number} studentCount
+ * @property {number | null} totalUnits
+ * @property {number | null} avgUnitsPerStudent
+ * @property {number} totalPrice
+ */
+
+/**
+ * @typedef {object} PeriodicFarmGroup
+ * @property {string} [id]
+ * @property {string} farmName
+ * @property {string} [companyId]
+ * @property {PeriodicWorkRow[]} rows
+ * @property {{ totalPrice: number }} totals
+ */
+
+/**
+ * @typedef {object} PeriodicWorkReportData
+ * @property {PeriodicFarmGroup[]} chargedGroups
+ * @property {PeriodicFarmGroup[]} skipGroups
+ * @property {number} chargeTotal
+ */
+
+/** @param {string | number | null | undefined} value */
 function displayValue(value) {
   if (value == null || value === "") return "—";
   return value;
@@ -66,6 +94,10 @@ function previousMonthDefaults() {
   };
 }
 
+/**
+ * @param {string} year
+ * @param {string} month
+ */
 function monthDateRange(year, month) {
   const startDate = `${year}-${month}-01`;
   const lastDay = new Date(Number(year), Number(month), 0).getDate();
@@ -73,21 +105,109 @@ function monthDateRange(year, month) {
   return { startDate, endDate };
 }
 
+/**
+ * @param {object} props
+ * @param {PeriodicFarmGroup} props.group
+ * @param {string} props.monthLabel
+ * @param {string} props.year
+ * @param {string[]} props.tableHeaders
+ * @param {(date: string) => string} props.formatDate
+ */
+function FarmSection({ group, monthLabel, year, tableHeaders, formatDate }) {
+  return (
+    <div>
+      <div className="mb-2">
+        <p className="text-sm font-bold">
+          לכבוד: {group.farmName}
+          {group.companyId ? `  ח.פ ${group.companyId}` : ""}
+        </p>
+        <p className="text-xs text-gray-500">
+          דוח עבודה תקופתי — {monthLabel} {year}
+        </p>
+      </div>
+      <table className="w-full text-xs border-collapse">
+        <thead>
+          <tr className="bg-gray-100">
+            {tableHeaders.map((header) => (
+              <th
+                key={header}
+                className="border border-gray-300 px-2 py-1.5 text-right font-semibold"
+              >
+                {header}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {group.rows.map((row, index) => (
+            <tr
+              key={`${row.date}-${row.workplaceName}-${index}`}
+              className={index % 2 === 0 ? "bg-white" : "bg-gray-50"}
+            >
+              <td className="border border-gray-300 px-2 py-1.5">
+                {formatDate(row.date)}
+              </td>
+              <td className="border border-gray-300 px-2 py-1.5">
+                {row.workplaceName}
+              </td>
+              <td className="border border-gray-300 px-2 py-1.5 text-center">
+                {displayValue(row.rate)}
+              </td>
+              <td className="border border-gray-300 px-2 py-1.5 text-center">
+                {row.unitName}
+              </td>
+              <td className="border border-gray-300 px-2 py-1.5 text-center">
+                {row.studentCount}
+              </td>
+              <td className="border border-gray-300 px-2 py-1.5 text-center">
+                {displayValue(row.totalUnits)}
+              </td>
+              <td className="border border-gray-300 px-2 py-1.5 text-center">
+                {displayValue(row.avgUnitsPerStudent)}
+              </td>
+              <td className="border border-gray-300 px-2 py-1.5 text-center">
+                {row.totalPrice} ₪
+              </td>
+            </tr>
+          ))}
+        </tbody>
+        <tfoot>
+          <tr className="bg-gray-200 font-bold">
+            <td
+              colSpan={3}
+              className="border border-gray-300 px-2 py-1.5 text-right"
+            >
+              סה"כ
+            </td>
+            <td className="border border-gray-300 px-2 py-1.5"></td>
+            <td className="border border-gray-300 px-2 py-1.5"></td>
+            <td className="border border-gray-300 px-2 py-1.5"></td>
+            <td className="border border-gray-300 px-2 py-1.5"></td>
+            <td className="border border-gray-300 px-2 py-1.5 text-center">
+              {group.totals.totalPrice} ₪
+            </td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  );
+}
+
 export default function PeriodicWorkReport() {
   const [month, setMonth] = useState(() => previousMonthDefaults().month);
   const [year, setYear] = useState(() => previousMonthDefaults().year);
   const [exporting, setExporting] = useState(false);
   const [exportingXlsx, setExportingXlsx] = useState(false);
-  const [selectedFarms, setSelectedFarms] = useState([]); // multi-select
+  const [selectedFarms, setSelectedFarms] = useState(/** @type {string[]} */ ([]));
   const [farmOpen, setFarmOpen] = useState(false);
-  const reportRef = useRef(null);
+  const reportRef = useRef(/** @type {HTMLDivElement | null} */ (null));
 
   const { startDate, endDate } = useMemo(
     () => monthDateRange(year, month),
     [year, month],
   );
 
-  const { farmNames } = useWorkplaces(); // unique farm names for filter
+  const { farms } = useWorkplaces();
 
   const { data, isLoading } = useWorkByWorkplaceReport({
     startDate,
@@ -96,7 +216,13 @@ export default function PeriodicWorkReport() {
     groupBy: "farm",
   });
 
-  const groups = data?.groups ?? [];
+  const report = /** @type {PeriodicWorkReportData | undefined} */ (data);
+  const chargedGroups = report?.chargedGroups ?? [];
+  const skipGroups = report?.skipGroups ?? [];
+  const chargeTotal = report?.chargeTotal ?? 0;
+  const farmNameById = useMemo(() => {
+    return new Map(farms.map((farm) => [farm.id, farm.name || farm.id]));
+  }, [farms]);
 
   const tableHeaders = [
     "תאריך",
@@ -109,12 +235,14 @@ export default function PeriodicWorkReport() {
     "מחיר",
   ];
 
+  /** @param {string} farm */
   const toggleFarm = (farm) => {
     setSelectedFarms((prev) =>
       prev.includes(farm) ? prev.filter((f) => f !== farm) : [...prev, farm],
     );
   };
 
+  /** @param {string} d */
   const formatDate = (d) => {
     const [y, m, day] = d.split("-");
     return `${day}/${m}/${y}`;
@@ -124,6 +252,10 @@ export default function PeriodicWorkReport() {
     setExporting(true);
     await new Promise((r) => setTimeout(r, 100));
     const el = reportRef.current;
+    if (!el) {
+      setExporting(false);
+      return;
+    }
     const pdf = new jsPDF({
       orientation: "portrait",
       unit: "mm",
@@ -135,7 +267,7 @@ export default function PeriodicWorkReport() {
     const printW = pageW - margin * 2;
     const maxImgH = pageH - margin * 2;
 
-    const sections = Array.from(el.children);
+    const sections = /** @type {HTMLElement[]} */ (Array.from(el.children));
     let firstPage = true;
     for (const section of sections) {
       const canvas = await html2canvas(section, {
@@ -151,19 +283,19 @@ export default function PeriodicWorkReport() {
         const slice = document.createElement("canvas");
         slice.width = canvas.width;
         slice.height = sliceH;
-        slice
-          .getContext("2d")
-          .drawImage(
-            canvas,
-            0,
-            srcY,
-            canvas.width,
-            sliceH,
-            0,
-            0,
-            canvas.width,
-            sliceH,
-          );
+        const ctx = slice.getContext("2d");
+        if (!ctx) throw new Error("Canvas 2D context is unavailable");
+        ctx.drawImage(
+          canvas,
+          0,
+          srcY,
+          canvas.width,
+          sliceH,
+          0,
+          0,
+          canvas.width,
+          sliceH,
+        );
         if (!firstPage) pdf.addPage();
         pdf.addImage(
           slice.toDataURL("image/jpeg", 0.88),
@@ -181,51 +313,29 @@ export default function PeriodicWorkReport() {
     setExporting(false);
   };
 
-  const handleExportXLSX = () => {
+  const handleExportXLSX = async () => {
     setExportingXlsx(true);
-    const rows = [];
-    groups.forEach((group) => {
-      const farm = group.farmName;
-      const farmRows = group.rows;
-      farmRows.forEach((r) =>
-        rows.push({
-          משק: farm,
-          "ח.פ": group.companyId || "",
-          תאריך: formatDate(r.date),
-          "מקום עבודה": r.workplaceName,
-          תעריף: displayValue(r.rate),
-          יחידה: r.unitName || "",
-          "סה״כ יחידות": displayValue(r.totalUnits),
-          מחיר: r.totalPrice,
-        }),
+    try {
+      await reportApi.downloadWorkByWorkplace(
+        {
+          startDate,
+          endDate,
+          farms: selectedFarms.length > 0 ? selectedFarms : undefined,
+        },
+        `דוח_עבודה_חודשי_${month}_${year}.xlsx`,
       );
-      rows.push({
-        משק: "",
-        "ח.פ": "",
-        תאריך: "",
-        "מקום עבודה": 'סה"כ',
-        תעריף: "",
-        יחידה: "",
-        "סה״כ יחידות": "",
-        מחיר: group.totals.totalPrice,
-      });
-      rows.push({});
-    });
-    const ws = XLSX.utils.json_to_sheet(rows);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "דוח חודשי");
-    markWorkbookRtl(wb);
-    XLSX.writeFile(wb, `דוח_עבודה_חודשי_${month}_${year}.xlsx`);
-    setExportingXlsx(false);
+    } finally {
+      setExportingXlsx(false);
+    }
   };
 
   const monthLabel = MONTHS.find((m) => m.value === month)?.label || "";
-  const hasData = groups.length > 0;
+  const hasData = chargedGroups.length > 0 || skipGroups.length > 0;
   const farmLabel =
     selectedFarms.length === 0
       ? "כל המשקים"
       : selectedFarms.length === 1
-        ? selectedFarms[0]
+        ? farmNameById.get(selectedFarms[0]) || selectedFarms[0]
         : `${selectedFarms.length} משקים נבחרו`;
 
   return (
@@ -307,18 +417,18 @@ export default function PeriodicWorkReport() {
                       />
                       כל המשקים
                     </CommandItem>
-                    {farmNames.map((f) => (
+                    {farms.map((farm) => (
                       <CommandItem
-                        key={f}
-                        value={f}
-                        onSelect={() => toggleFarm(f)}
+                        key={farm.id}
+                        value={`${farm.name || ""} ${farm.id}`}
+                        onSelect={() => toggleFarm(farm.id)}
                         className="text-xs flex items-center gap-2"
                       >
                         <Checkbox
-                          checked={selectedFarms.includes(f)}
+                          checked={selectedFarms.includes(farm.id)}
                           className="shrink-0"
                         />
-                        {f}
+                        {farm.name || farm.id}
                       </CommandItem>
                     ))}
                   </CommandGroup>
@@ -328,14 +438,14 @@ export default function PeriodicWorkReport() {
           </Popover>
           {selectedFarms.length > 0 && (
             <div className="flex flex-wrap gap-1 mt-1">
-              {selectedFarms.map((f) => (
+              {selectedFarms.map((farmId) => (
                 <span
-                  key={f}
+                  key={farmId}
                   className="flex items-center gap-1 bg-primary/10 text-primary text-xs px-2 py-0.5 rounded-full"
                 >
-                  {f}
+                  {farmNameById.get(farmId) || farmId}
                   <button
-                    onClick={() => toggleFarm(f)}
+                    onClick={() => toggleFarm(farmId)}
                     className="hover:text-destructive"
                   >
                     <X size={10} />
@@ -392,87 +502,43 @@ export default function PeriodicWorkReport() {
               אין נתונים לתקופה זו
             </p>
           ) : (
-            groups.map((group) => {
-              const farm = group.farmName;
-              const rows = group.rows;
-              return (
-                <div key={farm}>
-                  <div className="mb-2">
-                    <p className="text-sm font-bold">
-                      לכבוד: {farm}
-                      {group.companyId ? `  ח.פ ${group.companyId}` : ""}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      דוח עבודה תקופתי — {monthLabel} {year}
-                    </p>
-                  </div>
-                  <table className="w-full text-xs border-collapse">
-                    <thead>
-                      <tr className="bg-gray-100">
-                        {tableHeaders.map((h) => (
-                          <th
-                            key={h}
-                            className="border border-gray-300 px-2 py-1.5 text-right font-semibold"
-                          >
-                            {h}
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {rows.map((r, i) => (
-                        <tr
-                          key={i}
-                          className={i % 2 === 0 ? "bg-white" : "bg-gray-50"}
-                        >
-                          <td className="border border-gray-300 px-2 py-1.5">
-                            {formatDate(r.date)}
-                          </td>
-                          <td className="border border-gray-300 px-2 py-1.5">
-                            {r.workplaceName}
-                          </td>
-                          <td className="border border-gray-300 px-2 py-1.5 text-center">
-                            {displayValue(r.rate)}
-                          </td>
-                          <td className="border border-gray-300 px-2 py-1.5 text-center">
-                            {r.unitName}
-                          </td>
-                          <td className="border border-gray-300 px-2 py-1.5 text-center">
-                            {r.studentCount}
-                          </td>
-                          <td className="border border-gray-300 px-2 py-1.5 text-center">
-                            {displayValue(r.totalUnits)}
-                          </td>
-                          <td className="border border-gray-300 px-2 py-1.5 text-center">
-                            {displayValue(r.avgUnitsPerStudent)}
-                          </td>
-                          <td className="border border-gray-300 px-2 py-1.5 text-center">
-                            {r.totalPrice} ₪
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                    <tfoot>
-                      <tr className="bg-gray-200 font-bold">
-                        <td
-                          colSpan={3}
-                          className="border border-gray-300 px-2 py-1.5 text-right"
-                        >
-                          סה"כ
-                        </td>
-                        <td className="border border-gray-300 px-2 py-1.5"></td>
-                        <td className="border border-gray-300 px-2 py-1.5"></td>
-                        <td className="border border-gray-300 px-2 py-1.5"></td>
-                        <td className="border border-gray-300 px-2 py-1.5"></td>
-                        <td className="border border-gray-300 px-2 py-1.5 text-center">
-                          {group.totals.totalPrice} ₪
-                        </td>
-                      </tr>
-                    </tfoot>
-                  </table>
-                </div>
-              );
-            })
+            <>
+              {chargedGroups.map((group) => (
+                <FarmSection
+                  key={group.id || group.farmName}
+                  group={group}
+                  monthLabel={monthLabel}
+                  year={year}
+                  tableHeaders={tableHeaders}
+                  formatDate={formatDate}
+                />
+              ))}
+              <table className="w-full text-xs border-collapse">
+                <tbody>
+                  <tr className="bg-gray-200 font-bold">
+                    <td
+                      colSpan={7}
+                      className="border border-gray-300 px-2 py-1.5 text-right"
+                    >
+                      סה"כ חיוב
+                    </td>
+                    <td className="border border-gray-300 px-2 py-1.5 text-left whitespace-nowrap">
+                      {chargeTotal} ₪
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+              {skipGroups.map((group) => (
+                <FarmSection
+                  key={group.id || group.farmName}
+                  group={group}
+                  monthLabel={monthLabel}
+                  year={year}
+                  tableHeaders={tableHeaders}
+                  formatDate={formatDate}
+                />
+              ))}
+            </>
           )}
         </div>
       )}

@@ -35,6 +35,17 @@ test("a saved name becomes every matching farm id, and an unknown name is droppe
   assert.deepEqual(resolved.ids, ["aaaaaaaaaaaaaaaaaaaaaaaa"]);
 });
 
+test("a saved id is stored in lowercase", () => {
+  const resolved = resolveArzenuSkipFarms({
+    [ARZENU_SKIP_FARM_FIELD]: ["AAAAAAAAAAAAAAAAAAAAAAAA", "BBBBBBBBBBBBBBBBBBBBBBBB"],
+  }, farms);
+  assert.equal(resolved.changed, true);
+  assert.deepEqual(resolved.ids, [
+    "aaaaaaaaaaaaaaaaaaaaaaaa",
+    "bbbbbbbbbbbbbbbbbbbbbbbb",
+  ]);
+});
+
 test("a deleted farm id stays and is not written again", () => {
   const deletedId = "999999999999999999999999";
   const resolved = resolveArzenuSkipFarms({

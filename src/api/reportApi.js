@@ -1,4 +1,4 @@
-import { apiRequest } from "@/api/base44Client";
+import { API_BASE_URL, apiRequest, getAuthToken } from "@/api/base44Client";
 
 /**
  * @typedef {object} ReportRangeParams
@@ -84,6 +84,41 @@ function joinList(values) {
 
 const BASE = "/api/reports";
 
+/**
+ * @param {string} path
+ * @param {string} filename
+ */
+async function downloadReportFile(path, filename) {
+  /** @type {Record<string, string>} */
+  const headers = {};
+  const token = getAuthToken();
+  if (token) headers.Authorization = `Bearer ${token}`;
+
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    credentials: "include",
+    headers,
+  });
+
+  if (!response.ok) {
+    let message = `Request failed: ${response.status}`;
+    try {
+      const payload = await response.json();
+      message = payload?.message || message;
+    } catch {
+      // The error response had no JSON body.
+    }
+    throw new Error(message);
+  }
+
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
 export const reportApi = {
   /**
    * @param {WorkByWorkplaceParams} params
@@ -134,6 +169,34 @@ export const reportApi = {
   arzenu({ startDate, endDate }) {
     return apiRequest(
       `${BASE}/arzenu${buildQuery({ startDate, endDate })}`,
+    );
+  },
+
+  /**
+   * @param {WorkByWorkplaceParams} params
+   * @param {string} filename
+   */
+  downloadWorkByWorkplace({ startDate, endDate, workplaces, farms }, filename) {
+    return downloadReportFile(
+      `${BASE}/work-by-workplace/export${buildQuery({
+        startDate,
+        endDate,
+        workplaces: joinList(workplaces),
+        farms: joinList(farms),
+        groupBy: "farm",
+      })}`,
+      filename,
+    );
+  },
+
+  /**
+   * @param {ReportRangeParams} params
+   * @param {string} filename
+   */
+  downloadArzenu({ startDate, endDate }, filename) {
+    return downloadReportFile(
+      `${BASE}/arzenu/export${buildQuery({ startDate, endDate })}`,
+      filename,
     );
   },
 };

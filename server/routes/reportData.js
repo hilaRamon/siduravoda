@@ -16,6 +16,11 @@ function requireReportAccess(req, res, next) {
 }
 
 router.get(
+  "/work-by-workplace/export",
+  requireReportAccess,
+  reportController.workByWorkplaceExport,
+);
+router.get(
   "/work-by-workplace",
   requireReportAccess,
   reportController.workByWorkplace,
@@ -26,6 +31,7 @@ router.get(
   requireReportAccess,
   reportController.studentAttendance,
 );
+router.get("/arzenu/export", requireReportAccess, reportController.arzenuExport);
 router.get("/arzenu", requireReportAccess, reportController.arzenu);
 
 export default router;

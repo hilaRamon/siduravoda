@@ -11,15 +11,22 @@ export function useWorkplaces() {
   });
   const farmsQuery = useFarms();
 
-  const farmNames = useMemo(() => {
-    const names = (farmsQuery.data ?? []).map((farm) => farm.name).filter(Boolean);
-    return [...names].sort((a, b) => a.localeCompare(b, "he"));
+  const farms = useMemo(() => {
+    return [...(farmsQuery.data ?? [])]
+      .filter((farm) => farm.id)
+      .sort((a, b) => (a.name || "").localeCompare(b.name || "", "he"));
   }, [farmsQuery.data]);
+
+  const farmNames = useMemo(
+    () => farms.map((farm) => farm.name).filter(Boolean),
+    [farms],
+  );
 
   return {
     ...query,
     isLoading: query.isLoading || farmsQuery.isLoading,
     workplaces: query.data ?? [],
+    farms,
     farmNames,
   };
 }
