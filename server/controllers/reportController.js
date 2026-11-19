@@ -1,5 +1,8 @@
 import {
+  buildArzenuWorkbook,
+  buildMonthlyWorkWorkbook,
   getArzenuReport,
+  getStudentAttendanceReport,
   getStudentWorkReport,
   getWorkByWorkplaceReport,
 } from "../services/reportService.js";
@@ -50,6 +53,39 @@ export async function workByWorkplace(req, res, next) {
   }
 }
 
+function sendWorkbook(res, buffer, filename) {
+  res.setHeader(
+    "Content-Type",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  );
+  res.setHeader(
+    "Content-Disposition",
+    `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`,
+  );
+  return res.send(buffer);
+}
+
+export async function workByWorkplaceExport(req, res, next) {
+  try {
+    const range = readDateRange(req.query);
+    if (range.error) {
+      return res.status(400).json({ message: range.error });
+    }
+
+    const result = await getWorkByWorkplaceReport({
+      startDate: range.startDate,
+      endDate: range.endDate,
+      workplaces: parseListParam(req.query.workplaces),
+      farms: parseListParam(req.query.farms),
+      groupBy: "farm",
+    });
+    const filename = `דוח_עבודה_חודשי_${range.startDate}_${range.endDate}.xlsx`;
+    return sendWorkbook(res, buildMonthlyWorkWorkbook(result), filename);
+  } catch (error) {
+    return next(error);
+  }
+}
+
 export async function studentWork(req, res, next) {
   try {
     const range = readDateRange(req.query);
@@ -58,6 +94,25 @@ export async function studentWork(req, res, next) {
     }
 
     const result = await getStudentWorkReport({
+      startDate: range.startDate,
+      endDate: range.endDate,
+      students: parseListParam(req.query.students),
+    });
+
+    return res.json(result);
+  } catch (error) {
+    return next(error);
+  }
+}
+
+export async function studentAttendance(req, res, next) {
+  try {
+    const range = readDateRange(req.query);
+    if (range.error) {
+      return res.status(400).json({ message: range.error });
+    }
+
+    const result = await getStudentAttendanceReport({
       startDate: range.startDate,
       endDate: range.endDate,
       students: parseListParam(req.query.students),
@@ -82,6 +137,24 @@ export async function arzenu(req, res, next) {
     });
 
     return res.json(result);
+  } catch (error) {
+    return next(error);
+  }
+}
+
+export async function arzenuExport(req, res, next) {
+  try {
+    const range = readDateRange(req.query);
+    if (range.error) {
+      return res.status(400).json({ message: range.error });
+    }
+
+    const result = await getArzenuReport({
+      startDate: range.startDate,
+      endDate: range.endDate,
+    });
+    const filename = `דוח_לארצנו_${range.startDate}_${range.endDate}.xlsx`;
+    return sendWorkbook(res, buildArzenuWorkbook(result.rows), filename);
   } catch (error) {
     return next(error);
   }

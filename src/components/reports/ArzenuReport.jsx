@@ -2,9 +2,20 @@ import { useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Loader2, FileSpreadsheet } from 'lucide-react';
 import { format, subMonths, startOfMonth, endOfMonth } from 'date-fns';
-import * as XLSX from 'xlsx';
+import { reportApi } from '@/api/reportApi';
 import { useArzenuReport } from '@/queries/reports/useArzenuReport';
-import { markWorkbookRtl } from '@/lib/excel';
+
+/**
+ * @typedef {object} ArzenuRow
+ * @property {string} date
+ * @property {string} name
+ * @property {string} workplace
+ */
+
+/**
+ * @typedef {object} ArzenuReportData
+ * @property {ArzenuRow[]} rows
+ */
 
 // Default range = the full previous calendar month relative to today.
 function previousMonthRange() {
@@ -22,30 +33,22 @@ export default function ArzenuReport() {
   const [exporting, setExporting] = useState(false);
 
   const { data, isLoading } = useArzenuReport({ startDate, endDate });
-  const rows = data?.rows ?? [];
+  const report = /** @type {ArzenuReportData | undefined} */ (data);
+  const rows = report?.rows ?? [];
 
+  /** @param {string} d */
   const formatDate = (d) => {
     const [y, m, day] = d.split('-');
     return `${day}/${m}/${y}`;
   };
 
-  const handleExportXLSX = () => {
+  const handleExportXLSX = async () => {
     setExporting(true);
     try {
-      const sheetData = rows.map((r) => ({
-        'תאריך': formatDate(r.date),
-        'שם': r.name,
-        'מקום עבודה': r.workplace,
-      }));
-      const ws = XLSX.utils.json_to_sheet(sheetData, {
-        header: ['תאריך', 'שם', 'מקום עבודה'],
-      });
-      ws['!cols'] = [{ wch: 14 }, { wch: 28 }, { wch: 28 }];
-
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, 'דוח לארצנו');
-      markWorkbookRtl(wb);
-      XLSX.writeFile(wb, `דוח_לארצנו_${startDate}_${endDate}.xlsx`);
+      await reportApi.downloadArzenu(
+        { startDate, endDate },
+        `דוח_לארצנו_${startDate}_${endDate}.xlsx`,
+      );
     } finally {
       setExporting(false);
     }

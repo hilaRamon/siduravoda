@@ -40,10 +40,16 @@ export default function DailyReportPDFButton({ date, assignments }) {
   const { data: published = [] } = usePublishedSchedules();
 
   const recordForDate = published.find((record) => record.date === date);
-  const isLiveForThisDate = Boolean(
-    recordForDate && isScheduleVisible(recordForDate.date),
+  // Public /schedule shows only the latest visible publish (same rule as getPublicSchedule).
+  const livePublic = published.find((record) =>
+    isScheduleVisible(record.date),
   );
-  const isSavedPending = Boolean(recordForDate && !isLiveForThisDate);
+  const isLiveForThisDate = Boolean(
+    livePublic && livePublic.date === date,
+  );
+  const isSavedPending = Boolean(
+    recordForDate && !isScheduleVisible(recordForDate.date),
+  );
   const visibleOnDate = getScheduleVisibleDate(date);
   const showToast = showPublishToast;
   const showStatus = !showToast && Boolean(recordForDate);

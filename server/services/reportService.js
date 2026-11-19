@@ -1,8 +1,15 @@
+import * as XLSX from "xlsx";
 import { getModel } from "../models/index.js";
 import Assignment from "../models/Assignment.js";
 import Farm from "../models/Farm.js";
 import Workplace from "../models/Workplace.js";
-import { SKIP_FARMS, SKIP_WORKPLACES } from "../lib/reportConstants.js";
+import { SKIP_WORKPLACES } from "../lib/reportConstants.js";
+import {
+  attendanceAbsentPercent,
+  classifyAttendanceWorkplace,
+  resolveAttendanceBuckets,
+} from "../lib/attendanceBuckets.js";
+import { canonicalFarmId, resolveArzenuSkipFarms } from "../lib/arzenuSkipFarms.js";
 import { primaryWorkNumberMatch } from "../lib/assignmentWorkNumber.js";
 import {
   calcAvgDailyUnits,
@@ -19,13 +26,13 @@ import {
   logisticsKey,
   pickCanonicalLogistics,
 } from "../lib/pieceworkLogistics.js";
+import { markWorkbookRtl } from "../lib/excel.js";
 
-async function getAppSettings() {
+async function findAppSettings() {
   const AppSettings = getModel("AppSettings");
-  const settings = await AppSettings.findOne()
+  return AppSettings.findOne()
     .sort({ updated_date: -1, created_date: -1 })
     .lean();
-  return normalizeAppSettings(settings);
 }
 
 async function listWorkplacesWithFarmName() {
@@ -39,25 +46,34 @@ async function listWorkplacesWithFarmName() {
       { name: farm.name || "", companyId: farm.company_id || "" },
     ]),
   );
-  return workplaces.map((workplace) => {
-    const farm = farmById.get(workplace.farm_id);
-    return {
-      id: workplace._id.toString(),
-      name: workplace.name || "",
-      farmName: farm?.name || "",
-      companyId: farm?.companyId || "",
-    };
-  });
+  return {
+    farms: farms.map((farm) => ({
+      id: farm._id.toString(),
+      name: farm.name || "",
+    })),
+    workplaces: workplaces.map((workplace) => {
+      const farmId = canonicalFarmId(workplace.farm_id);
+      const farm = farmById.get(farmId);
+      return {
+        id: workplace._id.toString(),
+        name: workplace.name || "",
+        farmId,
+        farmName: farm?.name || "",
+        companyId: farm?.companyId || "",
+      };
+    }),
+  };
 }
 
 async function getWorkByWorkplaceMaps() {
-  const workplaces = await listWorkplacesWithFarmName();
+  const { workplaces, farms } = await listWorkplacesWithFarmName();
   const byId = {};
   const skipIds = [];
 
   for (const workplace of workplaces) {
     byId[workplace.id] = {
       name: workplace.name,
+      farmId: workplace.farmId,
       farmName: workplace.farmName,
       companyId: workplace.companyId,
     };
@@ -66,7 +82,7 @@ async function getWorkByWorkplaceMaps() {
     }
   }
 
-  return { byId, skipIds };
+  return { byId, skipIds, farms };
 }
 
 async function getStudentWorkWorkplaceMaps() {
@@ -86,25 +102,36 @@ async function getStudentWorkWorkplaceMaps() {
   return { byId, skipIds };
 }
 
-async function getArzenuWorkplaceMaps() {
-  const workplaces = await listWorkplacesWithFarmName();
+async function getArzenuWorkplaceMaps(skipFarmIds) {
+  const { workplaces } = await listWorkplacesWithFarmName();
   const byId = {};
   const skipIds = [];
 
   for (const workplace of workplaces) {
     byId[workplace.id] = {
       name: workplace.name,
+      farmId: workplace.farmId,
       farmName: workplace.farmName,
     };
     if (
       SKIP_WORKPLACES.includes(workplace.name) ||
-      SKIP_FARMS.includes(workplace.farmName)
+      skipFarmIds.has(workplace.farmId)
     ) {
       skipIds.push(workplace.id);
     }
   }
 
   return { byId, skipIds };
+}
+
+async function persistAppSettings(settings, stored) {
+  const AppSettings = getModel("AppSettings");
+  if (settings?._id) {
+    await AppSettings.updateOne({ _id: settings._id }, { $set: stored });
+    return settings._id.toString();
+  }
+  const created = await AppSettings.create(stored);
+  return created._id.toString();
 }
 
 function resolveWorkByWorkplaceName(workplaceId, assignmentName, byId) {
@@ -212,21 +239,28 @@ function toWorkplaceGroups(rowBuckets) {
     .sort((a, b) => a.workplaceName.localeCompare(b.workplaceName, "he"));
 }
 
-function toFarmGroups(rowBuckets) {
+function toFarmGroups(rowBuckets, skipFarmIds = new Set()) {
   const farmBuckets = {};
 
   for (const wpGroup of Object.values(rowBuckets)) {
-    const farmName = wpGroup.farmName || wpGroup.workplaceName;
-    if (!farmBuckets[farmName]) {
-      farmBuckets[farmName] = {
-        farmName,
-        companyId: wpGroup.companyId || "",
+    const farmId = String(wpGroup.farmId || "").trim();
+    const key = farmId || `workplace:${wpGroup.workplaceId}`;
+    if (!farmBuckets[key]) {
+      farmBuckets[key] = {
+        id: key,
+        farmId,
+        farmName: farmId ? wpGroup.farmName || "" : wpGroup.workplaceName || "",
+        companyId: farmId ? wpGroup.companyId || "" : "",
+        excludedFromCharge: Boolean(farmId) && skipFarmIds.has(farmId),
         rows: [],
       };
-    } else if (!farmBuckets[farmName].companyId && wpGroup.companyId) {
-      farmBuckets[farmName].companyId = wpGroup.companyId;
+    } else if (farmId && !farmBuckets[key].companyId && wpGroup.companyId) {
+      farmBuckets[key].companyId = wpGroup.companyId;
     }
-    farmBuckets[farmName].rows.push(...wpGroup.rows);
+    if (farmId && !farmBuckets[key].farmName && wpGroup.farmName) {
+      farmBuckets[key].farmName = wpGroup.farmName;
+    }
+    farmBuckets[key].rows.push(...wpGroup.rows);
   }
 
   return Object.values(farmBuckets)
@@ -240,8 +274,11 @@ function toFarmGroups(rowBuckets) {
         return a.date.localeCompare(b.date);
       });
       return {
+        id: group.id,
+        farmId: group.farmId,
         farmName: group.farmName,
         companyId: group.companyId || "",
+        excludedFromCharge: group.excludedFromCharge,
         rows,
         totals: buildTotals(rows),
       };
@@ -251,13 +288,21 @@ function toFarmGroups(rowBuckets) {
 
 function shouldSkipArzenuAssignment(workplaceId, workplaceName, byId) {
   const info = byId[workplaceId];
-  if (info) {
-    return (
-      SKIP_WORKPLACES.includes(info.name) ||
-      SKIP_FARMS.includes(info.farmName)
-    );
-  }
+  if (info) return SKIP_WORKPLACES.includes(info.name);
   return SKIP_WORKPLACES.includes(workplaceName);
+}
+
+function emptyWorkReport(groupBy, pricingMethod) {
+  if (groupBy === "farm") {
+    return {
+      chargedGroups: [],
+      skipGroups: [],
+      chargeTotal: 0,
+      workplaceOptions: [],
+      pricingMethod,
+    };
+  }
+  return { groups: [], workplaceOptions: [], pricingMethod };
 }
 
 /**
@@ -270,19 +315,25 @@ export async function getWorkByWorkplaceReport({
   farms = [],
   groupBy = "workplace",
 }) {
-  const [appSettings, { byId, skipIds }] = await Promise.all([
-    getAppSettings(),
+  const [settingsDoc, { byId, skipIds, farms: farmRecords }] = await Promise.all([
+    findAppSettings(),
     getWorkByWorkplaceMaps(),
   ]);
+  const appSettings = normalizeAppSettings(settingsDoc);
+  const skipFarmIds =
+    groupBy === "farm"
+      ? new Set(resolveArzenuSkipFarms(settingsDoc, farmRecords).ids)
+      : new Set();
   const assignmentDefaults = getAssignmentDefaults(appSettings);
 
   let farmWorkplaceIds = null;
   if (farms.length > 0) {
+    const selectedFarms = new Set(farms.map((farmId) => canonicalFarmId(farmId)));
     farmWorkplaceIds = Object.entries(byId)
-      .filter(([, info]) => farms.includes(info.farmName))
+      .filter(([, info]) => selectedFarms.has(info.farmId))
       .map(([id]) => id);
     if (farmWorkplaceIds.length === 0) {
-      return { groups: [], workplaceOptions: [], pricingMethod: appSettings.pricing_method };
+      return emptyWorkReport(groupBy, appSettings.pricing_method);
     }
   }
 
@@ -429,7 +480,9 @@ export async function getWorkByWorkplaceReport({
 
     if (!rowBuckets[workplaceId]) {
       rowBuckets[workplaceId] = {
+        workplaceId,
         workplaceName,
+        farmId: byId[workplaceId]?.farmId || "",
         farmName: byId[workplaceId]?.farmName || "",
         companyId: byId[workplaceId]?.companyId || "",
         rows: [],
@@ -438,17 +491,28 @@ export async function getWorkByWorkplaceReport({
     rowBuckets[workplaceId].rows.push(row);
   }
 
-  const groups =
-    groupBy === "farm"
-      ? toFarmGroups(rowBuckets)
-      : toWorkplaceGroups(rowBuckets);
-
   const workplaceOptions = [...workplaceOptionsSet].sort((a, b) =>
     a.localeCompare(b, "he"),
   );
 
+  if (groupBy === "farm") {
+    const groups = toFarmGroups(rowBuckets, skipFarmIds);
+    const chargedGroups = groups.filter((group) => !group.excludedFromCharge);
+    const skipGroups = groups.filter((group) => group.excludedFromCharge);
+    const chargeTotal = round2(
+      chargedGroups.reduce((sum, group) => sum + (group.totals?.totalPrice || 0), 0),
+    );
+    return {
+      chargedGroups,
+      skipGroups,
+      chargeTotal,
+      workplaceOptions,
+      pricingMethod: appSettings.pricing_method,
+    };
+  }
+
   return {
-    groups,
+    groups: toWorkplaceGroups(rowBuckets),
     workplaceOptions,
     pricingMethod: appSettings.pricing_method,
   };
@@ -552,13 +616,133 @@ export async function getStudentWorkReport({
 }
 
 /**
+ * @param {{ startDate: string, endDate: string, students?: string[] }} params
+ */
+export async function getStudentAttendanceReport({
+  startDate,
+  endDate,
+  students = [],
+}) {
+  const [settings, workplaceDocs, activeStudents] = await Promise.all([
+    findAppSettings(),
+    Workplace.find().select("name").lean(),
+    studentRepository.find({ is_active: { $ne: false } }),
+  ]);
+  const studentById = {};
+  for (const student of activeStudents) {
+    if (!student?.id) continue;
+    studentById[student.id] = student.full_name || "";
+  }
+  const activeIds = Object.keys(studentById);
+  const countedIds = students.length > 0
+    ? students.filter((id) => Object.prototype.hasOwnProperty.call(studentById, id))
+    : activeIds;
+  const workplaceRecords = workplaceDocs.map((workplace) => ({
+    id: workplace._id.toString(),
+    name: workplace.name || "",
+  }));
+  const resolved = resolveAttendanceBuckets(settings, workplaceRecords);
+  const AppSettings = getModel("AppSettings");
+  let settingsId = settings?._id ? settings._id.toString() : null;
+  if (resolved.changed) {
+    if (settingsId) {
+      await AppSettings.updateOne({ _id: settings._id }, { $set: resolved.stored });
+    } else {
+      const created = await AppSettings.create(resolved.stored);
+      settingsId = created._id.toString();
+    }
+  }
+  const { buckets, notAssignedIds } = resolved;
+
+  if (countedIds.length === 0) {
+    return { students: [], buckets, settingsId };
+  }
+
+  const match = {
+    date: { $gte: startDate, $lte: endDate },
+    workplace_name: { $exists: true, $ne: "" },
+    student_id: { $in: countedIds },
+    ...primaryWorkNumberMatch(),
+  };
+
+  const rows = await Assignment.aggregate([
+    { $match: match },
+    { $sort: { updated_date: -1, created_date: -1 } },
+    {
+      $group: {
+        _id: { student_id: "$student_id", date: "$date" },
+        workplace_id: { $first: "$workplace_id" },
+        student_name: { $first: "$student_name" },
+      },
+    },
+  ]);
+
+  const studentBuckets = {};
+
+  for (const item of rows) {
+    const studentId = item._id.student_id;
+    const kind = classifyAttendanceWorkplace(
+      item.workplace_id,
+      buckets,
+      notAssignedIds,
+    );
+    if (!kind) continue;
+
+    if (!studentBuckets[studentId]) {
+      studentBuckets[studentId] = {
+        studentId,
+        name: resolveStudentName(studentId, item.student_name, studentById),
+        didNotLeave: 0,
+        didNotWork: 0,
+        studies: 0,
+        worked: 0,
+      };
+    }
+    studentBuckets[studentId][kind] += 1;
+  }
+
+  const result = Object.values(studentBuckets)
+    .map((student) => {
+      const assignedDays =
+        student.didNotLeave + student.didNotWork + student.studies + student.worked;
+      return {
+        ...student,
+        assignedDays,
+        absentPercent: attendanceAbsentPercent(
+          student.didNotLeave,
+          student.didNotWork,
+          assignedDays,
+        ),
+      };
+    })
+    .filter((student) => student.assignedDays > 0)
+    .sort((a, b) => a.name.localeCompare(b.name, "he"));
+
+  return {
+    students: result,
+    buckets,
+    settingsId,
+  };
+}
+
+/**
  * @param {{ startDate: string, endDate: string }} params
  */
 export async function getArzenuReport({ startDate, endDate }) {
-  const [{ byId: workplaceById, skipIds }, studentById] = await Promise.all([
-    getArzenuWorkplaceMaps(),
+  const [settings, farmDocs, studentById] = await Promise.all([
+    findAppSettings(),
+    Farm.find().select("name").lean(),
     getStudentMap(),
   ]);
+  const resolved = resolveArzenuSkipFarms(
+    settings,
+    farmDocs.map((farm) => ({ id: farm._id.toString(), name: farm.name || "" })),
+  );
+  if (resolved.changed) {
+    await persistAppSettings(settings, resolved.stored);
+  }
+  const skipFarmIds = new Set(resolved.ids);
+  const { byId: workplaceById, skipIds } = await getArzenuWorkplaceMaps(skipFarmIds);
 
   const match = {
     date: { $gte: startDate, $lte: endDate },
@@ -612,4 +796,87 @@ export async function getArzenuReport({ startDate, endDate }) {
   });
 
   return { rows, totalRows: rows.length };
+}
+
+function formatReportDate(value) {
+  const [year, month, day] = String(value || "").split("-");
+  if (!year || !month || !day) return value || "";
+  return `${day}/${month}/${year}`;
+}
+
+function displayCell(value) {
+  if (value == null || value === "") return "—";
+  return value;
+}
+
+function monthlySheetRows(groups) {
+  const rows = [];
+  for (const group of groups) {
+    for (const row of group.rows) {
+      rows.push({
+        משק: group.farmName,
+        "ח.פ": group.companyId || "",
+        תאריך: formatReportDate(row.date),
+        "מקום עבודה": row.workplaceName,
+        תעריף: displayCell(row.rate),
+        יחידה: row.unitName || "",
+        "סה״כ יחידות": displayCell(row.totalUnits),
+        מחיר: row.totalPrice,
+      });
+    }
+    rows.push({
+      משק: "",
+      "ח.פ": "",
+      תאריך: "",
+      "מקום עבודה": 'סה"כ',
+      תעריף: "",
+      יחידה: "",
+      "סה״כ יחידות": "",
+      מחיר: group.totals.totalPrice,
+    });
+    rows.push({});
+  }
+  return rows;
+}
+
+export function buildMonthlyWorkWorkbook({ chargedGroups = [], skipGroups = [], chargeTotal = 0 }) {
+  const chargedRows = monthlySheetRows(chargedGroups);
+  chargedRows.push({
+    משק: "",
+    "ח.פ": "",
+    תאריך: "",
+    "מקום עבודה": 'סה"כ חיוב',
+    תעריף: "",
+    יחידה: "",
+    "סה״כ יחידות": "",
+    מחיר: chargeTotal,
+  });
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(chargedRows), "דוח חודשי");
+  if (skipGroups.length > 0) {
+    XLSX.utils.book_append_sheet(
+      workbook,
+      XLSX.utils.json_to_sheet(monthlySheetRows(skipGroups)),
+      "מחוץ לחיוב",
+    );
+  }
+  markWorkbookRtl(workbook);
+  return XLSX.write(workbook, { bookType: "xlsx", type: "buffer" });
+}
+
+export function buildArzenuWorkbook(rows = []) {
+  const sheetRows = rows.map((row) => ({
+    תאריך: formatReportDate(row.date),
+    שם: row.name,
+    "מקום עבודה": row.workplace,
+  }));
+  const worksheet = XLSX.utils.json_to_sheet(
+    sheetRows.length > 0 ? sheetRows : [{ תאריך: "", שם: "", "מקום עבודה": "" }],
+    { header: ["תאריך", "שם", "מקום עבודה"] },
+  );
+  worksheet["!cols"] = [{ wch: 14 }, { wch: 28 }, { wch: 28 }];
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, "דוח לארצנו");
+  markWorkbookRtl(workbook);
+  return XLSX.write(workbook, { bookType: "xlsx", type: "buffer" });
 }

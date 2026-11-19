@@ -4,9 +4,16 @@ import { ReportContent } from "@/components/reports/dailyReportPdf";
 const TV_CONTENT_WIDTH = 1400;
 const TV_COLUMN_COUNT = 4;
 
+/**
+ * @typedef {import("@/components/reports/dailyReportPdf").ReportContentProps} ReportContentProps
+ */
+
+/**
+ * @param {{ snapshot: Pick<ReportContentProps, "reportGroups" | "gregDate" | "hebrewDate"> }} props
+ */
 export default function ScheduleScreenView({ snapshot }) {
-  const containerRef = useRef(null);
-  const contentRef = useRef(null);
+  const containerRef = useRef(/** @type {HTMLDivElement | null} */ (null));
+  const contentRef = useRef(/** @type {HTMLDivElement | null} */ (null));
   const [scale, setScale] = useState(1);
   const { reportGroups, gregDate, hebrewDate } = snapshot;
 
