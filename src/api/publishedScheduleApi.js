@@ -1,4 +1,5 @@
 import { apiRequest } from "@/api/base44Client";
+import { readScheduleAccessToken } from "@/lib/scheduleAccess";
 
 function buildQuery(params = {}) {
   const search = new URLSearchParams();
@@ -50,6 +51,16 @@ export const publishedScheduleApi = {
   },
 
   getPublic() {
-    return apiRequest("/api/public/schedule", { cache: "no-store" });
+    return apiRequest("/api/public/schedule", {
+      cache: "no-store",
+      headers: { "X-Schedule-Access": readScheduleAccessToken() },
+    });
+  },
+
+  unlock(password) {
+    return apiRequest("/api/public/schedule-access", {
+      method: "POST",
+      body: JSON.stringify({ password }),
+    });
   },
 };

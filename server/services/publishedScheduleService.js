@@ -1,5 +1,5 @@
 import { buildSort } from "../lib/query.js";
-import { isScheduleVisible } from "../lib/scheduleVisibility.js";
+import { getLatestVisibleScheduleDate } from "../lib/scheduleVisibility.js";
 import * as publishedScheduleRepository from "../repositories/publishedScheduleRepository.js";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -122,9 +122,9 @@ export async function deletePublishedSchedule(id) {
 }
 
 export async function getPublicSchedule(now = new Date()) {
-  const records = await publishedScheduleRepository.find(
-    {},
-    { sort: { date: -1 } },
-  );
-  return records.find((record) => isScheduleVisible(record.date, now)) || null;
+  const filter =
+    process.env.NODE_ENV === "production"
+      ? { date: { $lte: getLatestVisibleScheduleDate(now) } }
+      : {};
+  return publishedScheduleRepository.findLatest(filter);
 }

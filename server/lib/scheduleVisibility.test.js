@@ -4,6 +4,7 @@ import {
   formatDayMonth,
   getScheduleVisibleAt,
   getScheduleVisibleDate,
+  getLatestVisibleScheduleDate,
   isScheduleVisible,
 } from "./scheduleVisibility.js";
 
@@ -59,4 +60,30 @@ test("DST fall-back day: 16:00 Israel is after the 02:00 rollback (UTC+2)", () =
 
 test("formatDayMonth uses DD/MM", () => {
   assert.equal(formatDayMonth("2026-09-08"), "08/09");
+});
+
+test("before 16:00 Israel the latest visible schedule date is today", () => {
+  assert.equal(
+    getLatestVisibleScheduleDate(new Date("2026-07-14T12:59:59.000Z")),
+    "2026-07-14",
+  );
+  assert.equal(
+    getLatestVisibleScheduleDate(new Date("2026-01-14T13:59:59.000Z")),
+    "2026-01-14",
+  );
+});
+
+test("from 16:00 Israel the latest visible schedule date is tomorrow", () => {
+  assert.equal(
+    getLatestVisibleScheduleDate(new Date("2026-07-14T13:00:00.000Z")),
+    "2026-07-15",
+  );
+  assert.equal(
+    getLatestVisibleScheduleDate(new Date("2026-01-14T14:00:00.000Z")),
+    "2026-01-15",
+  );
+  assert.equal(
+    getLatestVisibleScheduleDate(new Date("2026-03-27T13:00:00.000Z")),
+    "2026-03-28",
+  );
 });

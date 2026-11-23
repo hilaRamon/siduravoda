@@ -52,7 +52,9 @@ The Express server lives in `server/` and exposes:
 - `POST /api/entities/:entityName/bulk`
 - `POST /api/integrations/core/upload-file` (authenticated)
 
-`GET /api/public/schedule` is public (for `/schedule`; no sign-in) and returns only a schedule that is already allowed to go live (16:00 Israel time the day before its date). Authenticated publish uses `/api/published-schedules`.
+`GET /api/public/schedule` serves `/schedule`. In production it returns only a schedule that is already allowed to go live (16:00 Israel time the day before its date). When `NODE_ENV` is not `production`, it returns the newest published schedule immediately. The route requires the `X-Schedule-Access` header. `POST /api/public/schedule-access` checks `SCHEDULE_PASSWORD` and returns that token. A wrong password is 401. If `SCHEDULE_PASSWORD` is missing, both routes return 503 and the schedule page stays closed. Authenticated publish uses `/api/published-schedules`.
+
+Set `SCHEDULE_PASSWORD` on the API service. Changing it signs out every device that chose "remember me".
 
 Uploaded PDFs are stored in the local `uploads/` directory and served back as static files.
 
@@ -113,6 +115,6 @@ The rewrite is included via `public/_redirects` (copied into `dist/` on build) a
 - Build command: `npm install && npm run build`
 - Start command: `npm start`
 - `CLIENT_ORIGIN=https://siduravoda.onrender.com` (no trailing slash)
-- `MONGODB_URI`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`, etc.
+- `MONGODB_URI`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `SCHEDULE_PASSWORD`, etc.
 
 Admin Tools links use the **frontend** origin (`window.location.origin`), so SPA rewrites must be configured on the static site — not only on the API server.

@@ -34,6 +34,8 @@ export function usePublicPublishedSchedule(options = {}) {
     refetchInterval: 30_000,
     refetchIntervalInBackground: true,
     refetchOnWindowFocus: true,
+    retry: (failureCount, error) =>
+      error?.status !== 401 && error?.status !== 503 && failureCount < 3,
     ...options,
   });
 }
