@@ -66,6 +66,27 @@ export function isScheduleVisible(dateStr, now = new Date()) {
   return now.getTime() >= getScheduleVisibleAt(dateStr).getTime();
 }
 
+function israelCalendarDate(instant) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: ISRAEL_TZ,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(instant);
+  const map = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${map.year}-${map.month}-${map.day}`;
+}
+
+/** Latest schedule date production may show at `now`. */
+export function getLatestVisibleScheduleDate(now = new Date()) {
+  const today = israelCalendarDate(now);
+  const releaseToday = zonedDateTimeToUtc(today, PUBLISH_HOUR, 0);
+  if (now.getTime() >= releaseToday.getTime()) {
+    return addCalendarDays(today, 1);
+  }
+  return today;
+}
+
 export function formatDayMonth(dateStr) {
   const [, month, day] = dateStr.split("-");
   return `${day}/${month}`;

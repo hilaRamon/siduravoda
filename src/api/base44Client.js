@@ -1,3 +1,5 @@
+import { readScheduleAccessToken } from "@/lib/scheduleAccess";
+
 /** @typedef {Error & { status?: number, data?: unknown }} ApiError */
 
 export const API_BASE_URL =
@@ -156,7 +158,10 @@ async function htmlToPdf({ html }) {
 export const base44 = {
   public: {
     getPublishedSchedule() {
-      return apiRequest("/api/public/schedule", { cache: "no-store" });
+      return apiRequest("/api/public/schedule", {
+        cache: "no-store",
+        headers: { "X-Schedule-Access": readScheduleAccessToken() },
+      });
     },
   },
   entities: {

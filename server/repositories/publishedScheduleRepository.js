@@ -20,6 +20,11 @@ export async function findByDate(date) {
   return toJson(doc);
 }
 
+export async function findLatest(filter = {}) {
+  const doc = await PublishedSchedule.findOne(filter).sort({ date: -1 });
+  return toJson(doc);
+}
+
 export async function find(filter = {}, { sort = { date: -1 }, limit } = {}) {
   let query = PublishedSchedule.find(filter).sort(sort);
   if (limit) query = query.limit(limit);
