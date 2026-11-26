@@ -13,6 +13,19 @@ import { markWorkbookRtl } from '@/lib/excel';
 import { farmApi } from '@/api/farmApi';
 import { workplaceApi } from '@/api/workplaceApi';
 import { workplaceLogisticsApi } from '@/api/workplaceLogisticsApi';
+import { transportationSummaryApi } from '@/api/transportationSummaryApi';
+
+function mapSummaryExportRow(row) {
+  return {
+    תאריך: row.date || '',
+    'סוג רכב': row.vehicle_name || '',
+    התייצבות: row.assembly || '',
+    יעד: row.destination || '',
+    'שעת יציאה': row.departure_time || '',
+    'שעת חזרה': row.return_time || '',
+    מקור: row.source === 'manual' ? 'ידני' : 'לוגיסטיקה',
+  };
+}
 
 function mapLogisticsExportRow(row) {
   return {
@@ -57,13 +70,14 @@ function workbookToBuffer(wb) {
 }
 
 async function buildAllWorkbooks() {
-  const [students, workplaces, farms, vehicles, assignments, logistics, settingsList] = await Promise.all([
+  const [students, workplaces, farms, vehicles, assignments, logistics, summaries, settingsList] = await Promise.all([
     studentApi.list({ sort: 'full_name', limit: 1000 }),
     workplaceApi.list({ sort: 'name', limit: 1000 }),
     farmApi.list({ sort: 'name', limit: 1000 }),
     vehicleApi.list({ sort: 'name', limit: 1000 }),
     assignmentApi.list({ sort: 'date', limit: 10000 }),
     workplaceLogisticsApi.list(),
+    transportationSummaryApi.list(),
     base44.entities.AppSettings.list(),
   ]);
   const appSettings = normalizeAppSettings(settingsList[0]);
@@ -85,7 +99,10 @@ async function buildAllWorkbooks() {
 
   // Vehicles
   const wsVehicles = XLSX.utils.json_to_sheet(vehicles.map(v => ({
-    'שם / מספר רכב': v.name || '', 'לוחית רישוי': v.license_plate || '', 'ביטוח': v.insurance || '',
+    'שם / מספר רכב': v.name || '',
+    'לוחית רישוי': v.license_plate || '',
+    'ביטוח': v.insurance || '',
+    'רכב הסעה': v.is_transportation ? 'כן' : 'לא',
   })));
   const wbVehicles = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wbVehicles, wsVehicles, 'רכבים');
@@ -103,12 +120,17 @@ async function buildAllWorkbooks() {
   const wbLogistics = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wbLogistics, wsLogistics, 'לוגיסטיקה');
 
+  const wsSummaries = XLSX.utils.json_to_sheet((summaries || []).map(mapSummaryExportRow));
+  const wbSummaries = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wbSummaries, wsSummaries, 'סיכום הסעות');
+
   return [
     { name: `גיבוי_תלמידים_${today}.xlsx`, wb: wbStudents },
     { name: `גיבוי_מקומות_עבודה_${today}.xlsx`, wb: wbWorkplaces },
     { name: `גיבוי_רכבים_${today}.xlsx`, wb: wbVehicles },
     { name: `גיבוי_שיבוצים_${today}.xlsx`, wb: wbAssignments },
     { name: `גיבוי_לוגיסטיקה_${today}.xlsx`, wb: wbLogistics },
+    { name: `גיבוי_סיכום_הסעות_${today}.xlsx`, wb: wbSummaries },
   ];
 }
 
@@ -146,6 +168,7 @@ async function exportVehicles() {
     'שם / מספר רכב': v.name || '',
     'לוחית רישוי': v.license_plate || '',
     'ביטוח': v.insurance || '',
+    'רכב הסעה': v.is_transportation ? 'כן' : 'לא',
   }));
   const ws = XLSX.utils.json_to_sheet(rows);
   const wb = XLSX.utils.book_new();
@@ -173,6 +196,14 @@ async function exportAssignments() {
   downloadWorkbook(wb, `גיבוי_שיבוצים_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
 }
 
+async function exportTransportationSummaries() {
+  const summaries = await transportationSummaryApi.list();
+  const ws = XLSX.utils.json_to_sheet((summaries || []).map(mapSummaryExportRow));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'סיכום הסעות');
+  downloadWorkbook(wb, `גיבוי_סיכום_הסעות_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
+}
+
 async function exportLogistics() {
   const logistics = await workplaceLogisticsApi.list();
   const ws = XLSX.utils.json_to_sheet((logistics || []).map(mapLogisticsExportRow));
@@ -197,7 +228,7 @@ const EXPORTS = [
   {
     key: 'vehicles',
     label: 'רכבים',
-    desc: 'שם רכב, לוחית רישוי, ביטוח',
+    desc: 'שם רכב, לוחית רישוי, ביטוח, רכב הסעה',
     fn: exportVehicles,
   },
   {
@@ -211,6 +242,12 @@ const EXPORTS = [
     label: 'לוגיסטיקה יומית',
     desc: 'תאריך, מקום עבודה, עבודת קבלנות, כמות, תעריף',
     fn: exportLogistics,
+  },
+  {
+    key: 'transportation',
+    label: 'סיכום הסעות',
+    desc: 'תאריך, רכב, התייצבות, יעד, שעת יציאה, שעת חזרה',
+    fn: exportTransportationSummaries,
   },
 ];
 

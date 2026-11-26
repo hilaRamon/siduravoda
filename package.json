@@ -12,6 +12,8 @@
     "seed:second-assignments": "node server/scripts/seed-second-assignments.js",
     "migrate:user-roles": "node server/scripts/migrate-user-roles.js",
     "migrate:farms": "node server/scripts/migrate-farms.js",
+    "backfill:transportation-summaries": "node server/scripts/backfill-transportation-summaries.js",
+    "mark:transportation-vehicles": "node server/scripts/mark-transportation-vehicles.js",
     "build": "vite build",
     "start": "node server/index.js",
     "lint": "eslint . --quiet",
@@ -19,7 +21,7 @@
     "typecheck": "tsc -p ./jsconfig.json",
     "dev:full": "node --watch server/index.js & vite",
     "preview": "vite preview",
-    "test": "node --test server/lib/pricing.test.js server/lib/scheduleVisibility.test.js server/lib/scheduleAccess.test.js server/lib/timeReportHours.test.js server/lib/assignmentWorkNumber.test.js server/lib/cloneWorkplaceDecision.test.js server/lib/pieceworkLogistics.test.js server/lib/attendanceBuckets.test.js server/lib/arzenuSkipFarms.test.js"
+    "test": "node --test server/lib/pricing.test.js server/lib/scheduleVisibility.test.js server/lib/scheduleAccess.test.js server/lib/timeReportHours.test.js server/lib/assignmentWorkNumber.test.js server/lib/cloneWorkplaceDecision.test.js server/lib/pieceworkLogistics.test.js server/lib/attendanceBuckets.test.js server/lib/arzenuSkipFarms.test.js server/lib/transportationSummary.test.js"
   },
   "dependencies": {
     "@base44/sdk": "^0.8.29",

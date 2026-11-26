@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from "react";
 import LogisticsSidebar from "@/components/assignments/LogisticsSidebar";
 import { useLogisticsByWorkplace } from "@/hooks/assignments/useLogisticsByWorkplace";
 import AssignmentsHeader from "@/components/assignments/AssignmentsHeader";
-import AssignmentsDateNav from "@/components/assignments/AssignmentsDateNav";
+import DailyDateNav from "@/components/DailyDateNav";
 import AssignmentsBulkToolbar from "@/components/assignments/AssignmentsBulkToolbar";
 import AssignmentsTable from "@/components/assignments/AssignmentsTable";
 import {
@@ -594,7 +594,7 @@ export default function Assignments() {
           }}
         />
 
-        <AssignmentsDateNav date={date} onDateChange={setDate} />
+        <DailyDateNav date={date} onDateChange={setDate} />
 
         <AssignmentsBulkToolbar
           selectedCount={selectedIds.size}

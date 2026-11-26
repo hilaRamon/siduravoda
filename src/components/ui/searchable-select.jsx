@@ -207,10 +207,13 @@ export function SearchableSelect({
               ) : null}
               {visibleItems.map((item) => {
                 const itemValue = getValue(item);
+                const searchLabel = getSearchText
+                  ? getSearchText(item)
+                  : getLabel(item);
                 return (
                   <CommandItem
                     key={String(itemValue)}
-                    value={`${itemValue} ${getLabel(item)}`}
+                    value={`${itemValue} ${typeof searchLabel === "string" ? searchLabel : ""}`}
                     onSelect={() => handleSelectItem(item)}
                     className={cn("cursor-pointer text-xs", itemClassName)}
                   >

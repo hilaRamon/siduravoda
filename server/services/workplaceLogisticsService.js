@@ -1,5 +1,6 @@
 import * as workplaceLogisticsRepository from "../repositories/workplaceLogisticsRepository.js";
 import { syncAssignmentsPieceworkForWorkplace } from "./assignmentService.js";
+import { ensureLogisticsSummaries } from "./transportationSummaryService.js";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const DEFAULT_EXIT_TIME = "06:35";
@@ -203,10 +204,12 @@ export async function createWorkplaceLogistics(body) {
       mergeCreateIntoExisting(existing, data),
     );
     await syncPieceworkAssignments(doc);
+    await ensureLogisticsSummaries(doc);
     return doc;
   }
   const doc = await workplaceLogisticsRepository.create(data);
   await syncPieceworkAssignments(doc);
+  await ensureLogisticsSummaries(doc);
   return doc;
 }
 
@@ -217,6 +220,7 @@ export async function updateWorkplaceLogistics(id, body) {
     throw new WorkplaceLogisticsError("Workplace logistics not found", 404);
   }
   await syncPieceworkAssignments(doc);
+  await ensureLogisticsSummaries(doc);
   return doc;
 }
 

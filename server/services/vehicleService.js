@@ -11,6 +11,16 @@ export class VehicleError extends Error {
   }
 }
 
+function parseBoolean(value) {
+  if (value === true || value === "true" || value === 1 || value === "1") {
+    return true;
+  }
+  if (value === false || value === "false" || value === 0 || value === "0") {
+    return false;
+  }
+  return Boolean(value);
+}
+
 function normalizeInput(body = {}, { partial = false } = {}) {
   const data = {};
 
@@ -26,6 +36,12 @@ function normalizeInput(body = {}, { partial = false } = {}) {
 
   for (const key of OPTIONAL_FIELDS) {
     if (body[key] !== undefined) data[key] = body[key];
+  }
+
+  if (body.is_transportation !== undefined) {
+    data.is_transportation = parseBoolean(body.is_transportation);
+  } else if (!partial) {
+    data.is_transportation = false;
   }
 
   return data;
