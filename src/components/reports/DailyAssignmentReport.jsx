@@ -7,9 +7,12 @@ import {
   buildLookupMaps,
   buildReportGroups,
   htmlToPdfBlob,
+} from "@/components/reports/dailyReportPdf";
+import {
   toGregDate,
   toHebrewDate,
-} from "@/components/reports/dailyReportPdf";
+  toHebrewWeekday,
+} from "@/lib/scheduleDates";
 import { useAssignments } from "@/queries/assignmentQueries";
 import { useStudents } from "@/queries/studentQueries";
 import { useWorkplaceLogisticsByDate } from "@/queries/workplaceLogisticsQueries";
@@ -37,6 +40,7 @@ export default function DailyAssignmentReport() {
 
   const gregDate = toGregDate(date);
   const hebrewDate = toHebrewDate(date);
+  const hebrewWeekday = toHebrewWeekday(date);
 
   const handleExportPDF = async () => {
     setExporting(true);
@@ -84,6 +88,7 @@ export default function DailyAssignmentReport() {
         reportGroups={reportGroups}
         gregDate={gregDate}
         hebrewDate={hebrewDate}
+        hebrewWeekday={hebrewWeekday}
         studentsMap={studentsMap}
       />
 
@@ -100,6 +105,7 @@ export default function DailyAssignmentReport() {
             reportGroups={reportGroups}
             gregDate={gregDate}
             hebrewDate={hebrewDate}
+            hebrewWeekday={hebrewWeekday}
             studentsMap={studentsMap}
             preview
           />

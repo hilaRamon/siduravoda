@@ -114,6 +114,7 @@ The rewrite is included via `public/_redirects` (copied into `dist/` on build) a
 
 - Build command: `npm install && npm run build`
 - Start command: `npm start`
+- `NODE_ENV=production`
 - `CLIENT_ORIGIN=https://siduravoda.onrender.com` (no trailing slash)
 - `MONGODB_URI`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `SCHEDULE_PASSWORD`, etc.
 

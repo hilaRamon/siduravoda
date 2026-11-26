@@ -8,6 +8,7 @@ import Farm from "../models/Farm.js";
 import Vehicle from "../models/Vehicle.js";
 import Workplace from "../models/Workplace.js";
 import WorkplaceLogistics from "../models/WorkplaceLogistics.js";
+import TransportationSummary from "../models/TransportationSummary.js";
 import { sendVerificationToRecipients, sendWeeklyBackupToRecipients } from "../lib/email.js";
 import {
   mapAssignmentExportRow,
@@ -35,13 +36,14 @@ function workbookToBuffer(wb) {
 async function loadBackupData() {
   const AppSettings = getModel("AppSettings");
 
-  const [students, workplaceDocs, farmDocs, vehicles, assignments, logistics, settingsDoc] = await Promise.all([
+  const [students, workplaceDocs, farmDocs, vehicles, assignments, logistics, summaries, settingsDoc] = await Promise.all([
     studentRepository.find({}, { sort: { full_name: 1 }, limit: 1000 }),
     Workplace.find().sort({ name: 1 }).limit(1000).lean(),
     Farm.find().sort({ name: 1 }).limit(1000).lean(),
     Vehicle.find().sort({ name: 1 }).limit(1000).lean(),
     Assignment.find().sort({ date: 1 }).lean(),
     WorkplaceLogistics.find().sort({ date: 1 }).lean(),
+    TransportationSummary.find().sort({ date: 1, departure_time: 1 }).limit(20000).lean(),
     AppSettings.findOne().sort({ updated_date: -1, created_date: -1 }).lean(),
   ]);
 
@@ -66,6 +68,7 @@ async function loadBackupData() {
     vehicles,
     assignments,
     logistics,
+    summaries,
     appSettings: normalizeAppSettings(settingsDoc),
   };
 }
@@ -75,7 +78,7 @@ function mapAssignmentRows(assignments, appSettings) {
 }
 
 function buildWorkbookFiles(data, exportDateStr) {
-  const { students, workplaces, vehicles, assignments, logistics, appSettings } = data;
+  const { students, workplaces, vehicles, assignments, logistics, summaries, appSettings } = data;
 
   const wsStudents = XLSX.utils.json_to_sheet(
     students.map((s) => ({
@@ -111,6 +114,7 @@ function buildWorkbookFiles(data, exportDateStr) {
       "שם / מספר רכב": v.name || "",
       "לוחית רישוי": v.license_plate || "",
       ביטוח: v.insurance || "",
+      "רכב הסעה": v.is_transportation === true ? "כן" : "לא",
     })),
   );
   const wbVehicles = XLSX.utils.book_new();
@@ -139,12 +143,30 @@ function buildWorkbookFiles(data, exportDateStr) {
   const wbLogistics = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wbLogistics, wsLogistics, "לוגיסטיקה");
 
+  const vehicleNameById = Object.fromEntries(
+    (vehicles || []).map((vehicle) => [String(vehicle._id), vehicle.name || ""]),
+  );
+  const wsSummaries = XLSX.utils.json_to_sheet(
+    (summaries || []).map((row) => ({
+      תאריך: row.date || "",
+      "סוג רכב": vehicleNameById[String(row.vehicle_id)] || "",
+      התייצבות: row.assembly || "",
+      יעד: row.destination || "",
+      "שעת יציאה": row.departure_time || "",
+      "שעת חזרה": row.return_time || "",
+      מקור: row.source === "manual" ? "ידני" : "לוגיסטיקה",
+    })),
+  );
+  const wbSummaries = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wbSummaries, wsSummaries, "סיכום הסעות");
+
   return [
     { name: `גיבוי_תלמידים_${exportDateStr}.xlsx`, buffer: workbookToBuffer(wbStudents) },
     { name: `גיבוי_מקומות_עבודה_${exportDateStr}.xlsx`, buffer: workbookToBuffer(wbWorkplaces) },
     { name: `גיבוי_רכבים_${exportDateStr}.xlsx`, buffer: workbookToBuffer(wbVehicles) },
     { name: `גיבוי_שיבוצים_${exportDateStr}.xlsx`, buffer: workbookToBuffer(wbAssignments) },
     { name: `גיבוי_לוגיסטיקה_${exportDateStr}.xlsx`, buffer: workbookToBuffer(wbLogistics) },
+    { name: `גיבוי_סיכום_הסעות_${exportDateStr}.xlsx`, buffer: workbookToBuffer(wbSummaries) },
   ];
 }
 

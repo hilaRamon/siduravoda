@@ -24,6 +24,7 @@ import workplaceLogisticsRouter from "./routes/workplaceLogistics.js";
 import vehiclesRouter from "./routes/vehicles.js";
 import farmsRouter from "./routes/farms.js";
 import workplacesRouter from "./routes/workplaces.js";
+import transportationSummariesRouter from "./routes/transportationSummaries.js";
 import { ensureAdminUser } from "./lib/bootstrap.js";
 import { migrateAssignmentWorkNumber } from "./lib/migrateAssignmentWorkNumber.js";
 import { migrateWorkplaceLogisticsUnique } from "./lib/migrateWorkplaceLogisticsUnique.js";
@@ -31,6 +32,10 @@ import { migrateLegacyUserRoles } from "./lib/migrateUserRoles.js";
 import { ensurePermissionRulesSeeded } from "./services/permissionRuleService.js";
 
 dotenv.config();
+
+if (!process.env.NODE_ENV) {
+  process.env.NODE_ENV = "development";
+}
 
 const app = express();
 app.set("trust proxy", true);
@@ -74,6 +79,7 @@ app.use("/api/workplace-logistics", workplaceLogisticsRouter);
 app.use("/api/vehicles", vehiclesRouter);
 app.use("/api/farms", farmsRouter);
 app.use("/api/workplaces", workplacesRouter);
+app.use("/api/transportation-summaries", transportationSummariesRouter);
 
 const distDir = path.resolve(process.cwd(), "dist");
 const hasFrontendBuild = fs.existsSync(path.join(distDir, "index.html"));
@@ -109,7 +115,9 @@ async function start() {
   await migrateLegacyUserRoles();
   await ensureAdminUser();
   app.listen(port, () => {
-    console.log(`Server listening on http://localhost:${port}`);
+    console.log(
+      `Server listening on http://localhost:${port} (${process.env.NODE_ENV})`,
+    );
     console.log(
       `Registered entities (${entityNames.length}): ${entityNames.join(", ")}`,
     );

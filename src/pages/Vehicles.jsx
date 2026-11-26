@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Plus, Pencil, Trash2, Upload } from 'lucide-react';
@@ -19,6 +20,7 @@ function VehicleFormModal({ vehicle, onSave, onClose }) {
     name: vehicle?.name || '',
     license_plate: vehicle?.license_plate || '',
     insurance: vehicle?.insurance || '',
+    is_transportation: vehicle?.is_transportation === true,
   });
 
   const handleSubmit = (e) => {
@@ -44,6 +46,16 @@ function VehicleFormModal({ vehicle, onSave, onClose }) {
           <div>
             <label className="text-xs font-medium text-muted-foreground mb-1 block">ביטוח</label>
             <Input value={form.insurance} onChange={e => setForm({ ...form, insurance: e.target.value })} />
+          </div>
+          <div className="flex items-center gap-2">
+            <Checkbox
+              id="is_transportation"
+              checked={form.is_transportation}
+              onCheckedChange={(checked) =>
+                setForm({ ...form, is_transportation: checked === true })
+              }
+            />
+            <label htmlFor="is_transportation" className="text-sm">רכב הסעה</label>
           </div>
           <div className="flex gap-2 justify-end pt-1">
             <Button type="button" variant="outline" onClick={onClose}>ביטול</Button>
@@ -118,14 +130,15 @@ export default function Vehicles() {
               <th className="px-4 py-3 text-right font-semibold text-muted-foreground text-xs">שם / מספר רכב</th>
               <th className="px-4 py-3 text-right font-semibold text-muted-foreground text-xs">לוחית רישוי</th>
               <th className="px-4 py-3 text-right font-semibold text-muted-foreground text-xs">ביטוח</th>
+              <th className="px-4 py-3 text-right font-semibold text-muted-foreground text-xs">רכב הסעה</th>
               <th className="px-4 py-3 w-20"></th>
             </tr>
           </thead>
           <tbody>
             {isLoading ? (
-              <tr><td colSpan={5} className="text-center py-10 text-muted-foreground">טוען...</td></tr>
+              <tr><td colSpan={6} className="text-center py-10 text-muted-foreground">טוען...</td></tr>
             ) : filtered.length === 0 ? (
-              <tr><td colSpan={5} className="text-center py-10 text-muted-foreground">אין רכבים</td></tr>
+              <tr><td colSpan={6} className="text-center py-10 text-muted-foreground">אין רכבים</td></tr>
             ) : (
               filtered.map((v, idx) => (
                 <tr key={v.id} className="hover:bg-secondary/20 transition-colors">
@@ -133,6 +146,7 @@ export default function Vehicles() {
                   <td className="px-4 py-3 font-medium">{v.name}</td>
                   <td className="px-4 py-3 text-muted-foreground">{v.license_plate || '—'}</td>
                   <td className="px-4 py-3 text-muted-foreground text-xs">{v.insurance || '—'}</td>
+                  <td className="px-4 py-3 text-muted-foreground text-xs">{v.is_transportation ? 'כן' : 'לא'}</td>
                   <td className="px-4 py-3">
                     <div className="flex gap-1 justify-end">
                       <button onClick={() => { setEditVehicle(v); setShowForm(true); }}

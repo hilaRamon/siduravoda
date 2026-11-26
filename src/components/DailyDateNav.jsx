@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
 import { addDays, format, subDays } from "date-fns";
 
-export default function AssignmentsDateNav({ date, onDateChange }) {
+export default function DailyDateNav({ date, onDateChange }) {
   const prevDay = () =>
     onDateChange(
       format(subDays(new Date(date + "T12:00:00"), 1), "yyyy-MM-dd"),
@@ -13,7 +13,7 @@ export default function AssignmentsDateNav({ date, onDateChange }) {
     );
 
   return (
-    <div className="flex items-center gap-3 mb-5">
+    <div className="flex items-center gap-3 mb-5 flex-wrap">
       <Button variant="outline" size="icon" onClick={prevDay}>
         <ChevronRight size={18} />
       </Button>

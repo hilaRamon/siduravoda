@@ -7,6 +7,7 @@ const vehicleSchema = new mongoose.Schema(
     license_plate: { type: String, trim: true },
     insurance: { type: String },
     notes: { type: String },
+    is_transportation: { type: Boolean, default: false },
   },
   baseSchemaOptions,
 );

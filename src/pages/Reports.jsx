@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { BarChart2, Users, UserCheck, FileSpreadsheet } from 'lucide-react';
+import { BarChart2, Users, UserCheck, FileSpreadsheet, Truck } from 'lucide-react';
 import PeriodicWorkReport from '@/components/reports/PeriodicWorkReport';
 import PeriodWorkReport from '@/components/reports/PeriodWorkReport';
 import StudentWorkReport from '@/components/reports/StudentWorkReport';
 import StudentAttendanceReport from '@/components/reports/StudentAttendanceReport';
 import ArzenuReport from '@/components/reports/ArzenuReport';
+import TransportationSummaryReport from '@/components/reports/TransportationSummary';
 
 export default function Reports() {
   const [activeTab, setActiveTab] = useState('periodic');
@@ -15,10 +16,11 @@ export default function Reports() {
     { key: 'student', label: 'דוח עבודת תלמיד', icon: Users },
     { key: 'attendance', label: 'דוח נוכחות תלמידים', icon: UserCheck },
     { key: 'arzenu', label: 'דוח לארצנו', icon: FileSpreadsheet },
+    { key: 'transportation', label: 'סיכום הסעות', icon: Truck },
   ];
 
   return (
-    <div className={`p-8 ${activeTab === 'attendance' ? 'max-w-7xl' : 'max-w-5xl'}`}>
+    <div className={`p-8 ${activeTab === 'attendance' || activeTab === 'transportation' ? 'max-w-7xl' : 'max-w-5xl'}`}>
       <div className="mb-6">
         <h2 className="text-2xl font-bold">דוחות</h2>
         <p className="text-muted-foreground mt-1">ייצוא ודוחות נתונים</p>
@@ -44,6 +46,7 @@ export default function Reports() {
       {activeTab === 'student' && <StudentWorkReport />}
       {activeTab === 'attendance' && <StudentAttendanceReport />}
       {activeTab === 'arzenu' && <ArzenuReport />}
+      {activeTab === 'transportation' && <TransportationSummaryReport />}
     </div>
   );
 }

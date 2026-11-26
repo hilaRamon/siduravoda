@@ -7,9 +7,12 @@ import {
   buildLookupMaps,
   buildReportGroups,
   htmlToPdfBlob,
+} from "@/components/reports/dailyReportPdf";
+import {
   toGregDate,
   toHebrewDate,
-} from "@/components/reports/dailyReportPdf";
+  toHebrewWeekday,
+} from "@/lib/scheduleDates";
 import {
   usePublishSchedule,
   usePublishedSchedules,
@@ -61,6 +64,7 @@ export default function DailyReportPDFButton({ date, assignments }) {
 
   const gregDate = toGregDate(date);
   const hebrewDate = toHebrewDate(date);
+  const hebrewWeekday = toHebrewWeekday(date);
   const reportGroups = buildReportGroups(assignments, logisticsMap, studentsMap);
 
   const handleExport = async () => {
@@ -88,7 +92,7 @@ export default function DailyReportPDFButton({ date, assignments }) {
       await publishSchedule.mutateAsync({
         date,
         file_url,
-        snapshot: { reportGroups, gregDate, hebrewDate },
+        snapshot: { reportGroups, gregDate, hebrewDate, hebrewWeekday },
       });
       const scheduled = !isScheduleVisible(date);
       setPublishWasScheduled(scheduled);
@@ -161,6 +165,7 @@ export default function DailyReportPDFButton({ date, assignments }) {
         reportGroups={reportGroups}
         gregDate={gregDate}
         hebrewDate={hebrewDate}
+        hebrewWeekday={hebrewWeekday}
         studentsMap={studentsMap}
       />
     </>
