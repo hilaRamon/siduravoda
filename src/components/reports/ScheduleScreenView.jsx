@@ -9,13 +9,13 @@ const TV_COLUMN_COUNT = 4;
  */
 
 /**
- * @param {{ snapshot: Pick<ReportContentProps, "reportGroups" | "gregDate" | "hebrewDate"> }} props
+ * @param {{ snapshot: Pick<ReportContentProps, "reportGroups" | "gregDate" | "hebrewDate" | "hebrewWeekday"> }} props
  */
 export default function ScheduleScreenView({ snapshot }) {
   const containerRef = useRef(/** @type {HTMLDivElement | null} */ (null));
   const contentRef = useRef(/** @type {HTMLDivElement | null} */ (null));
   const [scale, setScale] = useState(1);
-  const { reportGroups, gregDate, hebrewDate } = snapshot;
+  const { reportGroups, gregDate, hebrewDate, hebrewWeekday } = snapshot;
 
   const updateScale = useCallback(() => {
     const container = containerRef.current;
@@ -61,6 +61,7 @@ export default function ScheduleScreenView({ snapshot }) {
             reportGroups={reportGroups}
             gregDate={gregDate}
             hebrewDate={hebrewDate}
+            hebrewWeekday={hebrewWeekday}
           />
         </div>
       </div>

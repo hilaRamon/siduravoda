@@ -247,6 +247,12 @@ function lastWorkDayOnOrBefore(dateStr) {
   return dateStr;
 }
 
+function toHebrewWeekday(dateStr) {
+  return new Date(`${dateStr}T12:00:00`).toLocaleDateString("he-IL", {
+    weekday: "long",
+  });
+}
+
 function toGregDate(dateStr) {
   return new Date(`${dateStr}T12:00:00`).toLocaleDateString("he-IL", {
     day: "numeric",
@@ -338,6 +344,7 @@ function buildSnapshot(date, dayAssignments, logisticsDocs, studentDocs, vehicle
     reportGroups,
     gregDate: toGregDate(date),
     hebrewDate: toHebrewDate(date),
+    hebrewWeekday: toHebrewWeekday(date),
   };
 }
 

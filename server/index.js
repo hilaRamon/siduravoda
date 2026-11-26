@@ -33,6 +33,10 @@ import { ensurePermissionRulesSeeded } from "./services/permissionRuleService.js
 
 dotenv.config();
 
+if (!process.env.NODE_ENV) {
+  process.env.NODE_ENV = "development";
+}
+
 const app = express();
 app.set("trust proxy", true);
 const port = Number.parseInt(process.env.PORT || "4000", 10);
@@ -111,7 +115,9 @@ async function start() {
   await migrateLegacyUserRoles();
   await ensureAdminUser();
   app.listen(port, () => {
-    console.log(`Server listening on http://localhost:${port}`);
+    console.log(
+      `Server listening on http://localhost:${port} (${process.env.NODE_ENV})`,
+    );
     console.log(
       `Registered entities (${entityNames.length}): ${entityNames.join(", ")}`,
     );
